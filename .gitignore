@@ -1,0 +1,28 @@
+# Build output & compiled binaries
+build/
+bin/
+out/
+*.exe
+*.o
+*.obj
+*.pdb
+*.ilk
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+cmake-build-*/
+CMakePresets.json
+
+# IDE / Editor folders
+.vscode/
+.vs/
+.idea/
+*.sln
+*.vcxproj*
+
+# OS metadata
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store

@@ -1,0 +1,3 @@
+For our CGM lab project, we need to make something using OpenGL. 
+
+Read out project proposal from [CSE55_088_063_093_CGMLab_Project_Proposal.docx.pdf](file;file:///d%3A/GitHub/UITS/CGMLabProject_2DGame/doc/research/CSE55_088_063_093_CGMLab_Project_Proposal.docx.pdf) and the research done on related ideas from [Platformer%20Game%20Research%20Analysis.pdf](file;file:///d%3A/GitHub/UITS/CGMLabProject_2DGame/doc/research/Platformer%20Game%20Research%20Analysis.pdf) and implement the Phase 1 from [implementationSteps.pdf](file;file:///d%3A/GitHub/UITS/CGMLabProject_2DGame/doc/research/implementationSteps.pdf) .

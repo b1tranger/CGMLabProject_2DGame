@@ -1,0 +1,7 @@
+We need to build something for out CGM lab project. Our proposal was [CSE55_088_063_093_CGMLab_Project_Proposal.docx.pdf](file;file:///d%3A/GitHub/UITS/CGMLabProject_2DGame/doc/research/CSE55_088_063_093_CGMLab_Project_Proposal.docx.pdf) . And other related files are at [research](file;file:///d%3A/GitHub/UITS/CGMLabProject_2DGame/doc/research) . 
+
+First explain me what is the project about.
+
+Then create a Documenation in [doc](file;file:///d%3A/GitHub/UITS/CGMLabProject_2DGame/doc) for learning purpose with guided steps explained in simple language. The goal is to simplify the implementation process. 
+
+Also add a possible file structure for the project. 
