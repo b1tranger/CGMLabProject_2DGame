@@ -1,5 +1,7 @@
 # Build output & compiled binaries
-build/
+build/*
+!build/glfw3.dll
+!build/.gitkeep
 bin/
 out/
 *.exe
