@@ -46,7 +46,7 @@ public:
                 float animTimer, float daylightFactor, float twilightFactor,
                 unsigned int birdTex, unsigned int tilesetTex, unsigned int coinTex,
                 unsigned int shieldTex, unsigned int arrowTex, unsigned int sceneryTex,
-                float shieldTimerVal, const glm::vec2& playerRenderSize);
+                unsigned int spikesTex, float shieldTimerVal, const glm::vec2& playerRenderSize);
 
     const glm::vec2& getPlayerPos() const { return pos; }
     float getVelX() const { return velX; }

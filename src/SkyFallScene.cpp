@@ -265,7 +265,7 @@ void SkyFallScene::render(const glm::mat4& view, const glm::mat4& projection, co
                           float animTimer, float daylightFactor, float twilightFactor,
                           unsigned int birdTex, unsigned int tilesetTex, unsigned int coinTex,
                           unsigned int shieldTex, unsigned int arrowTex, unsigned int sceneryTex,
-                          float shieldTimerVal, const glm::vec2& playerRenderSize)
+                          unsigned int spikesTex, float shieldTimerVal, const glm::vec2& playerRenderSize)
 {
     // Celestial Stars in night sky
     if (daylightFactor < 0.75f) {
@@ -310,8 +310,12 @@ void SkyFallScene::render(const glm::mat4& view, const glm::mat4& projection, co
         glm::mat4 modelTrap = glm::mat4(1.0f);
         modelTrap = glm::translate(modelTrap, glm::vec3(trap.pos.x, trap.pos.y, 0.0f));
         modelTrap = glm::scale(modelTrap, glm::vec3(1.3f, 1.3f, 1.0f));
-        glm::vec4 trapUV = getTilesetUV(4, 8);
-        gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f, 0.35f, 0.35f, 1.0f), (tilesetTex != 0), trapUV, tilesetTex);
+        if (spikesTex != 0) {
+            gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f), true, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), spikesTex);
+        } else {
+            glm::vec4 trapUV = getTilesetUV(4, 8);
+            gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f, 0.35f, 0.35f, 1.0f), (tilesetTex != 0), trapUV, tilesetTex);
+        }
     }
 
     // 3. Render Moving Birds (Flapping Raptor Asset)

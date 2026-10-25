@@ -36,9 +36,10 @@ mingw32-make package
 ```
 
 ### Controls
+- **`J` / `X` / `Left Mouse Click`**: **Sword Slash Attack** — Swing katana to defeat Bringer of Death (1 hit), Initial Slime (2 hits), and Demon Slime Boss (5 hits)!
 - **`F`**: **Toggle Free Exploration Mode** — Disables continuous autonomous running! Walk and sprint with precision using `A` and `D`, rest in idle breathing stance when stationary, and hold position on ladders unless pressing `W`/`S`. Press `F` again to re-engage auto-runner mode.
 - **`Space` / `Esc` / `Enter` (During Intro)**: **Skip Intro Video** — Immediately interrupt the opening cinematic and advance to game spawn.
-- **`Left Shift`**: **Dash Movement** — High-speed burst with ghost trail afterimages and spike hazard invulnerability!
+- **`Left Shift`**: **Dash Movement** — High-speed burst with ghost trail afterimages and spike/hazard invulnerability!
 - **`Space` / `W` / `Up Arrow`**: Jump across gaps and over spiky traps, or latch on and climb upward inside ladder shafts
 - **`S` / `Down Arrow`**: Drop down through one-way platforms or descend into underground ladder shafts
 - **`A` / `Left Arrow`**: Run left (in Ladder Climb: leap to left ladder track; in Sky-Fall: aerial steer left)
@@ -49,6 +50,11 @@ mingw32-make package
 - **`T`**: Toggle autonomous direction shifts (`ENABLED` timer shifts every 6.5s <-> `DISABLED` direction relics only)
 - **`R`**: Quick restart run (when paused or after Game Over)
 - **`Q`**: Quit game to desktop (from Pause Menu or Game Over screen)
+- **3-Lives Health System & Heart Relics**: The player possesses 3 life pips displayed on the HUD. Collect ruby heart relics (spawned alongside shields) to restore lost lives, or gain +150 bonus overheal points.
+- **Roaming Enemies & Boss Fight**:
+  - **Bringer of Death**: Roaming scythe-wielding wraith. Defeat in **1 hit** before it cleaves you!
+  - **Initial Slime & Boss Demon Slime**: Defeating the green slime in **2 hits** triggers a 3.2-second transformation into the massive Boss Demon Slime. Slay the boss in **5 hits** or avoid it by sprinting away in the opposite direction ($>28\text{m}$) or dashing through it to despawn!
+- **Procedural Metallic Spikes**: Traps look like razor-sharp steel spikes with hazard red bases, replacing old pumpkin tiles.
 - **Mini-Game Scene Exits**: Mini-game scenes (3-Ladder Climbing and Sky-Fall Diving) can strictly **only** be exited by collecting Direction Arrow Relics (which unlock and spawn after the 15-second survival trial) or by taking an obstacle hit (resurrecting back on the main platformer). Manual scene switching via key presses is disabled.
 - **Underground Ladder Shafts**: Approach any underground ladder shaft from the surface and press `S` or `Down Arrow` to smoothly latch on and climb down into the subterranean caverns.
 - **Idle Stance at Start**: The Samurai starts in a grounded idle breathing stance upon game launch and restart until directional movement keys (`A`, `D`) or `Space` are pressed.
@@ -73,6 +79,63 @@ mingw32-make package
 ---
 
 ## 📜 Version History (Changelog)
+
+### [v0.6.6] - 2026-10-25 (Updated Slime Animations & Boss Demon Slime Platform Jump Mechanics)
+- **Updated Slime Animation Spritesheets**:
+  - Converted the updated initial slime GIF assets from `assets/enemies/boss_demon_slime/initial_slime/` into horizontal transparent PNG spritesheets: `slime_idle.png` (6 frames), `slime_move.png` (8 frames), `slime_take_hit.png` (6 frames), and `slime_transform.png` (33 frames).
+  - Updated OpenGL engine frame calculations to support the 33-frame transformation sequence.
+- **Boss Demon Slime Platform Jumping (`06_Smash.gif` Integration)**:
+  - Extracted and assembled `06_Smash.gif` into `assets/enemies/demon_smash.png` (18 frames at $576\times 320$).
+  - Added `ENEMY_STATE_JUMP` state machine and `jumpCooldown` timer to Boss Demon Slime.
+  - Implemented multi-phase platform jumping behavior:
+    - **Crouch Charge (Frames 0–4)**: Boss gathers dark power on current platform.
+    - **Leap Launch (Frame 5)**: Ballistic jump trajectory towards the player ($v_y = 11.0$–$14.5\text{ m/s}$, $v_x = 3.5$–$8.5\text{ m/s}$).
+    - **Airborne Flight & Dynamic Platform Landing (Frames 5–9)**: Boss experiences platformer gravity and evaluates solid tile collisions across `gameWorld.tiles`, snapping feet smoothly onto elevated or lower platform tiers.
+    - **Ground Slam & Shockwave Impact (Frames 10–16)**: Smashes the ground with impact SFX, floating text, and a localized frontal shockwave damaging players who fail to dodge.
+    - **Recovery (Frame 17)**: Recovers into patrol stance with a 3.2s jump cooldown.
+  - Autonomous AI triggers jumps when encountering platform gaps/chasms, pursuing players on elevated platforms, or closing mid-range distances.
+- **Standalone Package Update**: Re-compiled and packaged `TheWenderer_Standalone.zip` with the updated binary and enemy assets.
+
+### [v0.6.5] - 2026-10-25 (Directional Attack Commitment: Locked Boss Demon Slime & Bringer of Death Facing Direction)
+- **Boss Attack Directional Commitment (Zero Mid-Attack Spinning)**:
+  - Fixed an issue where the Demon Slime Boss (and Bringer of Death) continually updated their facing direction based on `distX < 0.0f` on every frame, even mid-swing, causing them to unnaturally flip $180^\circ$ mid-animation if the player jumped or dashed behind them.
+  - Locked `enemy.facingLeft` at the start of the attack animation: while `enemy.state == ENEMY_STATE_ATTACK`, facing direction updates are suppressed.
+- **Frontal Impact Damage Validation**:
+  - Cleave and shockwave damage now strictly requires the player to be physically situated in front of the attacking enemy: `playerInFront = (enemy.facingLeft && distX <= 0.4f) || (!enemy.facingLeft && distX >= -0.4f)`.
+  - Dashing or jumping behind the boss during its telegraph wind-up now cleanly evades the attack.
+
+### [v0.6.4] - 2026-10-25 (Fixed Enemy Facing Direction, Metallic Katana Slash SFX, Guaranteed Tutorial Window & Idle Stillness on Restart)
+- **Enemy Facing Direction Correction (Eliminated Moonwalking)**:
+  - Corrected horizontal UV flip calculation for enemy sprite sheets (`bod_walk.png`, `slime_move.png`, `demon_walk.png`), which natively face **LEFT** in raw texture space.
+  - Setting `flipHorizontal = !enemy.facingLeft` renders un-flipped textures when walking left and flipped textures when moving right, ensuring Bringer of Death always faces and walks forward.
+- **Realistic Procedural Katana Sword Slash SFX**:
+  - Overhauled `SFX_SLASH` in [`src/Audio.cpp`](/src/Audio.cpp) to synthesize a sharp, resonant Japanese katana sword slash combining an aerodynamic whoosh (descending 2400 Hz to 320 Hz exponential sweep) with multi-frequency steel ring harmonics (3250 Hz, 4950 Hz, 1920 Hz) and a sharp cutting transient bite.
+- **Guaranteed Post-Intro Tutorial Window Modal**:
+  - Fixed race condition where holding or pressing `Space`, `Enter`, or `Esc` to finish or skip the intro video immediately dismissed the tutorial window on the subsequent frame.
+  - Initialized `tutDismissLast = true` upon video skip/completion, strictly requiring the player to release and freshly press a key to dismiss the tutorial guide.
+  - Froze gameplay simulation (`deltaTime = 0.0f`) while `showTutorialModal` is active so no enemies or hazards can advance while reading the tutorial.
+- **Grounded Idle Stillness on Tutorial Dismiss & Game Over Restart**:
+  - Ensured player remains completely motionless (`playerVel = (0, 0)`, `isGameIdleAtStart = true`) upon tutorial dismissal and upon Game Over restart.
+  - Guarded Game Over input with `gameOverRestartLast` and prevented `Space` from registering as jump on the restart frame.
+  - Preserved idle stance until directional navigation keys (`A`, `D`, `Left`, `Right`) are deliberately pressed, allowing the player full control over when to start running.
+
+### [v0.6.3] - 2026-10-25 (Calibrated Enemy Proportions, Speeds, Platform Grounding & Telegraphed Attack Wind-Ups)
+- **Enemy Quad Aspect Ratios & Proportional Rendering**:
+  - **Bringer of Death**: Scaled render quad from square `(4.8, 4.8)` to true 1.5:1 aspect ratio `(4.5, 3.0)` matching $140\times 93$ pixels, fully eliminating vertical stretching.
+  - **Initial Slime**: Scaled render quad from `(2.4, 2.4)` to `(4.5, 2.5)` (1.8:1 aspect ratio matching $576\times 320$ pixels), making it visibly prominent, clear, and perfectly proportioned.
+  - **Boss Demon Slime**: Scaled render quad to true 1.8:1 aspect ratio `(10.8, 6.0)` matching $288\times 160$ pixels.
+- **Platform Grounding & Ledge Boundary Safety**:
+  - Added [`World::hasSolidGroundAt`](/src/World.cpp) to verify solid ground beneath feet. Procedural spawning verifies positions are not in chasms or ladder shafts.
+  - Raised enemy vertical center offsets so feet touch ground levels ($Y = 0.0\text{m}$ surface, $Y = -4.0\text{m}$ cavern).
+  - Added forward ledge detection in AI: patrolling enemies reverse at edges and chasing enemies halt at ledges rather than walking off platforms and floating in mid-air.
+- **Pacing & Speed Calibration**:
+  - Bringer of Death: patrol at $1.0\text{m/s}$, chase at $1.3\text{m/s}$ (down from $2.2\text{m/s}$).
+  - Slime: wander at $0.75\text{m/s}$, approach at $0.9\text{m/s}$ (down from $1.5\text{m/s}$).
+  - Boss Demon Slime: approach at $0.9\text{m/s}$ (down from $1.8\text{m/s}$).
+- **Telegraphed Attack Wind-Up Animations**:
+  - Bringer of Death pauses movement and raises scythe for $0.75\text{s}$ (frames 0-5 at 8 fps) with overhead red alert `"[ ! ]"` before cleave impact lands on frames 6-7.
+  - Boss Demon Slime removed instant walking contact damage. Telegraphed cleave attack plays $1.125\text{s}$ wind-up (frames 0-8 at 8 fps) with overhead alert `"[ ! ] DODGE!"` before ground slam shockwave strikes on frames 9-11.
+  - Standardized `enemy.animTimer` accumulation in seconds, eliminating compounded 10x double-multiplication glitch.
 
 ### [v0.5.15] - 2026-10-25 (Ladder Hero Scale Fix, Post-Intro Tutorial Modal, Shield Icon Pickups & Scene Exit Timers)
 - **Ladder Climb Hero Scale Restored**: Fixed missing matrix scale transformation on `modelHero` in `SCENE_LADDER_CLIMB`, scaling the climbing Samurai Mack sprite by `playerRenderSize` ($5.5\times 5.5$) to match runner and sky-fall proportions.

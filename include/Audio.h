@@ -7,11 +7,18 @@
 class AudioManager {
 public:
     AudioManager();
-    ~AudioManager() = default;
+    ~AudioManager();
 
     void init();
     void play(SFXType type);
     void updateCooldowns(float deltaTime);
+
+    // Boss & transformation sequenced audio
+    void playSlimeDeathSplat();
+    void playAcidBubbling();
+    void playMonsterRoar();
+    void playSmashLandingBang();
+    void stopTransformationAudio();
 
     float stepCooldown;
     float climbCooldown;

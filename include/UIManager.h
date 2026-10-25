@@ -37,12 +37,16 @@ public:
                                  unsigned int coinTex, unsigned int shieldTex);
 
     void renderScoreHUD(float halfW, float halfH, int totalScore, int coins, float distance,
-                        float shieldTimer, int frameCount, unsigned int coinTex);
+                        float shieldTimer, int playerLives, int frameCount,
+                        unsigned int coinTex, unsigned int heartTex);
+    void renderEnemyHealthBars(const glm::mat4& view, const glm::mat4& projection,
+                               const std::vector<EnemyEntity>& enemies, float animTimer);
     void renderTrialBadge(float halfW, float halfH, float timeLeft, float totalTime, float animTimer);
     void renderStartHintBanner(float halfW, float halfH, float animTimer);
 
     void renderPauseMenu(float halfW, float halfH, int totalScore, int coins, int relics, float distance,
-                         bool freeExploration, int activeScenery, bool isNight, float timeLeftInPhase);
+                         bool freeExploration, int activeScenery, bool isNight, float timeLeftInPhase,
+                         bool autoShiftEnabled = true);
     void renderTutorialModal(float halfW, float halfH, bool openedFromPause);
     void renderGameOver(float halfW, float halfH, const std::string& reason,
                         int totalScore, int coins, float distance);

@@ -21,6 +21,24 @@ bool World::checkCollision(const glm::vec2& posA, const glm::vec2& sizeA,
     return overlapX && overlapY;
 }
 
+bool World::hasSolidGroundAt(float x, float y, float toleranceY) const {
+    for (const auto& tile : tiles) {
+        if (tile.isLadder) continue;
+        float halfW = tile.size.x * 0.5f;
+        float halfH = tile.size.y * 0.5f;
+        if (x >= tile.pos.x - halfW && x <= tile.pos.x + halfW) {
+            float tileTop = tile.pos.y + halfH;
+            if (std::abs(tileTop - y) <= toleranceY) {
+                return true;
+            }
+        }
+    }
+    if (std::abs((BEDROCK_Y + 0.5f) - y) <= toleranceY) {
+        return true;
+    }
+    return false;
+}
+
 void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentTheme theme) {
     const float TILE_SIZE = 1.0f;
 
@@ -195,29 +213,37 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
             }
 
             if (withRelic) {
+                // If withRelic is true, spawn a Direction Arrow relic
                 DirectionRelic relic;
-                relic.pos = glm::vec2(px + (length * 0.4f) * TILE_SIZE, py + 1.25f);
+                relic.pos = glm::vec2(px + (length * 0.5f) * TILE_SIZE, py + 1.25f);
                 relic.animPhase = 0.0f;
-                // Give distinct directional arrows
                 RunDirection dirs[] = { DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN };
                 relic.targetDir = dirs[std::rand() % 4];
                 relic.collected = false;
                 relics.push_back(relic);
-
-                // Spawn a Fruit Shield pickup providing 10s temporary invulnerability
-                FruitShield fruit;
-                fruit.pos = glm::vec2(px + (length * 0.75f) * TILE_SIZE, py + 1.25f);
-                fruit.animPhase = 0.5f;
-                fruit.fruitType = std::rand() % 4;
-                fruit.collected = false;
-                fruits.push_back(fruit);
             }
         };
 
-        // 1. LEFT SIDE STARTING PLATFORMS (Immediate exploration running left from spawn x=0):
+        // 1. LEFT SIDE STARTING PLATFORMS (Exploration running left from spawn x=0):
         spawnPlatform(-8.0f, 1.8f, 5, false, false);               // Low tier jump
-        spawnPlatform(-16.0f, 3.0f, 6, true, true);                // Mid tier with ladder & relic
-        spawnPlatform(-24.0f, 5.2f, 6, true, true);                // Sky canopy tier with ladder & relic
+        spawnPlatform(-16.0f, 3.0f, 6, true, true);                // Mid tier with ladder & direction relic
+        spawnPlatform(-24.0f, 5.2f, 6, true, false);               // Sky canopy tier with ladder
+
+        // Shield & Heart pickups on upper sky tier, far away from direction change relics
+        {
+            FruitShield fruit;
+            fruit.pos = glm::vec2(-23.0f, 6.45f);
+            fruit.animPhase = 0.0f;
+            fruit.fruitType = 0;
+            fruit.collected = false;
+            fruits.push_back(fruit);
+
+            HeartPickup heart;
+            heart.pos = glm::vec2(-20.5f, 6.45f);
+            heart.animPhase = 0.5f;
+            heart.collected = false;
+            hearts.push_back(heart);
+        }
 
         // Underground Cavern Shaft on the Left:
         {
@@ -245,7 +271,23 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
         // 2. RIGHT SIDE STARTING PLATFORMS:
         spawnPlatform(4.0f, 1.8f, 5, false, false);
         spawnPlatform(12.0f, 3.0f, 6, true, true);
-        spawnPlatform(21.0f, 5.2f, 7, true, true);
+        spawnPlatform(21.0f, 5.2f, 7, true, false);
+
+        // Shield & Heart pickups on upper sky tier, away from direction relics
+        {
+            FruitShield fruit;
+            fruit.pos = glm::vec2(22.0f, 6.45f);
+            fruit.animPhase = 0.0f;
+            fruit.fruitType = 1;
+            fruit.collected = false;
+            fruits.push_back(fruit);
+
+            HeartPickup heart;
+            heart.pos = glm::vec2(24.5f, 6.45f);
+            heart.animPhase = 0.5f;
+            heart.collected = false;
+            hearts.push_back(heart);
+        }
 
         // Underground Cavern Shaft on the Right:
         {
@@ -351,8 +393,10 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
                 }
             }
 
-            // Direction Arrow Relic on elevated perch
+            // 1. Direction Arrow Relic on elevated perch
+            bool hasDirectionRelic = false;
             if (platY > 4.5f || (std::rand() % 3 == 0)) {
+                hasDirectionRelic = true;
                 DirectionRelic relic;
                 relic.pos = glm::vec2(curX + (platLen * 0.5f) * TILE_SIZE, platY + 1.35f);
                 relic.animPhase = static_cast<float>(std::rand() % 100) / 10.0f;
@@ -362,14 +406,33 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
                 relics.push_back(relic);
             }
 
-            // Fruit Shield pickup (grants 10s temporary shield)
-            if (std::rand() % 2 == 0) {
+            // 2. Shield pickups spawn LESS FREQUENTLY, and AWAY from direction change relics!
+            // Plus Heart-shaped relics beside the shield relic!
+            if (!hasDirectionRelic && (std::rand() % 5 == 0)) {
                 FruitShield fruit;
-                fruit.pos = glm::vec2(curX + (platLen * 0.25f) * TILE_SIZE, platY + 1.35f);
+                fruit.pos = glm::vec2(curX + (platLen * 0.35f) * TILE_SIZE, platY + 1.35f);
                 fruit.animPhase = static_cast<float>(std::rand() % 100) / 10.0f;
                 fruit.fruitType = std::rand() % 4;
                 fruit.collected = false;
                 fruits.push_back(fruit);
+
+                // Add Heart relic beside the shield relic to restore lives!
+                HeartPickup heart;
+                heart.pos = glm::vec2(curX + (platLen * 0.65f) * TILE_SIZE, platY + 1.35f);
+                heart.animPhase = static_cast<float>(std::rand() % 100) / 10.0f;
+                heart.collected = false;
+                hearts.push_back(heart);
+            }
+            // 3. Platform Spike Traps in groups (clusters of 2 to 4 spikes)
+            else if (!hasDirectionRelic && platLen >= 4 && platY <= 3.5f && (std::rand() % 3 == 0)) {
+                int groupSize = std::min(platLen - 2, 2 + (std::rand() % 3)); // 2 to 4 spikes
+                int startIdx = 1 + (std::rand() % (platLen - groupSize));
+                for (int s = 0; s < groupSize; ++s) {
+                    SpikeTrap spike;
+                    spike.pos = glm::vec2(curX + (startIdx + s + 0.5f) * TILE_SIZE, platY + 0.62f);
+                    spike.size = glm::vec2(0.85f, 0.7f);
+                    spikes.push_back(spike);
+                }
             }
 
             // Upward Ladder Shaft connecting Surface up to Sky Canopy Tier!
@@ -426,6 +489,112 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
 
         curX += (platLen * TILE_SIZE) + 4.0f;
     }
+
+    // 6. Spawn Roaming Enemies in non-initial chunks (Multiple enemies with increased frequency):
+    if (!isInitial) {
+        // Bringer of Death (1 to 3 spawns per chunk):
+        int numBod = 1 + (std::rand() % 3);
+        for (int b = 0; b < numBod; ++b) {
+            bool inCavern = (std::rand() % 3 == 0);
+            float footY = inCavern ? (CAVERN_FLOOR_Y + 0.5f) : (SURFACE_GROUND_Y + 0.5f);
+            float spawnY = footY + 1.45f;
+
+            // Search for candidate locations on solid ground away from chasms/shafts
+            for (int attempt = 0; attempt < 12; ++attempt) {
+                float candX = startX + 3.0f + static_cast<float>(std::rand() % static_cast<int>(std::max(4.0f, endX - startX - 6.0f)));
+                if (!inCavern && (isInsideChasm(candX - 1.8f) || isInsideChasm(candX) || isInsideChasm(candX + 1.8f))) {
+                    continue;
+                }
+                if (isUndergroundShaft(candX - 1.4f) || isUndergroundShaft(candX) || isUndergroundShaft(candX + 1.4f)) {
+                    continue;
+                }
+                if (!hasSolidGroundAt(candX, footY, 0.35f)) {
+                    continue;
+                }
+
+                // Check distance from already spawned enemies
+                bool tooClose = false;
+                for (const auto& existing : enemies) {
+                    if (std::abs(existing.pos.x - candX) < 3.5f && std::abs(existing.pos.y - spawnY) < 1.5f) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (tooClose) continue;
+
+                EnemyEntity bod;
+                bod.type = ENEMY_BRINGER_OF_DEATH;
+                bod.state = ENEMY_STATE_PATROL;
+                bod.pos = glm::vec2(candX, spawnY);
+                bod.size = glm::vec2(1.6f, 2.6f);
+                bod.vel = glm::vec2((std::rand() % 2 == 0) ? -1.0f : 1.0f, 0.0f);
+                bod.hp = 1;
+                bod.maxHp = 1;
+                bod.facingLeft = (bod.vel.x < 0.0f);
+                bod.animTimer = static_cast<float>(std::rand() % 10) * 0.1f;
+                bod.stateTimer = 0.0f;
+                bod.attackCooldown = 0.5f + static_cast<float>(std::rand() % 15) * 0.1f;
+                bod.jumpCooldown = 0.0f;
+                bod.spellCooldown = 1.5f + static_cast<float>(std::rand() % 25) * 0.1f;
+                bod.hurtTimer = 0.0f;
+                bod.active = true;
+                bod.hasHitPlayerThisAttack = false;
+                enemies.push_back(bod);
+                break;
+            }
+        }
+
+        // Initial Slime (60% chance to spawn 1 or 2 per chunk):
+        if (std::rand() % 10 < 6) {
+            int numSlimes = 1 + (std::rand() % 2);
+            for (int s = 0; s < numSlimes; ++s) {
+                float footY = SURFACE_GROUND_Y + 0.5f;
+                float spawnY = footY + 1.2f;
+
+                for (int attempt = 0; attempt < 12; ++attempt) {
+                    float candX = startX + 4.0f + static_cast<float>(std::rand() % static_cast<int>(std::max(4.0f, endX - startX - 8.0f)));
+                    if (isInsideChasm(candX - 1.8f) || isInsideChasm(candX) || isInsideChasm(candX + 1.8f)) {
+                        continue;
+                    }
+                    if (isUndergroundShaft(candX - 1.4f) || isUndergroundShaft(candX) || isUndergroundShaft(candX + 1.4f)) {
+                        continue;
+                    }
+                    if (!hasSolidGroundAt(candX, footY, 0.35f)) {
+                        continue;
+                    }
+
+                    bool tooClose = false;
+                    for (const auto& existing : enemies) {
+                        if (std::abs(existing.pos.x - candX) < 3.0f && std::abs(existing.pos.y - spawnY) < 1.5f) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (tooClose) continue;
+
+                    EnemyEntity slime;
+                    slime.type = ENEMY_SLIME_INITIAL;
+                    slime.state = ENEMY_STATE_PATROL;
+                    slime.pos = glm::vec2(candX, spawnY);
+                    slime.size = glm::vec2(1.8f, 1.4f);
+                    slime.vel = glm::vec2((std::rand() % 2 == 0) ? -0.75f : 0.75f, 0.0f);
+                    slime.hp = 2;
+                    slime.maxHp = 2;
+                    slime.facingLeft = (slime.vel.x < 0.0f);
+                    slime.animTimer = static_cast<float>(std::rand() % 10) * 0.1f;
+                    slime.stateTimer = 0.0f;
+                    slime.attackCooldown = 0.0f;
+                    slime.jumpCooldown = 0.0f;
+                    slime.spellCooldown = 0.0f;
+                    slime.hurtTimer = 0.0f;
+                    slime.active = true;
+                    slime.hasHitPlayerThisAttack = false;
+                    enemies.push_back(slime);
+                    break;
+                }
+            }
+        }
+    }
 }
 
 void World::updateProcedural(float playerX, EnvironmentTheme activeTheme) {
@@ -456,8 +625,14 @@ void World::updateProcedural(float playerX, EnvironmentTheme activeTheme) {
     fruits.erase(std::remove_if(fruits.begin(), fruits.end(),
         [playerX](const FruitShield& f) { return std::abs(f.pos.x - playerX) > 85.0f; }), fruits.end());
 
+    hearts.erase(std::remove_if(hearts.begin(), hearts.end(),
+        [playerX](const HeartPickup& h) { return std::abs(h.pos.x - playerX) > 85.0f; }), hearts.end());
+
     coins.erase(std::remove_if(coins.begin(), coins.end(),
         [playerX](const AnimatedCoin& c) { return std::abs(c.pos.x - playerX) > 85.0f; }), coins.end());
+
+    enemies.erase(std::remove_if(enemies.begin(), enemies.end(),
+        [playerX](const EnemyEntity& e) { return !e.active || std::abs(e.pos.x - playerX) > 85.0f; }), enemies.end());
 
     // Keep leftGenEdge and rightGenEdge tightly bounded to active tile presence so reversing never encounters voids!
     if (leftGenEdge < playerX - 80.0f) {
@@ -501,7 +676,9 @@ void World::reset(EnvironmentTheme initialTheme) {
     spikes.clear();
     relics.clear();
     fruits.clear();
+    hearts.clear();
     coins.clear();
+    enemies.clear();
 
     rightGenEdge = 35.0f;
     leftGenEdge  = -25.0f;

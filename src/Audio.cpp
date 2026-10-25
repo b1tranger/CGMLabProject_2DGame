@@ -11,6 +11,41 @@ AudioManager audioMgr;
 AudioManager::AudioManager()
     : stepCooldown(0.0f), climbCooldown(0.0f), slideCooldown(0.0f) {}
 
+AudioManager::~AudioManager() {
+    stopTransformationAudio();
+}
+
+void AudioManager::playSlimeDeathSplat() {
+    mciSendStringA("close sfx_splat", NULL, 0, NULL);
+    mciSendStringA("open \"assets/enemies/boss_demon_slime/universfield-wet-splat-impact-567197.mp3\" type mpegvideo alias sfx_splat", NULL, 0, NULL);
+    mciSendStringA("play sfx_splat from 0", NULL, 0, NULL);
+}
+
+void AudioManager::playAcidBubbling() {
+    mciSendStringA("close sfx_bubbling", NULL, 0, NULL);
+    mciSendStringA("open \"assets/enemies/boss_demon_slime/freesound_community-acid-bubbling-105397.mp3\" type mpegvideo alias sfx_bubbling", NULL, 0, NULL);
+    mciSendStringA("play sfx_bubbling from 0", NULL, 0, NULL);
+}
+
+void AudioManager::playMonsterRoar() {
+    mciSendStringA("close sfx_roar", NULL, 0, NULL);
+    mciSendStringA("open \"assets/enemies/boss_demon_slime/audiopapkin-monster-roar-ps-o24-333057.mp3\" type mpegvideo alias sfx_roar", NULL, 0, NULL);
+    mciSendStringA("play sfx_roar from 0", NULL, 0, NULL);
+}
+
+void AudioManager::playSmashLandingBang() {
+    mciSendStringA("close sfx_bang", NULL, 0, NULL);
+    mciSendStringA("open \"assets/enemies/boss_demon_slime/dragon-studio-distant-bang-472364.mp3\" type mpegvideo alias sfx_bang", NULL, 0, NULL);
+    mciSendStringA("play sfx_bang from 0", NULL, 0, NULL);
+}
+
+void AudioManager::stopTransformationAudio() {
+    mciSendStringA("close sfx_splat", NULL, 0, NULL);
+    mciSendStringA("close sfx_bubbling", NULL, 0, NULL);
+    mciSendStringA("close sfx_roar", NULL, 0, NULL);
+    mciSendStringA("close sfx_bang", NULL, 0, NULL);
+}
+
 std::vector<uint8_t> AudioManager::buildWav(const std::vector<int16_t>& samples, int sampleRate) {
     uint32_t dataSize = static_cast<uint32_t>(samples.size() * sizeof(int16_t));
     uint32_t totalSize = 36 + dataSize;
@@ -170,6 +205,152 @@ void AudioManager::init() {
             samples[i] = static_cast<int16_t>(s * 19000.0f);
         }
         sfxBuffers[SFX_DEATH] = buildWav(samples, sr);
+    }
+
+    // 9. SFX_SLASH: Crisp, metallic Katana Sword Slash (Steel blade cutting air + high metallic ring)
+    {
+        int count = static_cast<int>(sr * 0.20f); // 200ms duration
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count; // 0.0 -> 1.0
+            float timeSec = (float)i / sr;
+
+            // 1. Blade whoosh envelope: swift rise in first 20ms, then exponential tail
+            float whooshEnv = (t < 0.12f) ? (t / 0.12f) : std::pow(1.0f - (t - 0.12f) / 0.88f, 1.6f);
+
+            // 2. Frequency sweep: swift aerodynamic cut descending from 2400 Hz down to 320 Hz
+            float whooshFreq = 2400.0f * std::exp(-timeSec * 18.0f) + 320.0f;
+            float whooshTone = std::sin(2.0f * PI * whooshFreq * timeSec);
+
+            // Band-passed white noise for the cutting air whip
+            float whiteNoise = ((float)(std::rand() % 2000) - 1000.0f) / 1000.0f;
+            float airCut = (whiteNoise * 0.65f + whooshTone * 0.35f) * whooshEnv;
+
+            // 3. Metallic Steel Blade "Shing" Resonance: dual high harmonic pings ringing out
+            float metalEnv = std::exp(-timeSec * 15.0f); // fast metallic ring decay
+            float ring1 = std::sin(2.0f * PI * 3250.0f * timeSec);
+            float ring2 = std::sin(2.0f * PI * 4950.0f * timeSec);
+            float ring3 = std::sin(2.0f * PI * 1920.0f * timeSec);
+            float steelRing = (ring1 * 0.45f + ring2 * 0.35f + ring3 * 0.20f) * metalEnv;
+
+            // 4. Initial sharp cutting transient at the apex
+            float transientEnv = (t > 0.03f && t < 0.15f) ? std::sin((t - 0.03f) / 0.12f * PI) : 0.0f;
+            float bladeBite = std::sin(2.0f * PI * 1350.0f * timeSec) * transientEnv * 0.45f;
+
+            // Combined sword slash soundwave
+            float s = (airCut * 0.55f + steelRing * 0.35f + bladeBite * 0.20f);
+            s = std::max(-1.0f, std::min(1.0f, s * 1.35f));
+            samples[i] = static_cast<int16_t>(s * 22000.0f);
+        }
+        sfxBuffers[SFX_SLASH] = buildWav(samples, sr);
+    }
+
+    // 10. SFX_ENEMY_HIT: Blade striking flesh / armour
+    {
+        int count = static_cast<int>(sr * 0.14f);
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float env = (1.0f - t) * (1.0f - t);
+            float freq = 320.0f - (t * 180.0f);
+            float noise = ((float)(std::rand() % 1000) - 500.0f) / 500.0f;
+            float tone = std::sin(2.0f * PI * freq * ((float)i / sr));
+            float s = (tone * 0.55f + noise * 0.55f) * env;
+            samples[i] = static_cast<int16_t>(s * 19500.0f);
+        }
+        sfxBuffers[SFX_ENEMY_HIT] = buildWav(samples, sr);
+    }
+
+    // 11. SFX_ENEMY_ATTACK: Bringer of Death scythe cleave
+    {
+        int count = static_cast<int>(sr * 0.22f);
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float env = std::sin(t * PI);
+            float freq = 180.0f - (t * 60.0f);
+            float noise = ((float)(std::rand() % 1000) - 500.0f) / 500.0f;
+            float tone = std::sin(2.0f * PI * freq * ((float)i / sr));
+            float s = (tone * 0.4f + noise * 0.6f) * env;
+            samples[i] = static_cast<int16_t>(s * 18500.0f);
+        }
+        sfxBuffers[SFX_ENEMY_ATTACK] = buildWav(samples, sr);
+    }
+
+    // 12. SFX_ENEMY_DEATH: Bringer of Death shadowy dissipation
+    {
+        int count = static_cast<int>(sr * 0.35f);
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float env = (1.0f - t);
+            float freq = 140.0f - (t * 90.0f);
+            float noise = ((float)(std::rand() % 1000) - 500.0f) / 500.0f;
+            float tone = std::sin(2.0f * PI * freq * ((float)i / sr));
+            float s = (tone * 0.5f + noise * 0.5f) * env;
+            samples[i] = static_cast<int16_t>(s * 18000.0f);
+        }
+        sfxBuffers[SFX_ENEMY_DEATH] = buildWav(samples, sr);
+    }
+
+    // 13. SFX_SLIME_BOUNCE: Squishy cartoon slime jump
+    {
+        int count = static_cast<int>(sr * 0.16f);
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float env = (1.0f - t);
+            float freq = 200.0f + std::sin(t * PI * 4.0f) * 80.0f + (t * 120.0f);
+            float tone = std::sin(2.0f * PI * freq * ((float)i / sr));
+            samples[i] = static_cast<int16_t>(tone * env * 17000.0f);
+        }
+        sfxBuffers[SFX_SLIME_BOUNCE] = buildWav(samples, sr);
+    }
+
+    // 14. SFX_BOSS_ROAR: Demonic low-pitch transformation roar
+    {
+        int count = static_cast<int>(sr * 0.60f);
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float env = std::sin(t * PI);
+            float freq = 85.0f + std::sin(t * 18.0f) * 20.0f;
+            float noise = ((float)(std::rand() % 1000) - 500.0f) / 500.0f;
+            float tone = std::sin(2.0f * PI * freq * ((float)i / sr));
+            float s = (tone * 0.6f + noise * 0.4f) * env;
+            samples[i] = static_cast<int16_t>(s * 21000.0f);
+        }
+        sfxBuffers[SFX_BOSS_ROAR] = buildWav(samples, sr);
+    }
+
+    // 15. SFX_BOSS_ATTACK: Heavy demon cleave strike
+    {
+        int count = static_cast<int>(sr * 0.30f);
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float env = (1.0f - t);
+            float freq = 120.0f - (t * 70.0f);
+            float noise = ((float)(std::rand() % 1000) - 500.0f) / 500.0f;
+            float tone = std::sin(2.0f * PI * freq * ((float)i / sr));
+            float s = (tone * 0.5f + noise * 0.5f) * env;
+            samples[i] = static_cast<int16_t>(s * 22000.0f);
+        }
+        sfxBuffers[SFX_BOSS_ATTACK] = buildWav(samples, sr);
+    }
+
+    // 16. SFX_HEART_PICKUP: Harmonic life restoration chime
+    {
+        int count = static_cast<int>(sr * 0.28f);
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float env = (1.0f - t);
+            float freq = (t < 0.33f) ? 523.25f : ((t < 0.66f) ? 659.25f : 783.99f); // C5 - E5 - G5
+            float tone = std::sin(2.0f * PI * freq * ((float)i / sr));
+            samples[i] = static_cast<int16_t>(tone * env * 17500.0f);
+        }
+        sfxBuffers[SFX_HEART_PICKUP] = buildWav(samples, sr);
     }
 }
 

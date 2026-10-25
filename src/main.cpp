@@ -39,15 +39,45 @@ bool freeExplorationMode = false; // Toggle with 'F' key: allows full manual exp
 bool showTutorialModal        = false; // Tutorial window active
 bool hasShownInitialTutorial  = false; // Ensures tutorial appears only once after launch
 bool tutorialOpenedFromPause  = false; // Tracks if opened via [T] inside Pause Menu
+bool tutDismissLast           = false; // Prevents accidental key dismiss bleed-through
 float exitAppearedBannerTimer = 0.0f;  // Pulsing banner timer when mini-game exit unlocks
+
+// Player Lives & Combat State
+int playerLives            = 3; // 3 hits before death, restored by heart pickups
+bool isAttacking           = false;
+float attackAnimTimer      = 0.0f;
+bool attackDamageDealt     = false;
 
 // World & Object Textures
 unsigned int worldTilesetTexture     = 0;
 unsigned int platformsTexture        = 0;
 unsigned int coinTexture             = 0;
 unsigned int fruitTexture            = 0; // Shield pickup icon texture
+unsigned int heartTexture            = 0; // Heart pickup icon texture
+unsigned int spikesTexture           = 0; // Spikes hazard texture
 unsigned int birdTexture             = 0;
 unsigned int directionArrowsTexture = 0;
+
+// Enemy Textures (Bringer of Death)
+unsigned int texBodWalk   = 0;
+unsigned int texBodAttack = 0;
+unsigned int texBodDeath  = 0;
+unsigned int texBodHurt   = 0;
+unsigned int texBodIdle   = 0;
+
+// Boss Demon Slime Textures
+unsigned int texDemonIdle    = 0;
+unsigned int texDemonWalk    = 0;
+unsigned int texDemonAttack  = 0;
+unsigned int texDemonTakeHit = 0;
+unsigned int texDemonDeath   = 0;
+unsigned int texDemonSmash   = 0;
+
+// Initial Slime Textures
+unsigned int texSlimeIdle      = 0;
+unsigned int texSlimeMove      = 0;
+unsigned int texSlimeTakeHit   = 0;
+unsigned int texSlimeTransform = 0;
 
 // Player State
 glm::vec2 playerPos(0.0f, SURFACE_GROUND_Y + 1.2f);
@@ -356,6 +386,10 @@ void resetGame()
     gameOverReason = "";
     shieldTimer = 0.0f;
     postHitInvulnTimer = 0.0f;
+    playerLives = 3;
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    attackDamageDealt = false;
     freeExplorationMode = false;
 
     currentDirection  = DIR_RIGHT;
@@ -448,8 +482,29 @@ int main()
     platformsTexture       = gameRenderer.loadTexture("assets/platforms.png");
     coinTexture            = gameRenderer.loadTexture("assets/coin.png");
     fruitTexture           = gameRenderer.loadTexture("assets/shield_pickup.png");
+    heartTexture           = gameRenderer.loadTexture("assets/heart_pickup.png");
+    spikesTexture          = gameRenderer.loadTexture("assets/spikes.png");
     birdTexture            = gameRenderer.loadTexture("assets/bird.png");
     directionArrowsTexture = gameRenderer.loadTexture("assets/direction_arrows.png");
+
+    // Load Enemies Textures
+    texBodWalk   = gameRenderer.loadTexture("assets/enemies/bod_walk.png");
+    texBodAttack = gameRenderer.loadTexture("assets/enemies/bod_attack.png");
+    texBodDeath  = gameRenderer.loadTexture("assets/enemies/bod_death.png");
+    texBodHurt   = gameRenderer.loadTexture("assets/enemies/bod_hurt.png");
+    texBodIdle   = gameRenderer.loadTexture("assets/enemies/bod_idle.png");
+
+    texDemonIdle    = gameRenderer.loadTexture("assets/enemies/demon_idle.png");
+    texDemonWalk    = gameRenderer.loadTexture("assets/enemies/demon_walk.png");
+    texDemonAttack  = gameRenderer.loadTexture("assets/enemies/demon_attack.png");
+    texDemonTakeHit = gameRenderer.loadTexture("assets/enemies/demon_take_hit.png");
+    texDemonDeath   = gameRenderer.loadTexture("assets/enemies/demon_death.png");
+    texDemonSmash   = gameRenderer.loadTexture("assets/enemies/demon_smash.png");
+
+    texSlimeIdle      = gameRenderer.loadTexture("assets/enemies/slime_idle.png");
+    texSlimeMove      = gameRenderer.loadTexture("assets/enemies/slime_move.png");
+    texSlimeTakeHit   = gameRenderer.loadTexture("assets/enemies/slime_take_hit.png");
+    texSlimeTransform = gameRenderer.loadTexture("assets/enemies/slime_transform.png");
 
     // Load 4 Thematic Background Scenery Textures
     texScenery[SCENERY_SILVERGRASS] = gameRenderer.loadTexture("assets/scenery_silvergrass.png");
@@ -502,7 +557,7 @@ int main()
 
         if (rawDeltaTime > 0.06f) rawDeltaTime = 0.06f;
 
-        float deltaTime = (currentGameState == STATE_PAUSED) ? 0.0f : rawDeltaTime;
+        float deltaTime = (currentGameState == STATE_PAUSED || showTutorialModal) ? 0.0f : rawDeltaTime;
         if (transitionPhaseTimer > 0.0f && currentGameState == STATE_RUNNING) {
             transitionPhaseTimer -= rawDeltaTime;
             if (transitionPhaseTimer > transitionPhaseMax * 0.5f) {
@@ -616,10 +671,12 @@ int main()
                 introVideoPlayer.close();
                 currentGameState = STATE_RUNNING;
                 isGameIdleAtStart = true;
+                playerVel = glm::vec2(0.0f, 0.0f);
                 if (!hasShownInitialTutorial) {
                     showTutorialModal = true;
                     hasShownInitialTutorial = true;
                     tutorialOpenedFromPause = false;
+                    tutDismissLast = true;
                 }
             } else {
                 glClearColor(0.02f, 0.02f, 0.03f, 1.0f);
@@ -1024,9 +1081,20 @@ int main()
                                                        glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
                                 break;
                             } else {
-                                currentGameState = STATE_GAME_OVER;
-                                gameOverReason = "IMPALED BY SPIKY TRAP";
-                                audioMgr.play(SFX_DEATH);
+                                playerLives--;
+                                postHitInvulnTimer = 1.25f;
+                                audioMgr.play(SFX_ENEMY_HIT);
+                                if (playerLives <= 0) {
+                                    currentGameState = STATE_GAME_OVER;
+                                    gameOverReason = "IMPALED BY SPIKY TRAP";
+                                    audioMgr.play(SFX_DEATH);
+                                } else {
+                                    spawnFloatingText("LIFE LOST! (" + std::to_string(playerLives) + "/3)", playerPos + glm::vec2(0.0f, 1.2f),
+                                                      glm::vec4(1.0f, 0.25f, 0.25f, 1.0f), 0.28f, 0.40f, 2.0f, 1.3f);
+                                    showCornerNotification("DAMAGE", "SPIKE DAMAGE TAKEN!",
+                                                           "Remaining Lives: " + std::to_string(playerLives) + "/3",
+                                                           glm::vec4(1.0f, 0.3f, 0.3f, 1.0f), 0);
+                                }
                                 break;
                             }
                         }
@@ -1068,6 +1136,31 @@ int main()
                     fruit.animPhase += deltaTime * 3.5f;
                 }
 
+                // 6c. Heart Pickups (Restores 1 Life pip up to 3)
+                for (auto& heart : gameWorld.hearts)
+                {
+                    if (!heart.collected && gameWorld.checkCollision(playerPos, playerHitbox, heart.pos, glm::vec2(1.1f, 1.1f)))
+                    {
+                        heart.collected = true;
+                        audioMgr.play(SFX_HEART_PICKUP);
+                        if (playerLives < 3) {
+                            playerLives++;
+                            showCornerNotification("HEART", "+1 LIFE RESTORED!",
+                                                   "Health: " + std::to_string(playerLives) + "/3 Lives",
+                                                   glm::vec4(1.0f, 0.35f, 0.55f, 1.0f), 0);
+                            spawnFloatingText("+1 LIFE! (" + std::to_string(playerLives) + "/3)", heart.pos + glm::vec2(0.0f, 0.8f),
+                                              glm::vec4(1.0f, 0.3f, 0.55f, 1.0f), 0.30f, 0.42f, 2.4f, 1.3f);
+                        } else {
+                            coinsCollected += 3;
+                            showCornerNotification("HEART", "FULL HEALTH BONUS!", "+150 Points (Max Lives)",
+                                                   glm::vec4(1.0f, 0.4f, 0.6f, 1.0f), 0);
+                            spawnFloatingText("FULL HP! +150", heart.pos + glm::vec2(0.0f, 0.8f),
+                                              glm::vec4(1.0f, 0.4f, 0.6f, 1.0f), 0.28f, 0.40f, 2.2f, 1.2f);
+                        }
+                    }
+                    heart.animPhase += deltaTime * 3.5f;
+                }
+
                 // 7. Animated Coins Collection
                 for (auto& coin : gameWorld.coins)
                 {
@@ -1083,6 +1176,521 @@ int main()
                                           glm::vec4(1.0f, 0.88f, 0.22f, 1.0f), 0.24f, 0.34f, 1.4f, 1.1f);
                     }
                     coin.animTimer += deltaTime * 10.0f;
+                }
+
+                // 7b. Player Attack Resolution
+                if (isAttacking) {
+                    attackAnimTimer += deltaTime;
+                    float dirSign = (lastHorizontalDir == DIR_LEFT) ? -1.0f : 1.0f;
+                    // Active damage window during sword slash swing (frames 2-4)
+                    if (attackAnimTimer >= 0.10f && attackAnimTimer <= 0.32f && !attackDamageDealt) {
+                        glm::vec2 attackCenter = playerPos + glm::vec2(dirSign * 1.35f, 0.0f);
+                        glm::vec2 attackReach(2.4f, 2.0f);
+
+                        for (auto& enemy : gameWorld.enemies) {
+                            if (!enemy.active || enemy.state == ENEMY_STATE_DEATH || enemy.state == ENEMY_STATE_TRANSFORM) continue;
+                            if (gameWorld.checkCollision(attackCenter, attackReach, enemy.pos, enemy.size)) {
+                                enemy.hp -= 1;
+                                enemy.hurtTimer = 0.25f;
+                                attackDamageDealt = true;
+                                audioMgr.play(SFX_ENEMY_HIT);
+
+                                if (enemy.hp <= 0) {
+                                    enemy.hp = 0;
+                                    if (enemy.type == ENEMY_SLIME_INITIAL) {
+                                        float footY = enemy.pos.y - 1.2f;
+                                        // Slime defeated! Initiates transformation into Boss Demon Slime!
+                                        enemy.state = ENEMY_STATE_TRANSFORM;
+                                        enemy.stateTimer = 0.0f;
+                                        enemy.animTimer = 0.0f;
+                                        enemy.pos.y = footY + 3.0f; // Transform quad is 6.0m tall, rests on platform footY
+                                        spawnFloatingText("SLIME DEFEATED! TRANSFORMING...", enemy.pos + glm::vec2(0.0f, 1.4f),
+                                                          glm::vec4(1.0f, 0.4f, 0.2f, 1.0f), 0.28f, 0.40f, 3.0f, 1.2f);
+                                        showCornerNotification("TRANSFORMATION", "BOSS AWAKENING!",
+                                                               "The defeated slime begins demon transformation!",
+                                                               glm::vec4(1.0f, 0.35f, 0.2f, 1.0f), 1, 0);
+                                    } else {
+                                        enemy.state = ENEMY_STATE_DEATH;
+                                        enemy.animTimer = 0.0f;
+                                        audioMgr.play(SFX_ENEMY_DEATH);
+                                        if (enemy.type == ENEMY_BRINGER_OF_DEATH) {
+                                            coinsCollected += 5;
+                                            spawnFloatingText("+250 BRINGER OF DEATH SLAIN!", enemy.pos + glm::vec2(0.0f, 2.2f),
+                                                              glm::vec4(0.4f, 1.0f, 0.6f, 1.0f), 0.30f, 0.42f, 2.8f, 1.4f);
+                                            showCornerNotification("DEFEATED", "BRINGER OF DEATH SLAIN!", "+250 Points!",
+                                                                   glm::vec4(0.4f, 1.0f, 0.6f, 1.0f), 0);
+                                        } else if (enemy.type == ENEMY_BOSS_DEMON_SLIME) {
+                                            coinsCollected += 20;
+                                            spawnFloatingText("+1000 DEMON SLIME VANQUISHED!", enemy.pos + glm::vec2(0.0f, 3.5f),
+                                                              glm::vec4(1.0f, 0.85f, 0.2f, 1.0f), 0.36f, 0.48f, 3.5f, 1.6f);
+                                            showCornerNotification("VICTORY", "DEMON SLIME SLAIN!", "+1000 Boss Defeat Bonus!",
+                                                                   glm::vec4(1.0f, 0.85f, 0.2f, 1.0f), 0);
+                                        }
+                                    }
+                                } else {
+                                    spawnFloatingText("-1 HIT! [" + std::to_string(enemy.hp) + "/" + std::to_string(enemy.maxHp) + " HP]",
+                                                      enemy.pos + glm::vec2(0.0f, enemy.size.y * 0.6f + 0.5f),
+                                                      glm::vec4(1.0f, 0.85f, 0.25f, 1.0f), 0.26f, 0.38f, 1.6f, 1.2f);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (attackAnimTimer >= 0.50f) {
+                        isAttacking = false;
+                        attackAnimTimer = 0.0f;
+                        attackDamageDealt = false;
+                    }
+                }
+
+                // 7c. Enemy Entity AI & Combat Updates
+                for (auto& enemy : gameWorld.enemies) {
+                    if (!enemy.active) continue;
+
+                    if (enemy.hurtTimer > 0.0f) enemy.hurtTimer -= deltaTime;
+                    if (enemy.attackCooldown > 0.0f) enemy.attackCooldown -= deltaTime;
+                    if (enemy.jumpCooldown > 0.0f) enemy.jumpCooldown -= deltaTime;
+
+                    float distX = playerPos.x - enemy.pos.x;
+                    float absDist = std::abs(distX);
+                    float absY = std::abs(playerPos.y - enemy.pos.y);
+
+                    // =========================================================
+                    // Bringer of Death (1-Hit Roaming Enemy)
+                    // =========================================================
+                    if (enemy.type == ENEMY_BRINGER_OF_DEATH) {
+                        float footY = enemy.pos.y - 1.45f;
+                        if (enemy.state == ENEMY_STATE_DEATH) {
+                            enemy.animTimer += deltaTime;
+                            if (enemy.animTimer >= 1.0f) { // 10 frames at 10 fps
+                                enemy.active = false;
+                            }
+                        } else {
+                            if (enemy.state != ENEMY_STATE_ATTACK) {
+                                enemy.facingLeft = (distX < 0.0f);
+                            }
+
+                            // Trigger telegraphed attack when within 2.4m
+                            if (absDist < 2.4f && absY < 2.0f && enemy.attackCooldown <= 0.0f && enemy.state != ENEMY_STATE_ATTACK) {
+                                enemy.state = ENEMY_STATE_ATTACK;
+                                enemy.animTimer = 0.0f;
+                                enemy.facingLeft = (distX < 0.0f); // Lock attack direction
+                                enemy.hasHitPlayerThisAttack = false;
+                                enemy.attackCooldown = 2.0f;
+                                audioMgr.play(SFX_ENEMY_ATTACK);
+                                spawnFloatingText("[ ! ]", enemy.pos + glm::vec2(0.0f, 1.8f),
+                                                  glm::vec4(1.0f, 0.2f, 0.2f, 1.0f), 0.28f, 0.38f, 0.8f, 1.0f);
+                            }
+
+                            if (enemy.state == ENEMY_STATE_ATTACK) {
+                                enemy.animTimer += deltaTime;
+                                int atkFrame = static_cast<int>(enemy.animTimer * 8.0f); // 8 fps animation (10 frames = 1.25s)
+
+                                // Telegraph wind-up: frames 0-5 (0.0s to 0.75s) - Scythe raised, direction locked
+                                // Cleave impact window: frames 6-7 (0.75s to 1.0s) - only hits in front
+                                bool playerInFront = (enemy.facingLeft && distX <= 0.3f) || (!enemy.facingLeft && distX >= -0.3f);
+                                if (atkFrame >= 6 && atkFrame <= 7 && !enemy.hasHitPlayerThisAttack && playerInFront &&
+                                    absDist < 2.6f && absY < 2.0f && !isDashing && postHitInvulnTimer <= 0.0f)
+                                {
+                                    enemy.hasHitPlayerThisAttack = true;
+                                    if (shieldTimer > 0.0f) {
+                                        shieldTimer = 0.0f;
+                                        postHitInvulnTimer = 0.75f;
+                                        audioMgr.play(SFX_SLIDE);
+                                        spawnFloatingText("SHIELD BROKE! [ATTACK BLOCKED]", playerPos + glm::vec2(0.0f, 1.2f),
+                                                          glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                    } else {
+                                        playerLives--;
+                                        postHitInvulnTimer = 1.25f;
+                                        audioMgr.play(SFX_ENEMY_HIT);
+                                        if (playerLives <= 0) {
+                                            currentGameState = STATE_GAME_OVER;
+                                            gameOverReason = "SLAIN BY BRINGER OF DEATH";
+                                            audioMgr.play(SFX_DEATH);
+                                        } else {
+                                            spawnFloatingText("LIFE LOST! (" + std::to_string(playerLives) + "/3)",
+                                                              playerPos + glm::vec2(0.0f, 1.2f), glm::vec4(1.0f, 0.25f, 0.25f, 1.0f));
+                                        }
+                                    }
+                                }
+                                if (atkFrame >= 10 || enemy.animTimer >= 1.25f) {
+                                    enemy.state = ENEMY_STATE_IDLE;
+                                    enemy.animTimer = 0.0f;
+                                }
+                            } else if (absDist < 10.0f && absY < 2.5f) {
+                                // Controlled chase speed: 1.3 m/s with platform ledge verification
+                                enemy.state = ENEMY_STATE_PATROL;
+                                float dir = (distX > 0.0f) ? 1.0f : -1.0f;
+                                float step = dir * 1.3f * deltaTime;
+                                float nextX = enemy.pos.x + step;
+
+                                if (gameWorld.hasSolidGroundAt(nextX + dir * 0.7f, footY, 0.4f)) {
+                                    enemy.pos.x = nextX;
+                                    enemy.animTimer += deltaTime;
+                                } else {
+                                    enemy.state = ENEMY_STATE_IDLE;
+                                    enemy.animTimer += deltaTime;
+                                }
+                            } else {
+                                // Patrol pacing: 1.0 m/s with ledge turnaround
+                                enemy.state = ENEMY_STATE_PATROL;
+                                float dir = enemy.facingLeft ? -1.0f : 1.0f;
+                                float step = dir * 1.0f * deltaTime;
+                                float nextX = enemy.pos.x + step;
+
+                                if (gameWorld.hasSolidGroundAt(nextX + dir * 0.7f, footY, 0.4f)) {
+                                    enemy.pos.x = nextX;
+                                    enemy.animTimer += deltaTime;
+                                } else {
+                                    enemy.facingLeft = !enemy.facingLeft;
+                                    enemy.animTimer += deltaTime;
+                                }
+                            }
+                        }
+                    }
+                    // =========================================================
+                    // Initial Slime (2-Hit Enemy, transforms into Boss)
+                    // =========================================================
+                    else if (enemy.type == ENEMY_SLIME_INITIAL) {
+                        float footY = (enemy.state == ENEMY_STATE_TRANSFORM) ? (enemy.pos.y - 3.0f) : (enemy.pos.y - 1.2f);
+                        if (enemy.state == ENEMY_STATE_TRANSFORM) {
+                            enemy.stateTimer += deltaTime;
+                            enemy.animTimer += deltaTime;
+                            if (enemy.stateTimer >= 2.0f && enemy.stateTimer - deltaTime < 2.0f) {
+                                audioMgr.play(SFX_BOSS_ROAR);
+                            }
+                            // 3.2s transformation delay completed: transform into Boss Demon Slime!
+                            if (enemy.stateTimer >= 3.2f) {
+                                enemy.type = ENEMY_BOSS_DEMON_SLIME;
+                                enemy.maxHp = 5;
+                                enemy.hp = 5;
+                                enemy.state = ENEMY_STATE_IDLE;
+                                enemy.size = glm::vec2(3.6f, 4.4f);
+                                enemy.pos.y = footY + 3.0f; // 3.0f rests on ground (footY)
+                                enemy.animTimer = 0.0f;
+                                enemy.stateTimer = 0.0f;
+                                enemy.attackCooldown = 1.2f;
+                                enemy.jumpCooldown = 2.0f;
+                                enemy.hasHitPlayerThisAttack = false;
+                                audioMgr.play(SFX_BOSS_ROAR);
+                                spawnFloatingText("DEMON SLIME RISES! [5 HP]", enemy.pos + glm::vec2(0.0f, 3.5f),
+                                                  glm::vec4(1.0f, 0.25f, 0.35f, 1.0f), 0.35f, 0.48f, 3.5f, 1.5f);
+                                showCornerNotification("BOSS BATTLE", "DEMON SLIME SUMMONED!",
+                                                       "Attack to defeat (5 hits) or flee/dash away to despawn!",
+                                                       glm::vec4(1.0f, 0.25f, 0.35f, 1.0f), 1, 0);
+                            }
+                        } else {
+                            enemy.facingLeft = (distX < 0.0f);
+                            if (absDist < 8.0f && absY < 2.5f) {
+                                enemy.state = ENEMY_STATE_PATROL;
+                                float dir = (distX > 0.0f) ? 1.0f : -1.0f;
+                                float step = dir * 0.9f * deltaTime;
+                                float nextX = enemy.pos.x + step;
+
+                                if (gameWorld.hasSolidGroundAt(nextX + dir * 0.6f, footY, 0.4f)) {
+                                    enemy.pos.x = nextX;
+                                    enemy.animTimer += deltaTime;
+                                } else {
+                                    enemy.state = ENEMY_STATE_IDLE;
+                                    enemy.animTimer += deltaTime;
+                                }
+                            } else {
+                                enemy.state = ENEMY_STATE_PATROL;
+                                float dir = enemy.facingLeft ? -1.0f : 1.0f;
+                                float step = dir * 0.75f * deltaTime;
+                                float nextX = enemy.pos.x + step;
+
+                                if (gameWorld.hasSolidGroundAt(nextX + dir * 0.6f, footY, 0.4f)) {
+                                    enemy.pos.x = nextX;
+                                    enemy.animTimer += deltaTime;
+                                } else {
+                                    enemy.facingLeft = !enemy.facingLeft;
+                                    enemy.animTimer += deltaTime;
+                                }
+                            }
+
+                            // Slime contact damage to player on direct physical collision
+                            if (absDist < 1.3f && absY < 1.3f && !isDashing && postHitInvulnTimer <= 0.0f) {
+                                if (shieldTimer > 0.0f) {
+                                    shieldTimer = 0.0f;
+                                    postHitInvulnTimer = 0.75f;
+                                    audioMgr.play(SFX_SLIDE);
+                                    spawnFloatingText("SHIELD BROKE! [SLIME DEFLECTED]", playerPos + glm::vec2(0.0f, 1.2f),
+                                                      glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                } else {
+                                    playerLives--;
+                                    postHitInvulnTimer = 1.25f;
+                                    audioMgr.play(SFX_ENEMY_HIT);
+                                    if (playerLives <= 0) {
+                                        currentGameState = STATE_GAME_OVER;
+                                        gameOverReason = "DISSOLVED BY SLIME";
+                                        audioMgr.play(SFX_DEATH);
+                                    } else {
+                                        spawnFloatingText("LIFE LOST! (" + std::to_string(playerLives) + "/3)",
+                                                          playerPos + glm::vec2(0.0f, 1.2f), glm::vec4(1.0f, 0.25f, 0.25f, 1.0f));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // =========================================================
+                    // Boss Demon Slime (5-Hit Boss)
+                    // =========================================================
+                    else if (enemy.type == ENEMY_BOSS_DEMON_SLIME) {
+                        float footY = enemy.pos.y - 3.0f;
+                        // Boss Avoidance / Despawn:
+                        // "can be avoided by going to the opposite direction or dashing through it, so it despawns."
+                        if (absDist > 28.0f || (isDashing && absDist > 8.0f)) {
+                            enemy.active = false;
+                            spawnFloatingText("BOSS EVADED & DESPAWNED", playerPos + glm::vec2(0.0f, 1.8f),
+                                              glm::vec4(0.4f, 0.9f, 1.0f, 1.0f));
+                            showCornerNotification("BOSS EVADED", "DEMON SLIME RETREATED",
+                                                   "Successfully escaped boss confrontation!",
+                                                   glm::vec4(0.35f, 0.85f, 1.0f, 1.0f), 0);
+                        } else if (enemy.state == ENEMY_STATE_DEATH) {
+                            enemy.animTimer += deltaTime;
+                            if (enemy.animTimer >= 2.2f) { // 22 frames at 10 fps
+                                enemy.active = false;
+                            }
+                        } else {
+                            // Boss commits to attack/jump direction: cannot turn while attacking or jumping!
+                            if (enemy.state != ENEMY_STATE_ATTACK && enemy.state != ENEMY_STATE_JUMP) {
+                                enemy.facingLeft = (distX < 0.0f);
+                            }
+
+                            // Cleave attack trigger when within 4.2m
+                            if (absDist < 4.2f && absY < 3.2f && enemy.attackCooldown <= 0.0f &&
+                                enemy.state != ENEMY_STATE_ATTACK && enemy.state != ENEMY_STATE_JUMP)
+                            {
+                                enemy.state = ENEMY_STATE_ATTACK;
+                                enemy.animTimer = 0.0f;
+                                enemy.facingLeft = (distX < 0.0f); // Lock direction for this attack cycle!
+                                enemy.hasHitPlayerThisAttack = false;
+                                enemy.attackCooldown = 2.4f;
+                                audioMgr.play(SFX_BOSS_ATTACK);
+                                spawnFloatingText("[ ! ] DODGE!", enemy.pos + glm::vec2(0.0f, 3.2f),
+                                                  glm::vec4(1.0f, 0.3f, 0.2f, 1.0f), 0.35f, 0.48f, 1.1f, 1.2f);
+                            }
+
+                            if (enemy.state == ENEMY_STATE_ATTACK) {
+                                enemy.animTimer += deltaTime;
+                                int atkFrame = static_cast<int>(enemy.animTimer * 8.0f); // 8 fps animation (15 frames = 1.875s)
+
+                                // Telegraph wind-up: frames 0-8 (0.0s to 1.125s) - Demon raises arm and charges dark flame!
+                                // Slam impact: frames 9-11 (1.125s to 1.5s) - Shockwave damage strictly in front!
+                                bool playerInFront = (enemy.facingLeft && distX <= 0.4f) || (!enemy.facingLeft && distX >= -0.4f);
+                                if (atkFrame >= 9 && atkFrame <= 11 && !enemy.hasHitPlayerThisAttack && playerInFront &&
+                                    absDist < 4.6f && absY < 3.0f && !isDashing && postHitInvulnTimer <= 0.0f)
+                                {
+                                    enemy.hasHitPlayerThisAttack = true;
+                                    if (shieldTimer > 0.0f) {
+                                        shieldTimer = 0.0f;
+                                        postHitInvulnTimer = 0.75f;
+                                        audioMgr.play(SFX_SLIDE);
+                                        spawnFloatingText("SHIELD BROKE! [DEMON CLEAVE BLOCKED]", playerPos + glm::vec2(0.0f, 1.2f),
+                                                          glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                    } else {
+                                        playerLives--;
+                                        postHitInvulnTimer = 1.25f;
+                                        audioMgr.play(SFX_ENEMY_HIT);
+                                        if (playerLives <= 0) {
+                                            currentGameState = STATE_GAME_OVER;
+                                            gameOverReason = "CRUSHED BY DEMON SLIME";
+                                            audioMgr.play(SFX_DEATH);
+                                        } else {
+                                            spawnFloatingText("LIFE LOST! (" + std::to_string(playerLives) + "/3)",
+                                                              playerPos + glm::vec2(0.0f, 1.2f), glm::vec4(1.0f, 0.25f, 0.25f, 1.0f));
+                                        }
+                                    }
+                                }
+                                if (atkFrame >= 15 || enemy.animTimer >= 1.875f) {
+                                    enemy.state = ENEMY_STATE_IDLE;
+                                    enemy.animTimer = 0.0f;
+                                }
+                            } else if (enemy.state == ENEMY_STATE_JUMP) {
+                                // Sub-phase 0 (stateTimer == 0.0f): Crouch wind-up on current ground (frames 0 to 4)
+                                if (enemy.stateTimer < 0.5f) {
+                                    enemy.vel = glm::vec2(0.0f);
+                                    enemy.animTimer += deltaTime;
+                                    int crouchFrame = static_cast<int>(enemy.animTimer * 12.0f);
+                                    if (crouchFrame >= 5) {
+                                        // Launch into airborne leap!
+                                        enemy.stateTimer = 1.0f;
+                                        float jDir = enemy.facingLeft ? -1.0f : 1.0f;
+                                        float targetDx = std::max(2.5f, absDist);
+                                        enemy.vel.x = jDir * std::clamp(targetDx / 0.85f, 4.0f, 7.5f);
+                                        // High leap if player is above; standard leap otherwise
+                                        enemy.vel.y = (playerPos.y > enemy.pos.y + 1.0f) ? 12.5f : 9.5f;
+                                        audioMgr.play(SFX_BOSS_ATTACK);
+                                        spawnFloatingText("DEMON LEAP!", enemy.pos + glm::vec2(0.0f, 3.2f),
+                                                          glm::vec4(1.0f, 0.45f, 0.2f, 1.0f), 0.32f, 0.45f, 1.2f, 1.2f);
+                                    }
+                                }
+                                // Sub-phase 1 (stateTimer == 1.0f): Ballistic airborne flight with gravity & platform landing
+                                else if (enemy.stateTimer < 1.5f) {
+                                    enemy.vel.y += GRAVITY * deltaTime;
+                                    enemy.pos.x += enemy.vel.x * deltaTime;
+                                    enemy.pos.y += enemy.vel.y * deltaTime;
+
+                                    // Mid-air poses: 6 = rising, 7 = apex, 8 = falling
+                                    int airFrame = 7;
+                                    if (enemy.vel.y > 2.5f) airFrame = 6;
+                                    else if (enemy.vel.y < -2.5f) airFrame = 8;
+                                    enemy.animTimer = static_cast<float>(airFrame) / 12.0f;
+
+                                    // When falling, check landing on platforms or ground
+                                    if (enemy.vel.y <= 0.0f) {
+                                        float bFeet = enemy.pos.y - 3.0f;
+                                        bool landed = false;
+                                        float landedTop = 0.0f;
+
+                                        for (const auto& tile : gameWorld.tiles) {
+                                            if (tile.isLadder) continue;
+                                            float tileHalfW = tile.size.x * 0.5f;
+                                            float tileHalfH = tile.size.y * 0.5f;
+                                            float tileTop   = tile.pos.y + tileHalfH;
+
+                                            // Horizontal overlap
+                                            if (enemy.pos.x + 1.0f > tile.pos.x - tileHalfW &&
+                                                enemy.pos.x - 1.0f < tile.pos.x + tileHalfW)
+                                            {
+                                                if (bFeet <= tileTop + 0.35f && bFeet >= tileTop - 0.85f) {
+                                                    landed = true;
+                                                    landedTop = tileTop;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if (!landed) {
+                                            float groundTop = SURFACE_GROUND_Y + 0.5f;
+                                            if (bFeet <= groundTop + 0.35f && bFeet >= groundTop - 0.85f) {
+                                                landed = true;
+                                                landedTop = groundTop;
+                                            } else if (bFeet <= BEDROCK_Y + 0.5f) {
+                                                landed = true;
+                                                landedTop = BEDROCK_Y + 0.5f;
+                                            }
+                                        }
+
+                                        if (landed) {
+                                            enemy.pos.y = landedTop + 3.0f;
+                                            enemy.vel = glm::vec2(0.0f);
+                                            enemy.stateTimer = 2.0f; // Landed! Transition to slam impact
+                                            enemy.animTimer = 10.0f / 12.0f; // Frame 10 is touchdown slam
+                                            audioMgr.play(SFX_SLIME_BOUNCE);
+                                            spawnFloatingText("GROUND SLAM!", enemy.pos + glm::vec2(0.0f, 0.5f),
+                                                              glm::vec4(1.0f, 0.3f, 0.2f, 1.0f), 0.35f, 0.50f, 1.2f, 1.4f);
+                                        }
+                                    }
+                                }
+                                // Sub-phase 2 (stateTimer == 2.0f): Landed Ground Slam shockwave & recovery
+                                else {
+                                    enemy.vel = glm::vec2(0.0f);
+                                    enemy.animTimer += deltaTime;
+                                    int smashFrame = static_cast<int>(enemy.animTimer * 12.0f);
+
+                                    // Shockwave damage window: frames 11 to 14
+                                    if (smashFrame >= 11 && smashFrame <= 14 && !enemy.hasHitPlayerThisAttack) {
+                                        if (absDist < 4.2f && absY < 3.0f && !isDashing && postHitInvulnTimer <= 0.0f) {
+                                            enemy.hasHitPlayerThisAttack = true;
+                                            if (shieldTimer > 0.0f) {
+                                                shieldTimer = 0.0f;
+                                                postHitInvulnTimer = 0.75f;
+                                                audioMgr.play(SFX_SLIDE);
+                                                spawnFloatingText("SHIELD BROKE! [SLAM DEFLECTED]", playerPos + glm::vec2(0.0f, 1.2f),
+                                                                  glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                            } else {
+                                                playerLives--;
+                                                postHitInvulnTimer = 1.25f;
+                                                audioMgr.play(SFX_ENEMY_HIT);
+                                                if (playerLives <= 0) {
+                                                    currentGameState = STATE_GAME_OVER;
+                                                    gameOverReason = "CRUSHED BY DEMON SLAM";
+                                                    audioMgr.play(SFX_DEATH);
+                                                } else {
+                                                    spawnFloatingText("LIFE LOST! (" + std::to_string(playerLives) + "/3)",
+                                                                      playerPos + glm::vec2(0.0f, 1.2f), glm::vec4(1.0f, 0.25f, 0.25f, 1.0f));
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Animation complete: return to patrol!
+                                    if (smashFrame >= 18 || enemy.animTimer >= 1.5f) {
+                                        enemy.state = ENEMY_STATE_PATROL;
+                                        enemy.animTimer = 0.0f;
+                                        enemy.stateTimer = 0.0f;
+                                        enemy.jumpCooldown = 3.5f;
+                                        enemy.vel = glm::vec2(0.0f);
+                                    }
+                                }
+                            } else {
+                                // Deliberate, menacing advance towards player at 0.9 m/s with platform traversal & jump checks
+                                float dir = (distX > 0.0f) ? 1.0f : -1.0f;
+                                float step = dir * 0.9f * deltaTime;
+                                float nextX = enemy.pos.x + step;
+
+                                bool groundAhead = gameWorld.hasSolidGroundAt(nextX + dir * 1.5f, footY, 0.4f);
+                                bool playerAbove = (playerPos.y > enemy.pos.y + 1.2f && absDist < 14.0f);
+
+                                // Jump to cross platform gaps, reach elevated platforms, or leap towards player!
+                                if (enemy.jumpCooldown <= 0.0f && (!groundAhead || playerAbove || (absDist > 5.5f && absDist < 14.0f))) {
+                                    enemy.state = ENEMY_STATE_JUMP;
+                                    enemy.animTimer = 0.0f;
+                                    enemy.stateTimer = 0.0f;
+                                    enemy.facingLeft = (distX < 0.0f);
+                                    enemy.vel = glm::vec2(0.0f);
+                                    enemy.hasHitPlayerThisAttack = false;
+                                    enemy.jumpCooldown = 3.5f;
+                                } else if (groundAhead) {
+                                    enemy.state = ENEMY_STATE_PATROL;
+                                    enemy.pos.x = nextX;
+                                    enemy.animTimer += deltaTime;
+                                } else {
+                                    enemy.state = ENEMY_STATE_IDLE;
+                                    enemy.animTimer += deltaTime;
+                                }
+                            }
+
+                            // Grounding enforcement for Boss Demon Slime in all non-jump states
+                            if (enemy.state != ENEMY_STATE_JUMP) {
+                                float bFeet = enemy.pos.y - 3.0f;
+                                float supportY = SURFACE_GROUND_Y + 0.5f;
+                                for (const auto& tile : gameWorld.tiles) {
+                                    if (tile.isLadder) continue;
+                                    float tileHalfW = tile.size.x * 0.5f;
+                                    float tileHalfH = tile.size.y * 0.5f;
+                                    if (enemy.pos.x + 1.0f > tile.pos.x - tileHalfW && enemy.pos.x - 1.0f < tile.pos.x + tileHalfW) {
+                                        float top = tile.pos.y + tileHalfH;
+                                        if (top <= bFeet + 0.35f && top > supportY) {
+                                            supportY = top;
+                                        }
+                                    }
+                                }
+                                if (bFeet > supportY + 0.05f) {
+                                    enemy.vel.y += GRAVITY * deltaTime;
+                                    enemy.pos.y += enemy.vel.y * deltaTime;
+                                    if (enemy.pos.y - 3.0f <= supportY) {
+                                        enemy.pos.y = supportY + 3.0f;
+                                        enemy.vel.y = 0.0f;
+                                    }
+                                } else {
+                                    enemy.pos.y = supportY + 3.0f;
+                                    enemy.vel.y = 0.0f;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Prune dead/despawned enemies
+                for (auto it = gameWorld.enemies.begin(); it != gameWorld.enemies.end(); ) {
+                    if (!it->active) {
+                        it = gameWorld.enemies.erase(it);
+                    } else {
+                        ++it;
+                    }
                 }
 
                 // 8. Procedural World Streaming
@@ -1173,13 +1781,13 @@ int main()
         {
             gameLadderScene.render(view, projection, cameraPos, animTimer, daylightFactor, twilightFactor,
                                    worldTilesetTexture, coinTexture, fruitTexture, directionArrowsTexture,
-                                   texScenery[activeScenery], shieldTimer, playerRenderSize);
+                                   texScenery[activeScenery], spikesTexture, shieldTimer, playerRenderSize);
         }
         else if (currentScene == SCENE_SKY_FALL)
         {
             gameSkyFallScene.render(view, projection, cameraPos, animTimer, daylightFactor, twilightFactor,
                                     birdTexture, worldTilesetTexture, coinTexture, fruitTexture,
-                                    directionArrowsTexture, texScenery[activeScenery], shieldTimer, playerRenderSize);
+                                    directionArrowsTexture, texScenery[activeScenery], spikesTexture, shieldTimer, playerRenderSize);
         }
         else
         {
@@ -1315,14 +1923,14 @@ int main()
                 gameRenderer.drawQuad(modelSlope, view, projection, curTileTint, (worldTilesetTexture != 0), slopeUV, worldTilesetTexture);
             }
 
-            // 5. Render Spiky Traps
-            glm::vec4 spikeUV = getTilesetUV(4, 8);
+            // 5. Render Spiky Traps (Procedural Metallic Spike Hazard Texture)
+            glm::vec4 spikeUV(0.0f, 0.0f, 1.0f, 1.0f);
             for (const auto& spike : gameWorld.spikes)
             {
                 glm::mat4 modelSpike = glm::mat4(1.0f);
                 modelSpike = glm::translate(modelSpike, glm::vec3(spike.pos.x, spike.pos.y, 0.0f));
                 modelSpike = glm::scale(modelSpike, glm::vec3(spike.size.x, spike.size.y, 1.0f));
-                gameRenderer.drawQuad(modelSpike, view, projection, glm::vec4(1.0f, 0.85f, 0.85f, 1.0f), (worldTilesetTexture != 0), spikeUV, worldTilesetTexture);
+                gameRenderer.drawQuad(modelSpike, view, projection, glm::vec4(1.0f), (spikesTexture != 0), spikeUV, spikesTexture);
             }
 
             // 6. Render Direction Relics (Clear Arrowhead Symbols: Left, Right, Up, Down)
@@ -1370,6 +1978,26 @@ int main()
                 gameRenderer.drawQuad(modelFruit, view, projection, glm::vec4(1.0f), (fruitTexture != 0), fruitUV, fruitTexture);
             }
 
+            // 6c. Render Heart Pickups (Restores 1 Life Pip)
+            for (const auto& heart : gameWorld.hearts)
+            {
+                if (heart.collected) continue;
+                float hoverY = heart.pos.y + std::sin(heart.animPhase) * 0.18f;
+                float pulseScale = 1.0f + std::cos(heart.animPhase * 2.2f) * 0.10f;
+
+                glm::mat4 modelAura = glm::mat4(1.0f);
+                modelAura = glm::translate(modelAura, glm::vec3(heart.pos.x, hoverY, 0.0f));
+                modelAura = glm::scale(modelAura, glm::vec3(1.4f * pulseScale, 1.4f * pulseScale, 1.0f));
+                gameRenderer.drawQuad(modelAura, view, projection, glm::vec4(1.0f, 0.25f, 0.45f, 0.32f), false, glm::vec4(0), 0);
+
+                int hFrame = static_cast<int>(heart.animPhase * 2.0f) % 4;
+                glm::vec4 heartUV = getHeartUV(hFrame);
+                glm::mat4 modelHeart = glm::mat4(1.0f);
+                modelHeart = glm::translate(modelHeart, glm::vec3(heart.pos.x, hoverY, 0.0f));
+                modelHeart = glm::scale(modelHeart, glm::vec3(1.15f * pulseScale, 1.15f * pulseScale, 1.0f));
+                gameRenderer.drawQuad(modelHeart, view, projection, glm::vec4(1.0f), (heartTexture != 0), heartUV, heartTexture);
+            }
+
             // 7. Render Animated Gold Coins
             for (const auto& coin : gameWorld.coins)
             {
@@ -1396,6 +2024,11 @@ int main()
                 totalFrames = activeSet.deathFrames;
                 int dFrame = static_cast<int>(deathAnimTimer);
                 frameIndex = std::min(dFrame, totalFrames - 1);
+            } else if (isAttacking) {
+                activeTexture = activeSet.texAttack;
+                totalFrames = activeSet.attackFrames;
+                int aFrame = static_cast<int>(attackAnimTimer * 12.0f);
+                frameIndex = std::min(aFrame, totalFrames - 1);
             } else if (isSliding) {
                 activeTexture = activeSet.texAttack;
                 totalFrames = activeSet.attackFrames;
@@ -1468,6 +2101,111 @@ int main()
                 float sAlpha = std::min(0.70f, 0.35f + (shieldTimer / 10.0f) * 0.35f);
                 gameRenderer.drawCircle(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), 2.2f);
             }
+
+            // 8c. Render Active Enemies (Bringer of Death, Slime, Boss Demon Slime)
+            for (const auto& enemy : gameWorld.enemies)
+            {
+                if (!enemy.active) continue;
+
+                unsigned int eTex = 0;
+                int eTotalFrames = 1;
+                int eFrame = 0;
+                glm::vec2 eRenderSize(2.4f, 2.4f);
+
+                if (enemy.type == ENEMY_BRINGER_OF_DEATH) {
+                    eRenderSize = glm::vec2(4.5f, 3.0f);
+                    if (enemy.state == ENEMY_STATE_DEATH) {
+                        eTex = texBodDeath;
+                        eTotalFrames = 10;
+                        eFrame = std::min(static_cast<int>(enemy.animTimer * 10.0f), eTotalFrames - 1);
+                    } else if (enemy.state == ENEMY_STATE_ATTACK) {
+                        eTex = texBodAttack;
+                        eTotalFrames = 10;
+                        eFrame = std::min(static_cast<int>(enemy.animTimer * 8.0f), eTotalFrames - 1);
+                    } else if (enemy.hurtTimer > 0.0f) {
+                        eTex = texBodHurt;
+                        eTotalFrames = 3;
+                        eFrame = static_cast<int>(enemy.animTimer * 8.0f) % eTotalFrames;
+                    } else if (enemy.state == ENEMY_STATE_PATROL) {
+                        eTex = texBodWalk;
+                        eTotalFrames = 8;
+                        eFrame = static_cast<int>(enemy.animTimer * 8.0f) % eTotalFrames;
+                    } else {
+                        eTex = texBodIdle;
+                        eTotalFrames = 8;
+                        eFrame = static_cast<int>(enemy.animTimer * 5.0f) % eTotalFrames;
+                    }
+                } else if (enemy.type == ENEMY_SLIME_INITIAL) {
+                    if (enemy.state == ENEMY_STATE_TRANSFORM) {
+                        eRenderSize = glm::vec2(6.0f, 6.0f);
+                        eTex = texSlimeTransform;
+                        eTotalFrames = 33;
+                        eFrame = std::min(static_cast<int>(enemy.animTimer * 10.0f), eTotalFrames - 1);
+                    } else {
+                        eRenderSize = glm::vec2(2.4f, 2.4f);
+                        if (enemy.hurtTimer > 0.0f) {
+                            eTex = texSlimeTakeHit;
+                            eTotalFrames = 6;
+                            eFrame = static_cast<int>(enemy.animTimer * 8.0f) % eTotalFrames;
+                        } else if (enemy.state == ENEMY_STATE_PATROL) {
+                            eTex = texSlimeMove;
+                            eTotalFrames = 8;
+                            eFrame = static_cast<int>(enemy.animTimer * 8.0f) % eTotalFrames;
+                        } else {
+                            eTex = texSlimeIdle;
+                            eTotalFrames = 6;
+                            eFrame = static_cast<int>(enemy.animTimer * 5.0f) % eTotalFrames;
+                        }
+                    }
+                } else if (enemy.type == ENEMY_BOSS_DEMON_SLIME) {
+                    eRenderSize = glm::vec2(10.8f, 6.0f);
+                    if (enemy.state == ENEMY_STATE_DEATH) {
+                        eTex = texDemonDeath;
+                        eTotalFrames = 22;
+                        eFrame = std::min(static_cast<int>(enemy.animTimer * 10.0f), eTotalFrames - 1);
+                    } else if (enemy.state == ENEMY_STATE_JUMP) {
+                        eTex = texDemonSmash;
+                        eTotalFrames = 18;
+                        eFrame = std::min(static_cast<int>(enemy.animTimer * 12.0f), eTotalFrames - 1);
+                    } else if (enemy.state == ENEMY_STATE_ATTACK) {
+                        eTex = texDemonAttack;
+                        eTotalFrames = 15;
+                        eFrame = std::min(static_cast<int>(enemy.animTimer * 8.0f), eTotalFrames - 1);
+                    } else if (enemy.hurtTimer > 0.0f) {
+                        eTex = texDemonTakeHit;
+                        eTotalFrames = 5;
+                        eFrame = static_cast<int>(enemy.animTimer * 8.0f) % eTotalFrames;
+                    } else if (enemy.state == ENEMY_STATE_PATROL) {
+                        eTex = texDemonWalk;
+                        eTotalFrames = 12;
+                        eFrame = static_cast<int>(enemy.animTimer * 8.0f) % eTotalFrames;
+                    } else {
+                        eTex = texDemonIdle;
+                        eTotalFrames = 6;
+                        eFrame = static_cast<int>(enemy.animTimer * 5.0f) % eTotalFrames;
+                    }
+                }
+
+                if (eTex != 0 && eTotalFrames > 0) {
+                    float eu = static_cast<float>(eFrame) / static_cast<float>(eTotalFrames);
+                    float edu = 1.0f / static_cast<float>(eTotalFrames);
+                    // Raw enemy sprite sheets (Bringer of Death, Slime, Demon Boss) natively face LEFT in their textures.
+                    // Therefore, do not flip when facing left; flip horizontally (-edu) when facing right!
+                    bool flipHorizontal = !enemy.facingLeft;
+                    glm::vec4 eUV = flipHorizontal ? glm::vec4(eu + edu, 0.0f, -edu, 1.0f) : glm::vec4(eu, 0.0f, edu, 1.0f);
+
+                    glm::vec4 eTint = (enemy.hurtTimer > 0.0f) ?
+                                      glm::vec4(1.0f, 0.35f, 0.35f, 1.0f) : glm::vec4(1.0f);
+
+                    glm::mat4 modelEnemy = glm::mat4(1.0f);
+                    modelEnemy = glm::translate(modelEnemy, glm::vec3(enemy.pos.x, enemy.pos.y, 0.0f));
+                    modelEnemy = glm::scale(modelEnemy, glm::vec3(eRenderSize.x, eRenderSize.y, 1.0f));
+                    gameRenderer.drawQuad(modelEnemy, view, projection, eTint, true, eUV, eTex);
+                }
+            }
+
+            // 8d. Render Overhead Enemy Health Bars
+            UIManager::instance().renderEnemyHealthBars(view, projection, gameWorld.enemies, animTimer);
         }
 
         // 8b. Render World-Space Floating Texts (Pickups, Direction Warps, Score Popups)
@@ -1490,7 +2228,7 @@ int main()
 
         // 11. Top-Right On-Screen Score Counter HUD
         int totalScore = static_cast<int>(scoreDistance) * 10 + coinsCollected * 50 + relicsTriggered * 100;
-        UIManager::instance().renderScoreHUD(halfW, halfH, totalScore, coinsCollected, scoreDistance, shieldTimer, frameCount, coinTexture);
+        UIManager::instance().renderScoreHUD(halfW, halfH, totalScore, coinsCollected, scoreDistance, shieldTimer, playerLives, frameCount, coinTexture, heartTexture);
 
         // On-Screen Start Hint Banner (when standing still in idle animation at game start)
         if (currentScene == SCENE_PLATFORMER && isGameIdleAtStart && currentGameState == STATE_RUNNING) {
@@ -1539,11 +2277,28 @@ int main()
     if (platformsTexture) glDeleteTextures(1, &platformsTexture);
     if (coinTexture) glDeleteTextures(1, &coinTexture);
     if (fruitTexture) glDeleteTextures(1, &fruitTexture);
+    if (heartTexture) glDeleteTextures(1, &heartTexture);
+    if (spikesTexture) glDeleteTextures(1, &spikesTexture);
     if (birdTexture) glDeleteTextures(1, &birdTexture);
     if (directionArrowsTexture) glDeleteTextures(1, &directionArrowsTexture);
     for (int s = 0; s < SCENERY_COUNT; ++s) {
         if (texScenery[s]) glDeleteTextures(1, &texScenery[s]);
     }
+    if (texBodWalk) glDeleteTextures(1, &texBodWalk);
+    if (texBodAttack) glDeleteTextures(1, &texBodAttack);
+    if (texBodDeath) glDeleteTextures(1, &texBodDeath);
+    if (texBodHurt) glDeleteTextures(1, &texBodHurt);
+    if (texBodIdle) glDeleteTextures(1, &texBodIdle);
+    if (texDemonIdle) glDeleteTextures(1, &texDemonIdle);
+    if (texDemonWalk) glDeleteTextures(1, &texDemonWalk);
+    if (texDemonAttack) glDeleteTextures(1, &texDemonAttack);
+    if (texDemonTakeHit) glDeleteTextures(1, &texDemonTakeHit);
+    if (texDemonDeath) glDeleteTextures(1, &texDemonDeath);
+    if (texDemonSmash) glDeleteTextures(1, &texDemonSmash);
+    if (texSlimeIdle) glDeleteTextures(1, &texSlimeIdle);
+    if (texSlimeMove) glDeleteTextures(1, &texSlimeMove);
+    if (texSlimeTakeHit) glDeleteTextures(1, &texSlimeTakeHit);
+    if (texSlimeTransform) glDeleteTextures(1, &texSlimeTransform);
 
     glfwDestroyWindow(window);
     glfwTerminate();
@@ -1560,7 +2315,6 @@ void processInput(GLFWwindow* window, float deltaTime)
     static bool rKeyLast = false;
 
     // Handle Tutorial Window Dismissal
-    static bool tutDismissLast = false;
     if (showTutorialModal) {
         bool dismissPressed = (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ||
                                glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
@@ -1568,10 +2322,13 @@ void processInput(GLFWwindow* window, float deltaTime)
                                glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS);
         if (dismissPressed && !tutDismissLast) {
             showTutorialModal = false;
+            tutDismissLast = true;
             if (!tutorialOpenedFromPause) {
                 currentGameState = STATE_RUNNING;
                 isGameIdleAtStart = true;
+                playerVel = glm::vec2(0.0f, 0.0f);
             }
+            return; // Modal captures input exclusively and prevents dismiss key bleed-through!
         }
         tutDismissLast = dismissPressed;
         return; // Modal captures input exclusively
@@ -1587,11 +2344,14 @@ void processInput(GLFWwindow* window, float deltaTime)
             introVideoPlayer.close();
             currentGameState = STATE_RUNNING;
             isGameIdleAtStart = true;
+            playerVel = glm::vec2(0.0f, 0.0f);
             if (!hasShownInitialTutorial) {
                 showTutorialModal = true;
                 hasShownInitialTutorial = true;
                 tutorialOpenedFromPause = false;
+                tutDismissLast = true; // Key held to skip video cannot dismiss tutorial
             }
+            return;
         }
         return;
     }
@@ -1697,15 +2457,23 @@ void processInput(GLFWwindow* window, float deltaTime)
         return;
     }
 
+    static bool gameOverRestartLast = false;
     if (currentGameState == STATE_GAME_OVER) {
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        bool restartPressed = (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ||
+                               glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
+                               glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS);
+        if (restartPressed && !gameOverRestartLast) {
             resetGame();
+            gameOverRestartLast = true;
+            return; // Immediately return so Space doesn't jump or start movement!
         }
+        gameOverRestartLast = restartPressed;
         if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, true);
         }
         return;
     }
+    gameOverRestartLast = false;
 
     // DASH Input (Left or Right Shift)
     bool shiftPressed = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
@@ -1730,6 +2498,19 @@ void processInput(GLFWwindow* window, float deltaTime)
         showCornerNotification("SKILL", "SHADOW DASH", "Burst speed & trap invulnerability!", glm::vec4(0.25f, 0.85f, 1.0f, 1.0f), 0);
     }
 
+    // ATTACK Input (J key, X key, or Left Mouse Button)
+    static bool attackKeyLast = false;
+    bool attackKeyPressed = (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS ||
+                             glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS ||
+                             glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+    if (attackKeyPressed && !attackKeyLast && !isAttacking && currentGameState == STATE_RUNNING) {
+        isAttacking = true;
+        attackAnimTimer = 0.0f;
+        attackDamageDealt = false;
+        audioMgr.play(SFX_SLASH);
+    }
+    attackKeyLast = attackKeyPressed;
+
     // Scene-Specific Controls handled directly by LadderScene and SkyFallScene updates
     if (currentScene == SCENE_LADDER_CLIMB || currentScene == SCENE_SKY_FALL) {
         return;
@@ -1741,9 +2522,15 @@ void processInput(GLFWwindow* window, float deltaTime)
          glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
          glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS))
     {
-        isGameIdleAtStart = false;
-        // If near ladder and pressing W, climb up rather than jump away
-        bool willClimb = false;
+        if (isGameIdleAtStart) {
+            // Jump straight up in place while staying idle until player chooses horizontal movement!
+            playerVel.y = JUMP_BURST;
+            playerVel.x = 0.0f;
+            isGrounded = false;
+            audioMgr.play(SFX_JUMP);
+        } else {
+            // If near ladder and pressing W, climb up rather than jump away
+            bool willClimb = false;
         for (auto& tunnel : gameWorld.tunnels) {
             if (std::abs(playerPos.x - tunnel.x) <= 1.25f &&
                 playerPos.y >= (tunnel.minY - 0.4f) && playerPos.y <= (tunnel.maxY + 0.4f))
@@ -1783,6 +2570,7 @@ void processInput(GLFWwindow* window, float deltaTime)
             audioMgr.play(SFX_JUMP);
         }
     }
+}
 
     // Downward Ladder Entry: Press S/Down near a ladder top to descend into underground shafts!
     if (isGrounded && !isOnLadder && !isSliding &&

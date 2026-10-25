@@ -34,7 +34,7 @@ public:
     void render(const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cameraPos,
                 float animTimer, float daylightFactor, float twilightFactor,
                 unsigned int tilesetTex, unsigned int coinTex, unsigned int shieldTex, unsigned int arrowTex,
-                unsigned int sceneryTex, float shieldTimer, const glm::vec2& playerRenderSize);
+                unsigned int sceneryTex, unsigned int spikesTex, float shieldTimer, const glm::vec2& playerRenderSize);
 
     float getPlayerX() const { return playerX; }
     float getPlayerY() const { return playerY; }

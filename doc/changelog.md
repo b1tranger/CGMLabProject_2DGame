@@ -11,7 +11,13 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ## Table of Versions
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
-| :--- | :--- | :--- | :--- |
+| **v0.6.6** | [v5.6](#v56---updated-slime-animations-and-boss-demon-slime-platform-jump-mechanics) | 2026-10-25 | Slime Animation Refresh & Boss Demon Slime Platform Jump Mechanics (`06_Smash.gif` Integration) |
+| **v0.6.5** | [v5.5](#v55---lock-boss-attack-direction-and-directional-damage-sector) | 2026-10-25 | Directional Attack Commitment: Locked Boss Demon Slime & Bringer of Death Facing Direction & Frontal Damage Sector |
+| **v0.6.4** | [v5.4](#v54---fix-bringer-of-death-facing-realistic-katana-slash-sfx-guaranteed-tutorial-window-and-idle-stillness-on-restart) | 2026-10-25 | Fixed Enemy Facing Direction (Inverted UV Flip), Metallic Katana Slash SFX, Guaranteed Post-Intro Tutorial Window & Idle Stillness on Restart |
+| **v0.6.3** | [v5.3](#v53---calibrate-enemy-proportions-speeds-platform-grounding-and-telegraphed-attack-windups) | 2026-10-25 | Calibrated Enemy Sprite Proportions, Pacing Speeds, Platform Grounding & Telegraphed Attack Wind-Ups |
+| **v0.6.2** | [v5.2](#v52---modular-decomposition-of-main-engine-into-uimanager-ladderscene-and-skyfallscene) | 2026-10-25 | Modular Architecture Decomposition: Subsystem Segregation of `UIManager`, `LadderScene`, and `SkyFallScene` |
+| **v0.6.1** | [v5.1](#v51---standardize-standalone-executable-to-thewendererexe-and-eliminate-redundant-mainexe) | 2026-10-25 | Standalone Executable Deduplication: Standardized on `TheWenderer.exe` & Purged Redundant `main.exe` |
+| **v0.6.0** | [v5.0](#v50---combat-system-3-lives-spikes-bringer-of-death-and-demon-slime-boss-battle) | 2026-10-25 | Real-Time Combat System (J/X/LMB), 3-Lives Health System & Heart Pickups, Procedural Spikes, Bringer of Death & Demon Slime Boss Battle |
 | **v0.5.15** | [v4.17](#v417---ladder-hero-scale-fix-post-intro-tutorial-modal-shield-pickup-icon-and-scene-exit-timers) | 2026-10-25 | Ladder Hero Sprite Scale Restoration, Post-Intro Tutorial Modal Dialog, Dedicated Shield Pickup Icon & Mini-Game Exit Timers |
 | **v0.5.14** | [v4.16](#v416---circular-energy-shield-bubble-and-single-hit-trap-absorption) | 2026-10-25 | Circular Energy Shield Bubble Rendering via Fragment Discard & Single-Hit Trap Absorption with Grace Invulnerability |
 | **v0.5.13** | [v4.13](#v413---mini-game-scene-exit-restrictions-and-underground-ladder-descent-fix) | 2026-10-25 | Mini-Game Scene Exit Restrictions (Relics/Hit Only) & Underground Ladder Descent Pass-Through Fix |
@@ -42,6 +48,130 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ## Detailed Version Logs
+
+### [v0.6.6] - 2026-10-25
+#### Session Archive: [`v5.6 - Updated Slime Animations and Boss Demon Slime Platform Jump Mechanics.md`](/doc/prompts/v5.6%20-%20Updated%20Slime%20Animations%20and%20Boss%20Demon%20Slime%20Platform%20Jump%20Mechanics.md)
+* **Initial Slime Zoom & Crisp Proportions**:
+  - Cropped and centered the active slime bounding box ($160\times 160$) from the lower-middle region of the raw $576\times 320$ GIF assets, eliminating vast empty transparent margins.
+  - Generates compact, crystal-clear horizontal spritesheets: `slime_idle.png` ($960\times 160$), `slime_move.png` ($1280\times 160$), and `slime_take_hit.png` ($960\times 160$).
+  - Rendered at `eRenderSize = glm::vec2(2.4f, 2.4f)` with grounded foot alignment, scaling the slime by 2.5x to be visibly detailed, clear, and perfectly proportioned on the platform.
+* **Slime Transformation Fixed (Eliminated Black Screen & Texture Overflow)**:
+  - Discovered that generating horizontal sheets for the 33-frame transformation at full $576\times 320$ produced an exorbitant width ($19,008$ pixels) that exceeded hardware `GL_MAX_TEXTURE_SIZE` limits (typically 8,192 or 16,384), causing `glTexImage2D` to fail and render as an incomplete, pure black object.
+  - Cropped to the full morphing bounding box ($256\times 256$) and scaled to $160\times 160$ per cell, yielding `slime_transform.png` at $5280\times 160$ pixels ($5280 < 8192$), guaranteed to load and render with 100% reliability on all GPU architectures.
+  - Positioned the transformation quad (`6.0f, 6.0f`) at `footY + 3.0f` so the slime morphs into the demon grounded seamlessly on the platform surface.
+* **Boss Demon Slime Platform Jumping & Landing Physics Fixed**:
+  - Fixed an issue where the boss became trapped mid-air and jumped repeatedly into the sky due to airborne physics prematurely halting when animation frame reached 10 prior to platform contact.
+  - Re-engineered `ENEMY_STATE_JUMP` using a dedicated 3-phase physics state machine (`stateTimer`):
+    - **Phase 0 (Crouch Wind-up)**: Boss prepares on the ground (frames 0 to 4).
+    - **Phase 1 (Ballistic Airborne Flight)**: Launches with $v_y = 9.5$ to $12.5\text{ m/s}$ and $v_x = 4.0$ to $7.5\text{ m/s}$, maintaining gravity ($g = -22.0\text{ m/s}^2$) and cycling mid-air poses (frames 6–8) until feet make physical contact with a platform tile or ground surface.
+    - **Phase 2 (Touchdown Slam & Shockwave)**: Upon touchdown ($v_y \le 0$), snaps feet to the platform top $+ 3.0\text{f}$, zeroes velocity, and executes frames 10–17 (slam impact, shockwave damage window frames 11–14, and recovery to patrol).
+  - Enforced continuous ground gravity and platform surface snapping during patrol and idle states, preventing the boss from floating or drifting off platforms.
+  - Scaled `demon_smash.png` to $288\times 160$ per cell ($5184\times 160$ total), matching all other demon sprite sheets and fitting safely within GPU limits.
+* **Packaging & Standalone Distribution**:
+  - Updated `TheWenderer_Standalone.zip` via `mingw32-make package`.
+
+### [v0.6.5] - 2026-10-25
+#### Session Archive: [`v5.5 - Lock Boss Attack Direction and Directional Damage Sector.md`](/doc/prompts/v5.5%20-%20Lock%20Boss%20Attack%20Direction%20and%20Directional%20Damage%20Sector.md)
+* **Boss Attack Directional Commitment (Zero Mid-Attack Spinning)**:
+  - Fixed an issue where the Demon Slime Boss (and Bringer of Death) continually updated their facing direction based on `distX < 0.0f` on every frame, even mid-swing, causing them to unnaturally flip $180^\circ$ mid-animation if the player jumped or dashed behind them.
+  - Locked `enemy.facingLeft` at the start of the attack animation: while `enemy.state == ENEMY_STATE_ATTACK`, facing direction updates are suppressed.
+* **Frontal Impact Damage Validation**:
+  - Cleave and shockwave damage now strictly requires the player to be physically situated in front of the attacking enemy: `playerInFront = (enemy.facingLeft && distX <= 0.4f) || (!enemy.facingLeft && distX >= -0.4f)`.
+  - Dashing or jumping behind the boss during its telegraph wind-up now cleanly evades the attack.
+
+### [v0.6.4] - 2026-10-25
+#### Session Archive: [`v5.4 - Fix Bringer of Death Facing, Realistic Katana Slash SFX, Guaranteed Tutorial Window, and Idle Stillness on Restart.md`](/doc/prompts/v5.4%20-%20Fix%20Bringer%20of%20Death%20Facing,%20Realistic%20Katana%20Slash%20SFX,%20Guaranteed%20Tutorial%20Window,%20and%20Idle%20Stillness%20on%20Restart.md)
+* **Enemy Facing Direction Correction (Eliminated Moonwalking)**:
+  - Discovered that enemy sprite sheets (`bod_walk.png`, `slime_move.png`, `demon_walk.png`) natively face **LEFT** in raw texture space, opposite to player sprites which natively face right.
+  - Corrected horizontal UV flip calculation in [`src/main.cpp`](/src/main.cpp): `bool flipHorizontal = !enemy.facingLeft;`. When moving left (`facingLeft = true`), textures are rendered unflipped (`edu`), and when moving right (`facingLeft = false`), textures are flipped horizontally (`-edu`). Bringer of Death now walks forward in both directions.
+* **Realistic Procedural Katana Sword Slash SFX**:
+  - Overhauled `SFX_SLASH` in [`src/Audio.cpp`](/src/Audio.cpp) to synthesize a sharp, resonant Japanese katana sword slash.
+  - Combined a swift aerodynamic whoosh (descending 2400 Hz to 320 Hz exponential sweep + band-passed white noise whip) with multi-frequency metallic steel resonance (3250 Hz, 4950 Hz, and 1920 Hz harmonic rings) and a sharp cutting transient bite.
+* **Guaranteed Post-Intro Tutorial Window Modal**:
+  - Fixed race condition where holding or pressing `Space`, `Enter`, or `Esc` to finish or skip the intro video immediately bleed through and dismissed the tutorial window on the subsequent frame.
+  - Initialized `tutDismissLast = true` upon video skip/completion, strictly requiring the player to release and freshly press a key to dismiss the tutorial guide.
+  - Froze gameplay simulation (`deltaTime = 0.0f`) while `showTutorialModal` is active so no enemies or hazards can advance while reading the tutorial.
+* **Grounded Idle Stillness on Tutorial Dismiss & Game Over Restart**:
+  - Ensured player remains completely motionless (`playerVel = (0, 0)`, `isGameIdleAtStart = true`) upon tutorial dismissal and upon Game Over restart.
+  - Guarded Game Over input with `gameOverRestartLast` and prevented `Space` from registering as jump on the restart frame.
+  - Preserved idle stance until directional navigation keys (`A`, `D`, `Left`, `Right`) are deliberately pressed, allowing the player full control over when to start running.
+
+### [v0.6.3] - 2026-10-25
+#### Session Archive: [`v5.3 - Calibrate Enemy Proportions, Speeds, Platform Grounding, and Telegraphed Attack Windups.md`](/doc/prompts/v5.3%20-%20Calibrate%20Enemy%20Proportions,%20Speeds,%20Platform%20Grounding,%20and%20Telegraphed%20Attack%20Windups.md)
+* **Enemy Quad Aspect Ratios & Proportional Rendering**:
+  - **Bringer of Death**: Corrected render quad from squished 1:1 square `(4.8, 4.8)` to true 1.5:1 aspect ratio `glm::vec2(4.5f, 3.0f)`, matching its $140\times 93$ sprite dimensions and completely eliminating vertical stretching.
+  - **Initial Slime**: Scaled render quad from `(2.4, 2.4)` to `glm::vec2(4.5f, 2.5f)` (1.8:1 aspect ratio matching its $576\times 320$ canvas), making it fully visible and correctly proportioned rather than sunken and tiny.
+  - **Boss Demon Slime**: Updated render quad from 1:1 square `(8.5, 8.5)` to true 1.8:1 aspect ratio `glm::vec2(10.8f, 6.0f)`, matching its $288\times 160$ sprite dimensions.
+* **Platform Grounding & Ledge Boundary Clamping**:
+  - Added [`World::hasSolidGroundAt`](/src/World.cpp) to verify the presence of solid tiles underneath entity feet.
+  - Fixed procedural spawning in [`World::generateChunk()`](/src/World.cpp): verified candidate positions are not inside chasms or underground shafts with safety margins, and verified solid tiles underneath prior to enemy instantiation.
+  - Raised enemy vertical center offsets so their feet rest flush upon ground level ($Y = 0.0\text{m}$ on surface, $Y = -4.0\text{m}$ in caverns): BOD at `y = 1.45f`, Slime at `y = 1.25f`, Boss at `y = 3.0f`.
+  - Added continuous forward ledge/chasm boundary detection in the AI movement loop in [`src/main.cpp`](/src/main.cpp): patrolling enemies reverse direction at edges, and chasing enemies halt at ledges rather than walking into open chasms and floating between platforms in mid-air.
+* **Calibrated Enemy Speeds & Movement Pacing**:
+  - Bringer of Death: reduced patrol speed to $1.0\text{m/s}$ and alert chase speed to $1.3\text{m/s}$ (down from excessive $2.2\text{m/s}$).
+  - Initial Slime: reduced wander speed to $0.75\text{m/s}$ and approach to $0.9\text{m/s}$ (down from $1.5\text{m/s}$).
+  - Boss Demon Slime: reduced approach speed to $0.9\text{m/s}$ (down from $1.8\text{m/s}$), providing heavy, menacing footsteps.
+* **Telegraphed Attack Wind-Up Animations**:
+  - **Bringer of Death**:
+    - Initiates attack state when player is within $2.4\text{m}$, immediately halting horizontal movement.
+    - Added $0.75\text{s}$ wind-up telegraph window (frames 0-5 at 8 fps) with glowing overhead red alert `"[ ! ]"`, raising scythe in preparation.
+    - Cleave impact window restricted to frames 6-7 ($0.75\text{s}$ to $1.0\text{s}$), allowing player ample time to jump, dash away, or strike first.
+  - **Boss Demon Slime**:
+    - Removed unavoidable instantaneous walking contact damage.
+    - Initiates telegraphed cleave attack when player is within $4.2\text{m}$, halting forward walking.
+    - Added $1.125\text{s}$ wind-up telegraph window (frames 0-8 at 8 fps) with overhead alert `"[ ! ] DODGE!"` as the demon draws back its flame-charged arm.
+    - Ground slam shockwave damage window restricted to frames 9-11 ($1.125\text{s}$ to $1.5\text{s}$), giving players over a full second to dodge or dash through.
+  - Fixed animation timer framerate calculation: standardized `enemy.animTimer` to real-world seconds (`+= deltaTime`), eliminating compounded double-multiplication framerate glitch that caused instant attacks.
+
+### [v0.6.2] - 2026-10-25
+#### Session Archive: [`v5.2 - Modular Decomposition of Main Engine into UIManager, LadderScene, and SkyFallScene.md`](/doc/prompts/v5.2%20-%20Modular%20Decomposition%20of%20Main%20Engine%20into%20UIManager,%20LadderScene,%20and%20SkyFallScene.md)
+* **Code Size Optimization & Subsystem Modularization**:
+  - Refactored monolithic [`src/main.cpp`](/src/main.cpp) by extracting three major functional domains into dedicated header and source pairs matching the project's existing modular design:
+    1. **`UIManager` Subsystem** ([`include/UIManager.h`](/include/UIManager.h), [`src/UIManager.cpp`](/src/UIManager.cpp)):
+       - Encapsulated floating text management, corner HUD alerts, top-right score counter, survival trial countdown badges, overhead enemy health bars, pause menu dialog, game over modal, and tutorial window into a thread-safe singleton.
+    2. **`LadderScene` Subsystem** ([`include/LadderScene.h`](/include/LadderScene.h), [`src/LadderScene.cpp`](/src/LadderScene.cpp)):
+       - Encapsulated 3-track vertical ladder jumping physics, procedural rungs, sawblades, spike traps, shield pickups, reverse resurrection animation spotlight, and ladder scene rendering.
+    3. **`SkyFallScene` Subsystem** ([`include/SkyFallScene.h`](/include/SkyFallScene.h), [`src/SkyFallScene.cpp`](/src/SkyFallScene.cpp)):
+       - Encapsulated high-velocity aerial descent physics, horizontal steering, procedural raptor bird obstacles, floating spike mines, exit gate generation, and 90-degree CCW impact rotation animation.
+* **Build Configuration & Zero-Regression Verification**:
+  - Updated [`Makefile`](/Makefile) compilation targets to compile and link all new modules (`UIManager.cpp`, `LadderScene.cpp`, and `SkyFallScene.cpp`).
+  - Verified clean compilation with zero warnings and zero errors, and re-generated `TheWenderer_Standalone.zip`.
+
+### [v0.6.1] - 2026-10-25
+#### Session Archive: [`v5.1 - Standardize Standalone Executable to TheWenderer.exe and Eliminate Redundant main.exe.md`](/doc/prompts/v5.1%20-%20Standardize%20Standalone%20Executable%20to%20TheWenderer.exe%20and%20Eliminate%20Redundant%20main.exe.md)
+* **Packaging & Distribution Cleanup**:
+  - Eliminated duplicate executable issue where both `main.exe` and `TheWenderer.exe` were packaged into `TheWenderer_Standalone.zip`.
+  - Updated [`makefile`](/makefile) `package` target to explicitly copy `build/main.exe` directly as `TheWenderer.exe` in both `TheWenderer/` and `dist/TheWenderer/`.
+  - Purged leftover `TheWenderer/main.exe` and regenerated `TheWenderer_Standalone.zip` with a single, branded executable: `TheWenderer/TheWenderer.exe`.
+
+### [v0.6.0] - 2026-10-25
+#### Session Archive: [`v5.0 - Combat System, 3 Lives, Spikes, Bringer of Death, and Demon Slime Boss Battle.md`](/doc/prompts/v5.0%20-%20Combat%20System,%203%20Lives,%20Spikes,%20Bringer%20of%20Death,%20and%20Demon%20Slime%20Boss%20Battle.md)
+* **Real-Time Combat & Player Attack System**:
+  - Implemented melee sword slash attack triggered by **`[J]`**, **`[X]`**, or **Left Mouse Button (LMB)**.
+  - Dynamically activates `samuraiAnim.texAttack` with an oriented front-facing hitbox sweep arc ($2.4\times 2.0$ meters at $1.35\text{m}$ reach).
+  - Exact damage scaling per specification:
+    - **Bringer of Death**: Slain in **1 hit** (+250 points, +5 coins).
+    - **Initial Slime**: Slain in **2 hits**, triggering a dramatic delayed demonic transformation into the Boss!
+    - **Boss Demon Slime**: Slain in **5 hits** (+1000 boss defeat bonus, +20 coins).
+* **Player 3-Lives System & Heart Relics**:
+  - Replaced instant sudden-death with a forgiving **3-Lives Health System** (`playerLives = 3`).
+  - Added animated ruby heart pickups (`assets/heart_pickup.png`) spawning directly alongside shield relics.
+  - Picking up a heart restores **+1 Life pip** (up to 3 max); at full health, grants **+150 Overheal Bonus Score**.
+  - Taking damage (spike trap impalement, enemy blade, or slime contact) reduces 1 life pip and grants **1.25s grace invulnerability** with flash feedback.
+  - Score HUD updated to render 3 animated heart life pips beside the distance and coin meters.
+* **Procedural Metallic Spikes Hazard Texture**:
+  - Generated procedural $64\times 64$ metallic spike trap texture `assets/spikes.png` with steel teeth and red hazard warning base.
+  - Replaced Brackeys pumpkin tile UVs with `spikesTexture` across the platform runner, `LadderScene`, and `SkyFallScene`.
+* **Enemy AI, Boss Battle & Avoidance**:
+  - **Bringer of Death** ([Clembod](https://clembod.itch.io/bringer-of-death-free)): Roams surface and caverns; alerts and swings death scythe when close.
+  - **Initial Slime** ([Chierit](https://chierit.itch.io/boss-demon-slime)): Spawns at random on surface; hops towards player. Defeating it triggers a 3.2s transformation with audio roar into the Boss Demon Slime.
+  - **Boss Demon Slime**: Giant $8.5\times 8.5\text{m}$ boss entity with 5 HP, overhead crimson health bar, heavy cleave attacks, and direct contact damage.
+  - **Boss Avoidance & Despawn**: Player can avoid the fight by sprinting in the opposite direction ($>28\text{m}$) or dashing through it ($>8\text{m}$ away), causing the boss to retreat and despawn cleanly.
+* **Procedural Audio Waveforms for Combat & Enemies**:
+  - Added 8 procedural synthetic waveforms in `Audio.cpp`: `SFX_SLASH`, `SFX_ENEMY_HIT`, `SFX_ENEMY_ATTACK`, `SFX_ENEMY_DEATH`, `SFX_SLIME_BOUNCE`, `SFX_BOSS_ROAR`, `SFX_BOSS_ATTACK`, `SFX_HEART_PICKUP`.
+* **Overhead Health Bars & Relic Balancing**:
+  - Rendered segmented floating health bars with custom color codings above roaming enemies and wide crimson health bar above the Demon Slime.
+  - Shield relics rebalanced to spawn less frequently (1 in 5 platform roll) and positioned strictly on separate platforms away from direction-change relics.
 
 ### [v0.5.15] - 2026-10-25
 #### Session Archive: [`v4.17 - Ladder Hero Scale Fix, Post-Intro Tutorial Modal, Shield Pickup Icon, and Scene Exit Timers.md`](/doc/prompts/v4.17%20-%20Ladder%20Hero%20Scale%20Fix,%20Post-Intro%20Tutorial%20Modal,%20Shield%20Pickup%20Icon,%20and%20Scene%20Exit%20Timers.md)

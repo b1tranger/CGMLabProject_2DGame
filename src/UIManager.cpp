@@ -144,12 +144,13 @@ void UIManager::renderCornerNotification(float halfW, float halfH, int frameCoun
 }
 
 void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore, int coins, float distance,
-                               float shieldTimer, int frameCount, unsigned int coinTex)
+                               float shieldTimer, int playerLives, int frameCount,
+                               unsigned int coinTex, unsigned int heartTex)
 {
     glm::mat4 identityView = glm::mat4(1.0f);
     glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
 
-    float scoreCardW = 5.6f;
+    float scoreCardW = 6.4f;
     float scoreCardH = 1.45f;
     float scoreCardX = halfW - (scoreCardW * 0.5f) - 0.6f;
     float scoreCardY = halfH - (scoreCardH * 0.5f) - 0.6f;
@@ -170,6 +171,19 @@ void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore, int coi
     glm::vec4 coinHUDUV = getCoinUV(frameCount / 4);
     gameRenderer.drawQuad(modelCoinHUD, identityView, orthoUI, glm::vec4(1.0f), (coinTex != 0), coinHUDUV, coinTex);
 
+    // 3 Ruby Heart icons for Player Lives
+    for (int i = 0; i < 3; ++i) {
+        float hx = scoreCardX + (scoreCardW * 0.5f) - 1.9f + (i * 0.55f);
+        float hy = scoreCardY + 0.22f;
+        glm::mat4 modelHeart = glm::mat4(1.0f);
+        modelHeart = glm::translate(modelHeart, glm::vec3(hx, hy, 0.0f));
+        modelHeart = glm::scale(modelHeart, glm::vec3(0.52f, 0.52f, 1.0f));
+        bool hasLife = (playerLives > i);
+        glm::vec4 heartCol = hasLife ? glm::vec4(1.0f, 0.25f, 0.35f, 1.0f) : glm::vec4(0.35f, 0.38f, 0.45f, 0.45f);
+        glm::vec4 heartUV = getHeartUV((frameCount / 6) % 4);
+        gameRenderer.drawQuad(modelHeart, identityView, orthoUI, heartCol, (heartTex != 0), heartUV, heartTex);
+    }
+
     std::string scoreStr = "SCORE " + std::to_string(totalScore);
     std::string statsStr = "COIN " + std::to_string(coins) + "  DIST " + std::to_string(static_cast<int>(distance)) + "m";
     if (shieldTimer > 0.0f) {
@@ -179,6 +193,60 @@ void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore, int coi
                           glm::vec4(1.0f, 0.86f, 0.22f, 1.0f), orthoUI);
     gameRenderer.drawText(statsStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f, scoreCardY - 0.38f, 0.20f, 0.30f,
                           (shieldTimer > 0.0f) ? glm::vec4(0.3f, 0.95f, 1.0f, 1.0f) : glm::vec4(0.85f, 0.94f, 1.0f, 0.95f), orthoUI);
+}
+
+void UIManager::renderEnemyHealthBars(const glm::mat4& view, const glm::mat4& projection,
+                                      const std::vector<EnemyEntity>& enemies, float animTimer)
+{
+    (void)animTimer;
+    for (const auto& enemy : enemies) {
+        if (!enemy.active || enemy.state == ENEMY_STATE_DEATH) continue;
+
+        bool isBoss = (enemy.type == ENEMY_BOSS_DEMON_SLIME);
+        float barW = isBoss ? 3.4f : 1.5f;
+        float barH = isBoss ? 0.32f : 0.18f;
+        float barY = enemy.pos.y + (enemy.size.y * 0.5f) + (isBoss ? 0.55f : 0.32f);
+        float barX = enemy.pos.x;
+
+        // Background shadow / border
+        glm::mat4 modelBg = glm::mat4(1.0f);
+        modelBg = glm::translate(modelBg, glm::vec3(barX, barY, 0.0f));
+        modelBg = glm::scale(modelBg, glm::vec3(barW + 0.12f, barH + 0.08f, 1.0f));
+        gameRenderer.drawQuad(modelBg, view, projection, glm::vec4(0.04f, 0.04f, 0.08f, 0.92f), false, glm::vec4(0), 0);
+
+        // Health fill
+        float hpRatio = (enemy.maxHp > 0) ? (static_cast<float>(enemy.hp) / static_cast<float>(enemy.maxHp)) : 0.0f;
+        hpRatio = std::max(0.0f, std::min(1.0f, hpRatio));
+        float fillW = barW * hpRatio;
+        float fillOffset = -(barW * 0.5f) + (fillW * 0.5f);
+
+        glm::vec4 hpCol;
+        if (isBoss) {
+            hpCol = glm::vec4(0.95f, 0.15f, 0.15f, 1.0f); // Crimson demon boss
+        } else if (enemy.type == ENEMY_SLIME_INITIAL) {
+            hpCol = glm::vec4(0.20f, 0.88f, 0.35f, 1.0f); // Emerald slime
+        } else {
+            hpCol = glm::vec4(0.85f, 0.35f, 0.95f, 1.0f); // Violet bringer of death
+        }
+
+        if (fillW > 0.01f) {
+            glm::mat4 modelFill = glm::mat4(1.0f);
+            modelFill = glm::translate(modelFill, glm::vec3(barX + fillOffset, barY, 0.0f));
+            modelFill = glm::scale(modelFill, glm::vec3(fillW, barH, 1.0f));
+            gameRenderer.drawQuad(modelFill, view, projection, hpCol, false, glm::vec4(0), 0);
+        }
+
+        // Draw segmented tick marks if maxHp > 1
+        if (enemy.maxHp > 1) {
+            for (int seg = 1; seg < enemy.maxHp; ++seg) {
+                float segX = barX - (barW * 0.5f) + (barW / enemy.maxHp) * seg;
+                glm::mat4 modelTick = glm::mat4(1.0f);
+                modelTick = glm::translate(modelTick, glm::vec3(segX, barY, 0.0f));
+                modelTick = glm::scale(modelTick, glm::vec3(0.04f, barH, 1.0f));
+                gameRenderer.drawQuad(modelTick, view, projection, glm::vec4(0.06f, 0.06f, 0.10f, 0.95f), false, glm::vec4(0), 0);
+            }
+        }
+    }
 }
 
 void UIManager::renderTrialBadge(float halfW, float halfH, float timeLeft, float totalTime, float animTimer) {
@@ -326,7 +394,7 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore, int co
                           glm::vec4(1.0f, 0.4f, 0.4f, 1.0f), orthoUI);
     curY -= 0.56f;
 
-    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE/DROP  [SHIFT] DASH  [F] FREE EXPLORE",
+    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  [J/X/CLICK] ATTACK",
                           textX - 0.45f, curY, 0.15f, 0.22f, glm::vec4(0.6f, 0.7f, 0.85f, 0.8f), orthoUI);
 }
 
@@ -338,8 +406,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH, bool openedFromPau
     modelOverlay = glm::scale(modelOverlay, glm::vec3(halfW * 2.0f, halfH * 2.0f, 1.0f));
     gameRenderer.drawQuad(modelOverlay, identityView, orthoUI, glm::vec4(0.02f, 0.03f, 0.06f, 0.88f), false, glm::vec4(0), 0);
 
-    float tutW = 14.2f;
-    float tutH = 10.6f;
+    float tutW = 14.6f;
+    float tutH = 11.2f;
     glm::mat4 modelTut = glm::mat4(1.0f);
     modelTut = glm::scale(modelTut, glm::vec3(tutW, tutH, 1.0f));
     gameRenderer.drawQuad(modelTut, identityView, orthoUI, glm::vec4(0.04f, 0.07f, 0.12f, 0.98f), false, glm::vec4(0), 0);
@@ -352,47 +420,59 @@ void UIManager::renderTutorialModal(float halfW, float halfH, bool openedFromPau
     float textX = -tutW * 0.5f + 0.85f;
     float curY  = tutH * 0.5f - 0.85f;
 
-    gameRenderer.drawText("=== WELCOME TO THE WENDERER ===", textX + 1.2f, curY, 0.32f, 0.46f,
+    gameRenderer.drawText("=== WELCOME TO THE WENDERER ===", textX + 1.4f, curY, 0.32f, 0.46f,
                           glm::vec4(1.0f, 0.88f, 0.25f, 1.0f), orthoUI);
-    curY -= 0.65f;
+    curY -= 0.60f;
 
-    gameRenderer.drawText("--- THE ESSENCE OF WANDERING ---", textX + 1.8f, curY, 0.22f, 0.32f,
+    gameRenderer.drawText("--- THE ESSENCE OF WANDERING ---", textX + 2.0f, curY, 0.22f, 0.32f,
                           glm::vec4(0.40f, 0.85f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.70f;
+    curY -= 0.60f;
 
-    gameRenderer.drawText("Endless runner with traps to avoid and shields to pickup.", textX, curY, 0.21f, 0.30f,
+    gameRenderer.drawText("Endless runner with traps to avoid and shields to pickup.", textX, curY, 0.20f, 0.29f,
                           glm::vec4(0.95f, 0.95f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.46f;
+    curY -= 0.40f;
 
-    gameRenderer.drawText("Change movement direction and find the end goal of this venture.", textX, curY, 0.21f, 0.30f,
+    gameRenderer.drawText("Change movement direction and find the end goal of this venture.", textX, curY, 0.20f, 0.29f,
                           glm::vec4(1.0f, 0.88f, 0.35f, 1.0f), orthoUI);
-    curY -= 0.65f;
+    curY -= 0.55f;
 
-    gameRenderer.drawText("SHIELDS: Pick up glowing Shield icons to absorb 1 trap impact.", textX, curY, 0.19f, 0.28f,
+    gameRenderer.drawText("COMBAT : Press [J] / [X] / [Left Click] to attack with katana.", textX, curY, 0.18f, 0.27f,
+                          glm::vec4(1.0f, 0.45f, 0.45f, 1.0f), orthoUI);
+    curY -= 0.36f;
+
+    gameRenderer.drawText("ENEMIES: 1-hit Roamers, 2-hit Slimes, 5-hit Demon Slime Boss!", textX, curY, 0.18f, 0.27f,
+                          glm::vec4(1.0f, 0.75f, 0.35f, 1.0f), orthoUI);
+    curY -= 0.36f;
+
+    gameRenderer.drawText("LIVES  : 3 Hits absorbed before death. Pick up Hearts to restore lives.", textX, curY, 0.18f, 0.27f,
+                          glm::vec4(1.0f, 0.35f, 0.65f, 1.0f), orthoUI);
+    curY -= 0.36f;
+
+    gameRenderer.drawText("SHIELDS: Pick up glowing Shield icons to absorb 1 hazard/enemy hit.", textX, curY, 0.18f, 0.27f,
                           glm::vec4(0.35f, 0.95f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.44f;
+    curY -= 0.36f;
 
-    gameRenderer.drawText("WARPS  : Touch Direction Relics to transition into new dimensions.", textX, curY, 0.19f, 0.28f,
+    gameRenderer.drawText("WARPS  : Touch Direction Relics to transition into new dimensions.", textX, curY, 0.18f, 0.27f,
                           glm::vec4(0.45f, 1.0f, 0.55f, 1.0f), orthoUI);
-    curY -= 0.65f;
+    curY -= 0.52f;
 
-    gameRenderer.drawText("Check the pause menu for control details and press 'T' while", textX, curY, 0.20f, 0.29f,
+    gameRenderer.drawText("Check the pause menu for control details and press 'T' while", textX, curY, 0.19f, 0.28f,
                           glm::vec4(0.90f, 0.85f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.38f;
+    curY -= 0.34f;
 
-    gameRenderer.drawText("in the pause menu to view the tutorial window again.", textX, curY, 0.20f, 0.29f,
+    gameRenderer.drawText("in the pause menu to view this tutorial window again.", textX, curY, 0.19f, 0.28f,
                           glm::vec4(0.35f, 1.0f, 0.70f, 1.0f), orthoUI);
-    curY -= 0.65f;
+    curY -= 0.50f;
 
     glm::mat4 modelDiv = glm::mat4(1.0f);
     modelDiv = glm::translate(modelDiv, glm::vec3(0.0f, curY + 0.08f, 0.0f));
     modelDiv = glm::scale(modelDiv, glm::vec3(tutW - 1.7f, 0.04f, 1.0f));
     gameRenderer.drawQuad(modelDiv, identityView, orthoUI, glm::vec4(0.3f, 0.45f, 0.6f, 0.6f), false, glm::vec4(0), 0);
-    curY -= 0.46f;
+    curY -= 0.42f;
 
-    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  [F] FREE MODE",
+    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  [J/X/CLICK] ATTACK",
                           textX - 0.20f, curY, 0.15f, 0.22f, glm::vec4(0.7f, 0.8f, 0.95f, 0.9f), orthoUI);
-    curY -= 0.65f;
+    curY -= 0.58f;
 
     std::string promptStr = openedFromPause ? "PRESS [SPACE / ENTER / ESC / T] TO RESUME" : "PRESS [SPACE / ENTER / ESC] TO BEGIN VENTURE";
     float prW = static_cast<float>(promptStr.length()) * 0.23f;

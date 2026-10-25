@@ -14,6 +14,7 @@ public:
 
     bool checkCollision(const glm::vec2& posA, const glm::vec2& sizeA,
                         const glm::vec2& posB, const glm::vec2& sizeB) const;
+    bool hasSolidGroundAt(float x, float y, float toleranceY = 0.5f) const;
 
     std::vector<PlatformTile>   tiles;
     std::vector<LadderTunnel>   tunnels;
@@ -21,7 +22,9 @@ public:
     std::vector<SpikeTrap>      spikes;
     std::vector<DirectionRelic> relics;
     std::vector<FruitShield>    fruits;
+    std::vector<HeartPickup>    hearts;
     std::vector<AnimatedCoin>   coins;
+    std::vector<EnemyEntity>    enemies;
 
     float rightGenEdge;
     float leftGenEdge;

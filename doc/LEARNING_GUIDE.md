@@ -24,6 +24,7 @@ Welcome to **The Wenderer** project! This guide is written in clear, simple lang
    - [Phase 3: Game Feel & Polish](#phase-3-game-feel--polish)
    - [Phase 4: Game States & Deployment](#phase-4-game-states--deployment)
    - [Phase 5: Mini-Game Scene State Machine, Dash Trails & Dynamic Direction Mini-Games](#phase-5-mini-game-scene-state-machine-dash-trails--dynamic-direction-mini-games)
+   - [Phase 6: Real-Time Combat System, Hitbox Sweeps, 3 Lives, Roaming Enemies & Demon Slime Boss Battle](#17-real-time-combat-systems-hitbox-arc-sweeps-3-lives-health-pipeline--boss-state-machines-v060)
 6. [Quick Reference & Math Cheatsheet](#6-quick-reference--math-cheatsheet)
 
 ---
@@ -680,6 +681,27 @@ Instead of flat, plain-color geometric rectangles, the world is constructed from
     - **Temporal Pacing & Exit Predictability in Mini-Games**:
       - Sudden appearance of collectibles without prior warning creates abrupt, jarring scene changes.
       - Implementing a top-center real-time countdown timer (`SURVIVE UNTIL EXIT: XX.Xs`) coupled with a distinct audio/visual announcement banner (`=== EXIT APPEARED! ===`) gives players the necessary cognitive warning to adjust trajectory and choose their exit route intentionally.
+
+17. **Real-Time Combat Systems, Hitbox Arc Sweeps, 3-Lives Health Pipeline & Boss State Machines (`v0.6.0`)**:
+    - **Melee Attack Hitbox Sweeping & Active Frames**:
+      - Real-time combat requires decoupling the full animation length ($6\text{ frames} \approx 0.5\text{s}$) from the active damage window.
+      - An attack arc is active only during key impact frames (e.g. $t \in [0.10, 0.32]\text{s}$). During this window, an attack bounding box is projected directly in front of the player along the facing direction vector:
+        $$\mathbf{p}_{\text{hit}} = \mathbf{p}_{\text{player}} + (\text{dirSign} \times 1.35\,\hat{\mathbf{i}})$$
+      - Single-hit flag `attackDamageDealt` guarantees that a single sword swing registers exactly one point of damage rather than re-triggering damage every 16ms frame.
+    - **Finite State Machine (FSM) for Enemies & Boss Transformations**:
+      - Roaming enemies and the Demon Slime operate on structured FSM states: `ENEMY_STATE_IDLE`, `ENEMY_STATE_PATROL`, `ENEMY_STATE_ATTACK`, `ENEMY_STATE_TRANSFORM`, and `ENEMY_STATE_DEATH`.
+      - **Initial Slime Defeat & Delayed Metamorphosis**:
+        - When the Initial Slime is reduced to 0 HP, it enters `ENEMY_STATE_TRANSFORM` rather than dying immediately.
+        - A 3.2-second transformation timer plays the 32-frame slime metamorphosis animation sequence with deep synthesized roars before spawning the full 5 HP Boss Demon Slime.
+      - **Boss Avoidance & Spatial Despawning**:
+        - Boss encounters provide agency: players can either fight the Demon Slime directly (requiring 5 consecutive sword strikes) or evade it by sprinting $>28\,\text{m}$ in the opposite direction or executing a Shadow Dash through the boss ($>8\,\text{m}$ clear), safely resetting the encounter without penalizing the runner.
+    - **Overhead Health Bars & Segmented Tick Division**:
+      - To provide immediate tactical feedback, floating world-space health bars are rendered directly above each living enemy.
+      - Segmented vertical ticks dynamically divide the health bar into integer slices ($w_{\text{seg}} = \frac{W_{\text{bar}}}{\text{maxHp}}$), allowing players to intuitively track the 1-hit (BOD), 2-hit (Slime), and 5-hit (Boss) mechanics at a glance.
+    - **3-Lives Health Pipeline & Grace Invulnerability**:
+      - Replaced instantaneous sudden death with 3 absorbent player lives (`playerLives = 3`).
+      - On taking damage from hazards or enemies, the engine deducts 1 life pip, triggers a $1.25\,\text{s}$ invulnerability grace period (`postHitInvulnTimer = 1.25f`), and displays on-screen remaining life counters.
+      - Ruby heart relics spawn alongside defensive shields, restoring lost lives or conferring +150 overheal score bonuses.
 
 ---
 

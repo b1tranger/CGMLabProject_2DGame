@@ -230,7 +230,7 @@ void LadderScene::update(float deltaTime, GLFWwindow* window,
 void LadderScene::render(const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cameraPos,
                          float animTimer, float daylightFactor, float twilightFactor,
                          unsigned int tilesetTex, unsigned int coinTex, unsigned int shieldTex, unsigned int arrowTex,
-                         unsigned int sceneryTex, float shieldTimerVal, const glm::vec2& playerRenderSize)
+                         unsigned int sceneryTex, unsigned int spikesTex, float shieldTimerVal, const glm::vec2& playerRenderSize)
 {
     // Thematic Scenery Backdrop behind ladders
     glm::vec4 nightSceneryTint(0.42f, 0.48f, 0.70f, 1.0f);
@@ -282,14 +282,19 @@ void LadderScene::render(const glm::mat4& view, const glm::mat4& projection, con
     }
 
     // 3. Render Ladder Traps (Spikes / Sawblades)
+    // 3. Render Spikes on Ladder Track
     for (const auto& trap : traps) {
         if (!trap.active) continue;
         float tx = TRACK_X[trap.lane];
         glm::mat4 modelTrap = glm::mat4(1.0f);
         modelTrap = glm::translate(modelTrap, glm::vec3(tx, trap.y, 0.0f));
         modelTrap = glm::scale(modelTrap, glm::vec3(1.35f, 1.35f, 1.0f));
-        glm::vec4 trapUV = getTilesetUV(4, 8);
-        gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f, 0.3f, 0.3f, 1.0f), (tilesetTex != 0), trapUV, tilesetTex);
+        if (spikesTex != 0) {
+            gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f), true, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), spikesTex);
+        } else {
+            glm::vec4 trapUV = getTilesetUV(4, 8);
+            gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f, 0.3f, 0.3f, 1.0f), (tilesetTex != 0), trapUV, tilesetTex);
+        }
     }
 
     // 4. Render Ladder Collectibles (Coins, Shield Pickups & Direction Arrow Relics)

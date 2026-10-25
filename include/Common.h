@@ -105,6 +105,14 @@ enum SFXType {
     SFX_RELIC,
     SFX_SHIFT,
     SFX_DEATH,
+    SFX_SLASH,
+    SFX_ENEMY_HIT,
+    SFX_ENEMY_ATTACK,
+    SFX_ENEMY_DEATH,
+    SFX_SLIME_BOUNCE,
+    SFX_BOSS_ROAR,
+    SFX_BOSS_ATTACK,
+    SFX_HEART_PICKUP,
     SFX_COUNT
 };
 
@@ -157,10 +165,63 @@ struct FruitShield {
     bool collected;
 };
 
+struct HeartPickup {
+    glm::vec2 pos;
+    float animPhase;
+    bool collected;
+};
+
 struct AnimatedCoin {
     glm::vec2 pos;
     float animTimer;
     bool collected;
+};
+
+// -----------------------------------------------------------------------------
+// Enemy Entities & Boss Fight Structures
+// -----------------------------------------------------------------------------
+enum EnemyType {
+    ENEMY_BRINGER_OF_DEATH = 0,
+    ENEMY_SLIME_INITIAL    = 1,
+    ENEMY_BOSS_DEMON_SLIME = 2
+};
+
+enum EnemyState {
+    ENEMY_STATE_IDLE,
+    ENEMY_STATE_PATROL,
+    ENEMY_STATE_ALERT,
+    ENEMY_STATE_ATTACK,
+    ENEMY_STATE_CAST,
+    ENEMY_STATE_HURT,
+    ENEMY_STATE_TRANSFORM,
+    ENEMY_STATE_DEATH,
+    ENEMY_STATE_JUMP
+};
+
+struct SpellHazard {
+    glm::vec2 pos;
+    float animTimer;
+    bool hasDealtDamage;
+    bool active;
+};
+
+struct EnemyEntity {
+    EnemyType type;
+    EnemyState state;
+    glm::vec2 pos;
+    glm::vec2 size;
+    glm::vec2 vel;
+    int hp;
+    int maxHp;
+    bool facingLeft;
+    float animTimer;
+    float stateTimer;
+    float attackCooldown;
+    float jumpCooldown;
+    float spellCooldown;
+    float hurtTimer;
+    bool active;
+    bool hasHitPlayerThisAttack;
 };
 
 struct CornerNotification {
@@ -223,6 +284,15 @@ inline glm::vec4 getCoinUV(int frame) {
 }
 
 inline glm::vec4 getShieldUV(int frame = 0) {
+    int idx = (frame % 4);
+    float u  = static_cast<float>(idx) * 0.25f;
+    float v  = 0.0f;
+    float du = 0.25f;
+    float dv = 1.0f;
+    return glm::vec4(u, v, du, dv);
+}
+
+inline glm::vec4 getHeartUV(int frame = 0) {
     int idx = (frame % 4);
     float u  = static_cast<float>(idx) * 0.25f;
     float v  = 0.0f;
