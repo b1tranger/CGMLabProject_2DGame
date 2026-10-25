@@ -145,14 +145,15 @@ void UIManager::renderCornerNotification(float halfW, float halfH, int frameCoun
 
 void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore, int coins, float distance,
                                float shieldTimer, int playerLives, int frameCount,
-                               unsigned int coinTex, unsigned int heartTex)
+                               unsigned int coinTex, unsigned int heartTex,
+                               bool isBlocking, float blockCooldown)
 {
     glm::mat4 identityView = glm::mat4(1.0f);
     glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
 
-    float scoreCardW = 6.4f;
+    float scoreCardW = 7.4f;
     float scoreCardH = 1.45f;
-    float scoreCardX = halfW - (scoreCardW * 0.5f) - 0.6f;
+    float scoreCardX = halfW - (scoreCardW * 0.5f) - 0.5f;
     float scoreCardY = halfH - (scoreCardH * 0.5f) - 0.6f;
 
     glm::mat4 modelScoreCard = glm::mat4(1.0f);
@@ -189,10 +190,20 @@ void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore, int coi
     if (shieldTimer > 0.0f) {
         statsStr += "  SHIELD " + std::to_string(static_cast<int>(shieldTimer + 0.9f)) + "s";
     }
+    if (isBlocking) {
+        statsStr += "  [GUARD: ACTIVE]";
+    } else if (blockCooldown > 0.0f) {
+        char cdBuf[24];
+        snprintf(cdBuf, sizeof(cdBuf), "  [DEF: %.1fs]", blockCooldown);
+        statsStr += cdBuf;
+    }
     gameRenderer.drawText(scoreStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f, scoreCardY + 0.16f, 0.26f, 0.38f,
                           glm::vec4(1.0f, 0.86f, 0.22f, 1.0f), orthoUI);
-    gameRenderer.drawText(statsStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f, scoreCardY - 0.38f, 0.20f, 0.30f,
-                          (shieldTimer > 0.0f) ? glm::vec4(0.3f, 0.95f, 1.0f, 1.0f) : glm::vec4(0.85f, 0.94f, 1.0f, 0.95f), orthoUI);
+    glm::vec4 statsColor = isBlocking ? glm::vec4(0.35f, 1.0f, 0.95f, 1.0f) :
+                           (blockCooldown > 0.0f) ? glm::vec4(1.0f, 0.85f, 0.35f, 1.0f) :
+                           (shieldTimer > 0.0f) ? glm::vec4(0.3f, 0.95f, 1.0f, 1.0f) : glm::vec4(0.85f, 0.94f, 1.0f, 0.95f);
+    gameRenderer.drawText(statsStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f, scoreCardY - 0.38f, 0.18f, 0.27f,
+                          statsColor, orthoUI);
 }
 
 void UIManager::renderEnemyHealthBars(const glm::mat4& view, const glm::mat4& projection,
@@ -314,7 +325,8 @@ void UIManager::renderStartHintBanner(float halfW, float halfH, float animTimer)
 }
 
 void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore, int coins, int relics, float distance,
-                               bool freeExploration, int activeScenery, bool isNight, float timeLeftInPhase)
+                               bool freeExploration, int activeScenery, bool isNight, float timeLeftInPhase,
+                               bool autoShiftEnabled, bool bgmMuted)
 {
     glm::mat4 identityView = glm::mat4(1.0f);
     glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
@@ -323,8 +335,8 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore, int co
     modelOverlay = glm::scale(modelOverlay, glm::vec3(halfW * 2.0f, halfH * 2.0f, 1.0f));
     gameRenderer.drawQuad(modelOverlay, identityView, orthoUI, glm::vec4(0.02f, 0.03f, 0.06f, 0.78f), false, glm::vec4(0), 0);
 
-    float menuW = 12.8f;
-    float menuH = 10.7f;
+    float menuW = 13.2f;
+    float menuH = 11.6f;
     glm::mat4 modelMenu = glm::mat4(1.0f);
     modelMenu = glm::scale(modelMenu, glm::vec3(menuW, menuH, 1.0f));
     gameRenderer.drawQuad(modelMenu, identityView, orthoUI, glm::vec4(0.05f, 0.07f, 0.12f, 0.96f), false, glm::vec4(0), 0);
@@ -335,67 +347,79 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore, int co
     gameRenderer.drawQuad(modelHeaderStripe, identityView, orthoUI, glm::vec4(1.0f, 0.82f, 0.20f, 1.0f), false, glm::vec4(0), 0);
 
     float textX = -menuW * 0.5f + 0.9f;
-    float curY  = menuH * 0.5f - 0.9f;
+    float curY  = menuH * 0.5f - 0.85f;
 
-    gameRenderer.drawText("=== GAME PAUSED ===", textX + 1.8f, curY, 0.34f, 0.48f,
+    gameRenderer.drawText("=== GAME PAUSED ===", textX + 2.0f, curY, 0.34f, 0.48f,
                           glm::vec4(1.0f, 0.85f, 0.25f, 1.0f), orthoUI);
-    curY -= 0.80f;
+    curY -= 0.72f;
 
     gameRenderer.drawText("HERO: SAMURAI MACK [KATANA MASTER]", textX, curY, 0.22f, 0.32f,
                           glm::vec4(0.35f, 0.95f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.48f;
+    curY -= 0.42f;
 
     gameRenderer.drawText("TOTAL SCORE: " + std::to_string(totalScore) + " PTS", textX, curY, 0.23f, 0.34f,
                           glm::vec4(1.0f, 0.9f, 0.35f, 1.0f), orthoUI);
-    curY -= 0.45f;
+    curY -= 0.40f;
 
     gameRenderer.drawText("DISTANCE: " + std::to_string(static_cast<int>(distance)) + "m   COINS: " +
                           std::to_string(coins) + "   RELICS: " + std::to_string(relics),
                           textX, curY, 0.19f, 0.28f, glm::vec4(0.85f, 0.92f, 0.98f, 0.95f), orthoUI);
-    curY -= 0.55f;
+    curY -= 0.48f;
 
     glm::mat4 modelDiv = glm::mat4(1.0f);
     modelDiv = glm::translate(modelDiv, glm::vec3(0.0f, curY + 0.12f, 0.0f));
     modelDiv = glm::scale(modelDiv, glm::vec3(menuW - 1.8f, 0.05f, 1.0f));
     gameRenderer.drawQuad(modelDiv, identityView, orthoUI, glm::vec4(0.3f, 0.45f, 0.6f, 0.6f), false, glm::vec4(0), 0);
-    curY -= 0.42f;
+    curY -= 0.38f;
 
     gameRenderer.drawText("[ESC / SPACE]   RESUME GAME", textX, curY, 0.23f, 0.32f,
                           glm::vec4(0.35f, 1.0f, 0.55f, 1.0f), orthoUI);
-    curY -= 0.48f;
+    curY -= 0.42f;
 
-    std::string modeMenuStr = freeExploration ? "FREE EXPLORATION [MANUAL A/D]" : "AUTO-RUNNER [CONTINUOUS SPRINT]";
+    std::string modeMenuStr = freeExploration ? "FREE EXPLORATION (DEFAULT) [MANUAL A/D]" : "AUTO-RUNNER [CONTINUOUS SPRINT]";
     glm::vec4 modeMenuCol = freeExploration ? glm::vec4(0.35f, 1.0f, 0.55f, 1.0f) : glm::vec4(0.25f, 0.85f, 1.0f, 1.0f);
-    gameRenderer.drawText("[F]             MODE: " + modeMenuStr, textX, curY, 0.21f, 0.30f,
+    gameRenderer.drawText("[F]             MODE: " + modeMenuStr, textX, curY, 0.20f, 0.28f,
                           modeMenuCol, orthoUI);
-    curY -= 0.48f;
+    curY -= 0.42f;
+
+    std::string musicStr = bgmMuted ? "MUTED [Press M to Unmute]" : "50% VOLUME [Press M to Mute]";
+    glm::vec4 musicCol = bgmMuted ? glm::vec4(1.0f, 0.45f, 0.45f, 1.0f) : glm::vec4(0.40f, 0.85f, 1.0f, 1.0f);
+    gameRenderer.drawText("[M]             BGM MUSIC: " + musicStr, textX, curY, 0.20f, 0.28f,
+                          musicCol, orthoUI);
+    curY -= 0.42f;
+
+    std::string shiftStr = autoShiftEnabled ? "AUTO TIMER (6.5s)" : "MANUAL (RELICS ONLY)";
+    glm::vec4 shiftCol = autoShiftEnabled ? glm::vec4(1.0f, 0.65f, 0.25f, 1.0f) : glm::vec4(0.4f, 0.95f, 0.5f, 1.0f);
+    gameRenderer.drawText("[Y]             SHIFT MODE: " + shiftStr, textX, curY, 0.20f, 0.28f,
+                          shiftCol, orthoUI);
+    curY -= 0.42f;
 
     std::string scenStr = (activeScenery == 0) ? "SILVERGRASS FIELD" :
                           (activeScenery == 1) ? "AUTUMN FOLIAGE" :
                           (activeScenery == 2) ? "GREEN FOREST" : "URBAN AREA";
-    gameRenderer.drawText("[B]             SCENERY: " + scenStr, textX, curY, 0.23f, 0.32f,
+    gameRenderer.drawText("[B]             SCENERY: " + scenStr, textX, curY, 0.22f, 0.30f,
                           glm::vec4(0.3f, 0.95f, 0.85f, 1.0f), orthoUI);
-    curY -= 0.48f;
+    curY -= 0.42f;
 
     std::string cycleStr = (isNight ? "NIGHT TIME (" : "DAY TIME (") + std::to_string(static_cast<int>(timeLeftInPhase)) + "s left)";
-    gameRenderer.drawText("[N]             CYCLE: " + cycleStr, textX, curY, 0.23f, 0.32f,
+    gameRenderer.drawText("[N]             CYCLE: " + cycleStr, textX, curY, 0.22f, 0.30f,
                           isNight ? glm::vec4(0.5f, 0.75f, 1.0f, 1.0f) : glm::vec4(1.0f, 0.85f, 0.35f, 1.0f), orthoUI);
-    curY -= 0.48f;
+    curY -= 0.42f;
 
-    gameRenderer.drawText("[T]             TUTORIAL / HOW TO PLAY", textX, curY, 0.23f, 0.32f,
+    gameRenderer.drawText("[T]             TUTORIAL / HOW TO PLAY", textX, curY, 0.22f, 0.30f,
                           glm::vec4(0.35f, 1.0f, 0.65f, 1.0f), orthoUI);
-    curY -= 0.48f;
+    curY -= 0.42f;
 
-    gameRenderer.drawText("[R]             RESTART RUN", textX, curY, 0.23f, 0.32f,
+    gameRenderer.drawText("[R]             RESTART RUN", textX, curY, 0.22f, 0.30f,
                           glm::vec4(0.95f, 0.85f, 0.3f, 1.0f), orthoUI);
+    curY -= 0.42f;
+
+    gameRenderer.drawText("[Q]             QUIT TO DESKTOP", textX, curY, 0.22f, 0.30f,
+                          glm::vec4(1.0f, 0.4f, 0.4f, 1.0f), orthoUI);
     curY -= 0.48f;
 
-    gameRenderer.drawText("[Q]             QUIT TO DESKTOP", textX, curY, 0.23f, 0.32f,
-                          glm::vec4(1.0f, 0.4f, 0.4f, 1.0f), orthoUI);
-    curY -= 0.56f;
-
-    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  [J/X/CLICK] ATTACK",
-                          textX - 0.45f, curY, 0.15f, 0.22f, glm::vec4(0.6f, 0.7f, 0.85f, 0.8f), orthoUI);
+    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  [L-CLICK] ATK  [R-CLICK] BLOCK  [F] MODE  [M] BGM",
+                          textX - 0.45f, curY, 0.128f, 0.18f, glm::vec4(0.6f, 0.7f, 0.85f, 0.8f), orthoUI);
 }
 
 void UIManager::renderTutorialModal(float halfW, float halfH, bool openedFromPause) {
@@ -406,8 +430,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH, bool openedFromPau
     modelOverlay = glm::scale(modelOverlay, glm::vec3(halfW * 2.0f, halfH * 2.0f, 1.0f));
     gameRenderer.drawQuad(modelOverlay, identityView, orthoUI, glm::vec4(0.02f, 0.03f, 0.06f, 0.88f), false, glm::vec4(0), 0);
 
-    float tutW = 14.6f;
-    float tutH = 11.2f;
+    float tutW = 15.6f;
+    float tutH = 12.8f;
     glm::mat4 modelTut = glm::mat4(1.0f);
     modelTut = glm::scale(modelTut, glm::vec3(tutW, tutH, 1.0f));
     gameRenderer.drawQuad(modelTut, identityView, orthoUI, glm::vec4(0.04f, 0.07f, 0.12f, 0.98f), false, glm::vec4(0), 0);
@@ -418,61 +442,73 @@ void UIManager::renderTutorialModal(float halfW, float halfH, bool openedFromPau
     gameRenderer.drawQuad(modelHeaderStripe, identityView, orthoUI, glm::vec4(0.25f, 0.85f, 1.0f, 1.0f), false, glm::vec4(0), 0);
 
     float textX = -tutW * 0.5f + 0.85f;
-    float curY  = tutH * 0.5f - 0.85f;
+    float curY  = tutH * 0.5f - 0.80f;
 
-    gameRenderer.drawText("=== WELCOME TO THE WENDERER ===", textX + 1.4f, curY, 0.32f, 0.46f,
+    gameRenderer.drawText("=== WELCOME TO THE WENDERER ===", textX + 1.8f, curY, 0.32f, 0.46f,
                           glm::vec4(1.0f, 0.88f, 0.25f, 1.0f), orthoUI);
-    curY -= 0.60f;
+    curY -= 0.52f;
 
-    gameRenderer.drawText("--- THE ESSENCE OF WANDERING ---", textX + 2.0f, curY, 0.22f, 0.32f,
+    gameRenderer.drawText("--- THE ESSENCE OF WANDERING ---", textX + 2.4f, curY, 0.22f, 0.32f,
                           glm::vec4(0.40f, 0.85f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.60f;
+    curY -= 0.46f;
 
-    gameRenderer.drawText("Endless runner with traps to avoid and shields to pickup.", textX, curY, 0.20f, 0.29f,
+    gameRenderer.drawText("Endless runner with traps to avoid, shields to pickup, and bosses to slay.", textX, curY, 0.19f, 0.28f,
                           glm::vec4(0.95f, 0.95f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.40f;
+    curY -= 0.32f;
 
-    gameRenderer.drawText("Change movement direction and find the end goal of this venture.", textX, curY, 0.20f, 0.29f,
-                          glm::vec4(1.0f, 0.88f, 0.35f, 1.0f), orthoUI);
-    curY -= 0.55f;
+    gameRenderer.drawText("MODES  : Free Exploration is DEFAULT ([A/D] move). Press [F] to toggle Auto-Run!", textX, curY, 0.18f, 0.27f,
+                          glm::vec4(0.35f, 1.0f, 0.65f, 1.0f), orthoUI);
+    curY -= 0.32f;
 
-    gameRenderer.drawText("COMBAT : Press [J] / [X] / [Left Click] to attack with katana.", textX, curY, 0.18f, 0.27f,
+    gameRenderer.drawText("MUSIC  : Looping BGM plays at 50% volume. Press [M] to mute/unmute at any time.", textX, curY, 0.18f, 0.27f,
+                          glm::vec4(0.40f, 0.85f, 1.0f, 1.0f), orthoUI);
+    curY -= 0.32f;
+
+    gameRenderer.drawText("COMBAT : Press [Left Click] / [J] / [X] to attack with katana.", textX, curY, 0.18f, 0.27f,
                           glm::vec4(1.0f, 0.45f, 0.45f, 1.0f), orthoUI);
-    curY -= 0.36f;
+    curY -= 0.32f;
 
-    gameRenderer.drawText("ENEMIES: 1-hit Roamers, 2-hit Slimes, 5-hit Demon Slime Boss!", textX, curY, 0.18f, 0.27f,
+    gameRenderer.drawText("DEFEND : Press [Right Click] or [K] to block attacks for 1s (2s cooldown on hit).", textX, curY, 0.18f, 0.27f,
+                          glm::vec4(0.35f, 1.0f, 0.95f, 1.0f), orthoUI);
+    curY -= 0.32f;
+
+    gameRenderer.drawText("ENEMIES: 1-hit Roamers (Multi-layer Thunder Spells!), 2-hit Slimes, 5-hit Demon Boss!", textX, curY, 0.18f, 0.27f,
                           glm::vec4(1.0f, 0.75f, 0.35f, 1.0f), orthoUI);
-    curY -= 0.36f;
+    curY -= 0.32f;
 
     gameRenderer.drawText("LIVES  : 3 Hits absorbed before death. Pick up Hearts to restore lives.", textX, curY, 0.18f, 0.27f,
                           glm::vec4(1.0f, 0.35f, 0.65f, 1.0f), orthoUI);
-    curY -= 0.36f;
+    curY -= 0.32f;
 
     gameRenderer.drawText("SHIELDS: Pick up glowing Shield icons to absorb 1 hazard/enemy hit.", textX, curY, 0.18f, 0.27f,
                           glm::vec4(0.35f, 0.95f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.36f;
+    curY -= 0.32f;
 
     gameRenderer.drawText("WARPS  : Touch Direction Relics to transition into new dimensions.", textX, curY, 0.18f, 0.27f,
                           glm::vec4(0.45f, 1.0f, 0.55f, 1.0f), orthoUI);
-    curY -= 0.52f;
+    curY -= 0.32f;
 
-    gameRenderer.drawText("Check the pause menu for control details and press 'T' while", textX, curY, 0.19f, 0.28f,
+    gameRenderer.drawText("SHIFTS : Press [Y] to toggle Auto-Shift Timer (or rely solely on relics).", textX, curY, 0.18f, 0.27f,
+                          glm::vec4(1.0f, 0.68f, 0.28f, 1.0f), orthoUI);
+    curY -= 0.42f;
+
+    gameRenderer.drawText("Check the pause menu for controls, or press 'T' at any time to", textX, curY, 0.19f, 0.28f,
                           glm::vec4(0.90f, 0.85f, 1.0f, 1.0f), orthoUI);
-    curY -= 0.34f;
+    curY -= 0.28f;
 
-    gameRenderer.drawText("in the pause menu to view this tutorial window again.", textX, curY, 0.19f, 0.28f,
+    gameRenderer.drawText("view this tutorial window again without losing your progress.", textX, curY, 0.19f, 0.28f,
                           glm::vec4(0.35f, 1.0f, 0.70f, 1.0f), orthoUI);
-    curY -= 0.50f;
+    curY -= 0.40f;
 
     glm::mat4 modelDiv = glm::mat4(1.0f);
     modelDiv = glm::translate(modelDiv, glm::vec3(0.0f, curY + 0.08f, 0.0f));
     modelDiv = glm::scale(modelDiv, glm::vec3(tutW - 1.7f, 0.04f, 1.0f));
     gameRenderer.drawQuad(modelDiv, identityView, orthoUI, glm::vec4(0.3f, 0.45f, 0.6f, 0.6f), false, glm::vec4(0), 0);
-    curY -= 0.42f;
+    curY -= 0.34f;
 
-    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  [J/X/CLICK] ATTACK",
-                          textX - 0.20f, curY, 0.15f, 0.22f, glm::vec4(0.7f, 0.8f, 0.95f, 0.9f), orthoUI);
-    curY -= 0.58f;
+    gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  [L-CLICK] ATK  [R-CLICK] BLOCK  [F] AUTO-RUN  [M] MUTE",
+                          textX - 0.22f, curY, 0.126f, 0.18f, glm::vec4(0.7f, 0.8f, 0.95f, 0.9f), orthoUI);
+    curY -= 0.48f;
 
     std::string promptStr = openedFromPause ? "PRESS [SPACE / ENTER / ESC / T] TO RESUME" : "PRESS [SPACE / ENTER / ESC] TO BEGIN VENTURE";
     float prW = static_cast<float>(promptStr.length()) * 0.23f;

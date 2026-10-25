@@ -113,6 +113,7 @@ enum SFXType {
     SFX_BOSS_ROAR,
     SFX_BOSS_ATTACK,
     SFX_HEART_PICKUP,
+    SFX_BLOCK,
     SFX_COUNT
 };
 
@@ -202,6 +203,7 @@ struct SpellHazard {
     glm::vec2 pos;
     float animTimer;
     bool hasDealtDamage;
+    bool audioPlayed;
     bool active;
 };
 
@@ -243,6 +245,7 @@ struct CharacterAnimSet {
     unsigned int texAttack  = 0;
     unsigned int texDeath   = 0;
     unsigned int texTakeHit = 0;
+    unsigned int texDefend  = 0;
 
     int runFrames     = 8;
     int idleFrames    = 8;
@@ -251,6 +254,7 @@ struct CharacterAnimSet {
     int attackFrames  = 6;
     int deathFrames   = 6;
     int takeHitFrames = 4;
+    int defendFrames  = 8;
 };
 
 extern CharacterAnimSet samuraiAnim;

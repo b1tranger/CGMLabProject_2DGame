@@ -13,6 +13,9 @@ AudioManager::AudioManager()
 
 AudioManager::~AudioManager() {
     stopTransformationAudio();
+    stopBGM();
+    mciSendStringA("close sfx_thunder", NULL, 0, NULL);
+    mciSendStringA("close sfx_dying_roar", NULL, 0, NULL);
 }
 
 void AudioManager::playSlimeDeathSplat() {
@@ -39,11 +42,45 @@ void AudioManager::playSmashLandingBang() {
     mciSendStringA("play sfx_bang from 0", NULL, 0, NULL);
 }
 
+void AudioManager::playBossDyingRoar() {
+    mciSendStringA("close sfx_dying_roar", NULL, 0, NULL);
+    mciSendStringA("open \"assets/dyingRoar.mp3\" type mpegvideo alias sfx_dying_roar", NULL, 0, NULL);
+    mciSendStringA("play sfx_dying_roar from 0", NULL, 0, NULL);
+}
+
+void AudioManager::playThunderSpell() {
+    mciSendStringA("close sfx_thunder", NULL, 0, NULL);
+    mciSendStringA("open \"assets/thunder-after-crackle.mp3\" type mpegvideo alias sfx_thunder", NULL, 0, NULL);
+    mciSendStringA("play sfx_thunder from 0", NULL, 0, NULL);
+}
+
+void AudioManager::startBGM() {
+    mciSendStringA("close bgm", NULL, 0, NULL);
+    mciSendStringA("open \"assets/Quarter_in_the_Slot.mp3\" type mpegvideo alias bgm", NULL, 0, NULL);
+    mciSendStringA("setaudio bgm volume to 500", NULL, 0, NULL);
+    mciSendStringA("play bgm repeat", NULL, 0, NULL);
+    isBgmMuted = false;
+}
+
+void AudioManager::stopBGM() {
+    mciSendStringA("close bgm", NULL, 0, NULL);
+}
+
+void AudioManager::toggleBgmMute() {
+    isBgmMuted = !isBgmMuted;
+    if (isBgmMuted) {
+        mciSendStringA("setaudio bgm volume to 0", NULL, 0, NULL);
+    } else {
+        mciSendStringA("setaudio bgm volume to 500", NULL, 0, NULL);
+    }
+}
+
 void AudioManager::stopTransformationAudio() {
     mciSendStringA("close sfx_splat", NULL, 0, NULL);
     mciSendStringA("close sfx_bubbling", NULL, 0, NULL);
     mciSendStringA("close sfx_roar", NULL, 0, NULL);
     mciSendStringA("close sfx_bang", NULL, 0, NULL);
+    mciSendStringA("close sfx_dying_roar", NULL, 0, NULL);
 }
 
 std::vector<uint8_t> AudioManager::buildWav(const std::vector<int16_t>& samples, int sampleRate) {
@@ -352,6 +389,36 @@ void AudioManager::init() {
         }
         sfxBuffers[SFX_HEART_PICKUP] = buildWav(samples, sr);
     }
+
+    // 17. SFX_BLOCK: Resonant Japanese katana parry & sword guard deflection (sharp metallic impact + sustained ringing steel)
+    {
+        int count = static_cast<int>(sr * 0.28f); // 280ms duration
+        std::vector<int16_t> samples(count);
+        for (int i = 0; i < count; ++i) {
+            float t = (float)i / count;
+            float timeSec = (float)i / sr;
+
+            // Sharp metallic impulse clink at t = 0 (first 12ms)
+            float clinkEnv = (t < 0.05f) ? (1.0f - (t / 0.05f)) : 0.0f;
+            float clinkNoise = ((float)(std::rand() % 2000) - 1000.0f) / 1000.0f;
+            float clinkPulse = std::sin(2.0f * PI * 4800.0f * timeSec) * clinkEnv;
+
+            // Dual resonant metallic steel chime harmonics with exponential ringing decay
+            float ringEnv = std::exp(-timeSec * 16.0f);
+            float ring1 = std::sin(2.0f * PI * 2850.0f * timeSec);
+            float ring2 = std::sin(2.0f * PI * 4150.0f * timeSec);
+            float ring3 = std::sin(2.0f * PI * 1650.0f * timeSec);
+            float steelRing = (ring1 * 0.50f + ring2 * 0.35f + ring3 * 0.25f) * ringEnv;
+
+            // Low body resonance ping (blade mass absorbing impact)
+            float bodyEnv = std::exp(-timeSec * 30.0f);
+            float bodyTone = std::sin(2.0f * PI * 420.0f * timeSec) * bodyEnv;
+
+            float s = (clinkPulse * 0.40f + clinkNoise * clinkEnv * 0.30f + steelRing * 0.70f + bodyTone * 0.35f);
+            samples[i] = static_cast<int16_t>(s * 22000.0f);
+        }
+        sfxBuffers[SFX_BLOCK] = buildWav(samples, sr);
+    }
 }
 
 void AudioManager::play(SFXType type) {
@@ -364,4 +431,13 @@ void AudioManager::updateCooldowns(float deltaTime) {
     stepCooldown  -= deltaTime;
     climbCooldown -= deltaTime;
     slideCooldown -= deltaTime;
+
+    // Keep BGM looping if cycle finishes
+    if (!isBgmMuted) {
+        char mode[32] = {0};
+        mciSendStringA("status bgm mode", mode, sizeof(mode), NULL);
+        if (strcmp(mode, "stopped") == 0) {
+            mciSendStringA("play bgm from 0 repeat", NULL, 0, NULL);
+        }
+    }
 }

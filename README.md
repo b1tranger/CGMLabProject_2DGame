@@ -26,7 +26,7 @@ Unlike traditional static runners, **The Wenderer** features autonomous dynamic 
 mingw32-make
 
 # Or compile directly with g++:
-g++.exe -std=c++17 -Wall -Wextra -O2 -static-libgcc -static-libstdc++ -I./include ./src/main.cpp ./src/VideoPlayer.cpp ./src/Audio.cpp ./src/Renderer.cpp ./src/World.cpp ./src/glad.c -o ./build/main.exe -L./lib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lmfplat -lmfreadwrite -lmfuuid -lole32
+g++.exe -std=c++17 -Wall -Wextra -O2 -static-libgcc -static-libstdc++ -I./include ./src/main.cpp ./src/VideoPlayer.cpp ./src/Audio.cpp ./src/Renderer.cpp ./src/World.cpp ./src/UIManager.cpp ./src/LadderScene.cpp ./src/SkyFallScene.cpp ./src/glad.c -o ./build/main.exe -L./lib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lmfplat -lmfreadwrite -lmfuuid -lole32
 
 # Run the game
 ./build/main.exe
@@ -36,30 +36,33 @@ mingw32-make package
 ```
 
 ### Controls
+- **`A` / `D` (or Left / Right Arrow)**: **Walk & Run (Free Exploration - DEFAULT)** — Explore the world at your own pace! Samurai Mack stands still in idle stance when keys are released.
+- **`F`**: **Toggle Auto-Runner Mode** — Switches between default manual Free Exploration and continuous autonomous sprinting platformer mode.
+- **`M`**: **Mute / Unmute Background Music** — Toggles looping background music (`Quarter_in_the_Slot.mp3`, default 50% volume) with real-time HUD notification.
 - **`J` / `X` / `Left Mouse Click`**: **Sword Slash Attack** — Swing katana to defeat Bringer of Death (1 hit), Initial Slime (2 hits), and Demon Slime Boss (5 hits)!
-- **`F`**: **Toggle Free Exploration Mode** — Disables continuous autonomous running! Walk and sprint with precision using `A` and `D`, rest in idle breathing stance when stationary, and hold position on ladders unless pressing `W`/`S`. Press `F` again to re-engage auto-runner mode.
-- **`Space` / `Esc` / `Enter` (During Intro)**: **Skip Intro Video** — Immediately interrupt the opening cinematic and advance to game spawn.
+- **`Right Mouse Click` / `K`**: **Defend / Parry Stance** — Raise katana in defensive guard for up to 1.0s using `Defend_nobg.png`! Absorbs all enemy attacks (Slime, Bringer of Death scythe, Thunder cloud spell, Demon Boss cleave/smash) with a resonant metallic parry clang (`SFX_BLOCK`), floating `[PARRY]` text, and 0.6s grace invulnerability (2.0s cooldown on deflection).
+- **`Space` / `Esc` / `Enter` (During Intro)**: **Skip Intro Video** — Immediately interrupt the opening cinematic and advance to game spawn with tutorial modal.
 - **`Left Shift`**: **Dash Movement** — High-speed burst with ghost trail afterimages and spike/hazard invulnerability!
 - **`Space` / `W` / `Up Arrow`**: Jump across gaps and over spiky traps, or latch on and climb upward inside ladder shafts
 - **`S` / `Down Arrow`**: Drop down through one-way platforms or descend into underground ladder shafts
-- **`A` / `Left Arrow`**: Run left (in Ladder Climb: leap to left ladder track; in Sky-Fall: aerial steer left)
-- **`D` / `Right Arrow`**: Run right (in Ladder Climb: leap to right ladder track; in Sky-Fall: aerial steer right)
 - **`Esc`**: Open / Close **Pause Menu** (pause physics simulation, inspect stats, restart, or quit)
 - **`B`**: **Cycle Background Scenery** (Silvergrass Field <-> Autumn Foliage <-> Green Forest Foliage <-> Urban Area)
 - **`N`**: **Fast-Forward Day / Night Cycle** (Instantly advance 90-second half-cycle between Day and Night)
-- **`T`**: Toggle autonomous direction shifts (`ENABLED` timer shifts every 6.5s <-> `DISABLED` direction relics only)
+- **`T`**: **Open Tutorial Window** — View the comprehensive How-to-Play guide modal dialog during active exploration or inside the Pause Menu.
+- **`Y`**: **Toggle Shift Mode** (`ENABLED` timer shifts every 6.5s <-> `DISABLED` direction relics only)
 - **`R`**: Quick restart run (when paused or after Game Over)
 - **`Q`**: Quit game to desktop (from Pause Menu or Game Over screen)
 - **3-Lives Health System & Heart Relics**: The player possesses 3 life pips displayed on the HUD. Collect ruby heart relics (spawned alongside shields) to restore lost lives, or gain +150 bonus overheal points.
 - **Roaming Enemies & Boss Fight**:
-  - **Bringer of Death**: Roaming scythe-wielding wraith. Defeat in **1 hit** before it cleaves you!
-  - **Initial Slime & Boss Demon Slime**: Defeating the green slime in **2 hits** triggers a 3.2-second transformation into the massive Boss Demon Slime. Slay the boss in **5 hits** or avoid it by sprinting away in the opposite direction ($>28\text{m}$) or dashing through it to despawn!
-- **Procedural Metallic Spikes**: Traps look like razor-sharp steel spikes with hazard red bases, replacing old pumpkin tiles.
+  - **Bringer of Death**: Roaming scythe-wielding wraith. Now accurately pixel-centered on platforms. Casts ranged thunder spells targeting the player across multi-layer elevations (underground cavern to overground surface/sky canopy). Features a generous 1.0s telegraphed gathering cloud window allowing players to dodge before lightning strikes with `thunder-after-crackle.mp3` SFX! Cleave in **1 hit** before it attacks.
+  - **Enemy Separation**: Bringer of Death and Slime spawns now maintain a guaranteed 12.0m horizontal distance buffer, preventing cluttered spawn clumping.
+  - **Initial Slime & Boss Demon Slime**: Defeating the green slime in **2 hits** triggers a sequenced 3-phase audio metamorphosis ($5.5\text{s}$) with wet splat impact, acid bubbling, and demon roar. The Boss Demon Slime leaps between platforms with ground smash attacks that produce a heavy distant bang on impact. Slay the boss in **5 hits** or dash away to despawn!
+- **Grouped Platform Spikes**: Metallic spikes now spawn in challenging clusters of 2 to 4 spikes on elevated platforms, requiring careful jumps or dash bursts.
 - **Mini-Game Scene Exits**: Mini-game scenes (3-Ladder Climbing and Sky-Fall Diving) can strictly **only** be exited by collecting Direction Arrow Relics (which unlock and spawn after the 15-second survival trial) or by taking an obstacle hit (resurrecting back on the main platformer). Manual scene switching via key presses is disabled.
 - **Underground Ladder Shafts**: Approach any underground ladder shaft from the surface and press `S` or `Down Arrow` to smoothly latch on and climb down into the subterranean caverns.
 - **Idle Stance at Start**: The Samurai starts in a grounded idle breathing stance upon game launch and restart until directional movement keys (`A`, `D`) or `Space` are pressed.
 - **Direction Arrow Relics**: Distinct glowing neon arrowheads (Left, Right, Up, Down) explicitly indicate which direction change or scene transition they trigger when touched.
-- **Fruit Pickups (10s Energy Shield)**: Collecting tasty fruit grants a 10-second glowing energy shield bubble that deflects spikes, floating mines, and raptor birds!
+- **Heraldic Shield Pickups (10s Energy Shield)**: Collecting the glowing golden-cyan shield icon (`assets/shield_pickup.png`) grants a 10-second circular energy shield bubble that deflects spikes, floating mines, and raptor birds!
 - **Steep Slopes**: Walk or fall onto an angled slope to automatically engage controllable downhill **Sliding**! (Press `Space` to jump out at any midpoint)
 - **Ladder Tunnels**: Approach a ladder shaft to immediately stop horizontal run and ascend/descend
 - **Touch / Collect Gold Coin**: Scores bonus points (+50 pts) with floating `+50` text popups, real-time corner HUD feedback, and on-screen score tracking
@@ -79,6 +82,84 @@ mingw32-make package
 ---
 
 ## 📜 Version History (Changelog)
+
+### [v0.6.15] - 2026-10-26 (Boss Demon Slime Death Animation Calibration to Match Updated Dying Roar Audio)
+- **Boss Demon Slime Death Animation Synchronization (`05_d_death.gif` / `demon_death.png`)**:
+  - Calibrated the 22-frame death animation playback framerate to $6.0\,\text{FPS}$ ($3.67\,\text{s}$ duration), perfectly matching the updated $3.96\,\text{s}$ audio duration of [`assets/dyingRoar.mp3`](/assets/dyingRoar.mp3).
+  - Extended active death state despawn threshold to $4.0\,\text{s}$ so the final dissipating smoke frames linger gracefully until the dying roar acoustic reverberation naturally fades out.
+
+### [v0.6.14] - 2026-10-26 (Slime Ground Placement & AI Unfreezing, and Boss Demon Slime Dying Roar)
+- **Slime Ground Placement & AI Unfreezing**:
+  - Calibrated spawn elevation to `spawnY = footY + 1.2f` across initial starter slimes and procedural chunk streams. Rests slime quads ($2.4\,\text{m}$ tall) flush on surface grass ($Y = 0.0\,\text{m}$) and cavern floors ($Y = -4.0\,\text{m}$), eliminating sinking into dirt.
+  - Aligned collision raycasting tolerance: `footY = enemy.pos.y - 1.2f` now aligns with ground level ($0.0\,\text{m}$), resolving ground detection failure in `hasSolidGroundAt` and restoring active hopping and chasing movement.
+  - Fixed patrol facing behavior so slimes freely navigate platforms and reverse at edges without premature orientation snapping.
+- **Boss Demon Slime Dying Roar Audio (`dyingRoar.mp3`)**:
+  - Integrated authentic creature death audio [`assets/dyingRoar.mp3`](/assets/dyingRoar.mp3) via `AudioManager::playBossDyingRoar()`, playing asynchronously upon boss defeat to accompany the complete 22-frame death sequence (`05_d_death.gif`).
+
+### [v0.6.13] - 2026-10-25 (Player Defend Animation Proportional Rescaling)
+- **Player Defend Animation Proportional Rescaling (`assets/samurai/Defend_nobg.png`)**:
+  - Calibrated the defend spritesheet dimensions by downscaling character pixel artwork by $0.3377\times$ using 64-sample area averaging, reducing body height from $154\,\text{px}$ down to $51$–$53\,\text{px}$ to match [`assets/samurai/Idle.png`](/assets/samurai/Idle.png) ($52\,\text{px}$) and [`Run.png`](/assets/samurai/Run.png).
+  - Aligned foot grounding to $Y = 121\,\text{px}$ and horizontal centering to $X = 94\,\text{px}$, perfectly matching the rest of the Samurai Mack spritesheet coordinate system.
+  - Defend stance (`RMB` / `K`) now renders seamlessly with `playerRenderSize = (5.5, 5.5)` with zero abrupt size jump or platform sinking.
+
+### [v0.6.12] - 2026-10-25 (Slime Enemy Spawn Frequency & Multi-Elevation Density)
+- **Increased Slime Encounter Frequency & Multi-Elevation Spawning**:
+  - **Guaranteed Starter Slimes**: Added 2 initial slime enemies on the surface at $X = +17.5\,\text{m}$ and $X = -18.0\,\text{m}$ in the starting chunk, ensuring immediate combat encounters right after game start.
+  - **100% Guaranteed Chunk Spawning**: Removed the $60\%$ probability check, guaranteeing slime spawning in every newly generated $35\,\text{m}$ procedural world chunk.
+  - **Higher Pack Density (2 to 4 Slimes per Chunk)**: Increased procedural slime generation count from 1–2 to 2–4 (`numSlimes = 2 + (std::rand() % 3)`).
+  - **Subterranean Cavern Spawning**: Implemented a 33% probability for slimes to spawn in subterranean caverns (`CAVERN_FLOOR_Y + 0.5\,\text{m}`), populating underground exploration alongside surface runs.
+  - **Vertical-Aware Separation Buffers**: Refined enemy distance checks so Bringers of Death and Slimes only require a $9.0\,\text{m}$ buffer when on the same vertical elevation tier ($\Delta y < 2.5\,\text{m}$), allowing surface Bringers of Death and cavern slimes to coexist within the same horizontal sector without mutually blocking spawns. Tightened slime-to-slime spacing to $4.0\,\text{m}$ and doubled candidate placement search attempts to 24 per slime.
+
+### [v0.6.11] - 2026-10-25 (Mid-Animation Death Spell Damage & Visual Telegraph Window)
+- **Mid-Animation Thunder Strike Damage**:
+  - Fixed an issue where the Bringer of Death spell dealt damage immediately at $t = 0.0\text{s}$ upon cloud manifestation, causing unavoidable damage hits.
+  - Aligned damage evaluation strictly to the cloud's mid-animation impact phase (frames 7–10, $t \in [0.58\text{s}, 0.85\text{s}]$) where the lightning bolt connects with the ground.
+  - Introduced a generous $0.58\text{s}$ telegraph window (frames 0–6) accompanied by a `"THUNDER CLOUD GATHERING! MOVE!"` floating warning, allowing players to sprint, jump, dash, or raise katana guard to evade or parry the attack.
+
+### [v0.6.10] - 2026-10-25 (Documentation & Academic Guide Synchronization with Modern Subsystems)
+- **Academic Guide Enhancement (`/doc/explain.md`)**:
+  - Added dedicated comprehensive technical guide on **"How 2D Sprites Work in Modern OpenGL"**, detailing textured unit quads, normalized UV coordinate space, spritesheet frame slicing, horizontal mirroring, alpha discard in fragment shaders, and orthographic model-view-projection scaling.
+  - Updated architectural overview to cover all 8 modular engine subsystems (`UIManager`, `LadderScene`, `SkyFallScene`, `VideoPlayer`, `Audio`, `Renderer`, `World`, `main.cpp`).
+  - Added full explanations of combat hitbox sweeps, katana defend/parry damage negation with 2.0s cooldown, enemy AI behaviors, and expanded Viva Q&A.
+- **System Documentation Overhaul (`/doc/documentation.md`)**:
+  - Brought technical system documentation up to date with the latest engine milestones, physics models, procedural audio + Windows MCI BGM streaming, circular energy shield mathematics, and compilation flags.
+- **Quick Start Build Sync (`/README.md`)**:
+  - Updated direct `g++` compilation command to include `UIManager.cpp`, `LadderScene.cpp`, and `SkyFallScene.cpp`.
+
+### [v0.6.9] - 2026-10-25 (Synchronized Thunder Spell SFX & Katana Defend / Block Mechanic)
+- **Synchronized Bringer of Death Spellcast SFX**:
+  - Re-anchored `assets/thunder-after-crackle.mp3` playback to trigger immediately when Bringer of Death begins its spellcast attack animation (`ENEMY_STATE_CAST`).
+  - Audio waveform analysis aligned the initial 1.0-second crackling channel with the wraith's cast telegraph, ensuring the loud thunder impact and lightning crack land right when the ground thunder cloud animation spawns at the player's coordinates.
+- **Player Defend / Parry Stance (`assets/samurai/Defend_nobg.png`)**:
+  - Integrated full 8-frame defensive guard animation using `Defend_nobg.png` ($1600\times 200$, $200\times 200$ px/frame) triggered via **Right Mouse Click** (or `K` key).
+  - Defensive stance holds for up to **1.0 second** while stationary, showing a cyan guard indicator on the HUD.
+  - Successfully intercepting an enemy attack (Slime body blow, Bringer of Death scythe cleave, telegraphed Thunder cloud spell, Boss charge, or Boss ground slam) completely negates player damage, plays a newly synthesized metallic katana deflection clang (`SFX_BLOCK`), spawns `"[PARRY]"` floating text, grants 0.6s grace invulnerability, and applies a **2.0-second cooldown** before another block can be initiated.
+- **UI & Tutorial Updates**:
+  - Added real-time HUD status badge for Guard state (`[GUARD: ACTIVE]` or `[DEF: X.Xs]` cooldown).
+  - Updated Tutorial modal window and Pause Menu with Defend controls and combat instructions.
+
+### [v0.6.8] - 2026-10-25 (Delayed Multi-Layer Thunder Spell, BGM Integration, Free Exploration Default & Enemy Separation)
+- **Multi-Elevation Telegraphed Thunder Spells**:
+  - Expanded Bringer of Death ranged spell casting to detect and target players across multi-layer platform elevations (underground cavern, ground surface, elevated tiers, and sky canopy) across vertical distances up to $14.0\text{m}$.
+  - Introduced a generous 1.0-second visual telegraph window (frames 0–5, cloud gathering with `"THUNDER CLOUD GATHERING! MOVE!"` floating warning), allowing players to dash or leap to safety before the strike.
+  - Synchronized lightning strike impact at $t = 1.0\text{s}$ (frames 6–11) with authentic `assets/thunder-after-crackle.mp3` audio. Players outside the strike radius take zero damage.
+- **Background Music Integration & Volume/Mute Controls**:
+  - Integrated `assets/Quarter_in_the_Slot.mp3` as the looping background music track, streaming through Windows MCI at 50% default volume.
+  - Added dedicated `[M]` key toggle to mute/unmute music at any time during gameplay or within the Pause Menu, accompanied by HUD notifications and floating text feedback.
+- **Free Exploration Mode as Default**:
+  - Configured manual Free Exploration Mode (`A`/`D` movement, idle breathing stillness when stationary) as the **default** gameplay experience upon game launch and restart.
+  - Autonomous continuous sprint runner mode is now optional and toggleable via `[F]`.
+  - Updated Tutorial Modal window and Pause Menu with complete explanations of all controls.
+- **Enemy Separation (BOD & Slime Spacing)**:
+  - Enforced a strict minimum 12.0m horizontal distance buffer between Bringer of Death and Slime spawns, preventing enemy crowding.
+- **Redundant Asset Cleanup**:
+  - Removed redundant `assets/enemies/bringer_of_death/Bringer-Of-Death/Individual Sprite/No Effect Sprites` directory and added it to `.gitignore`.
+
+### [v0.6.7] - 2026-10-25 (BOD Sprite Centering, Spell Casting, Spike Clusters & Metamorphosis SFX)
+- Calibrated Bringer of Death sprite quad bounds ($1.9\text{m} \times 2.6\text{m}$) to eliminate visual off-centering.
+- Added procedural multi-spike traps (clusters of 2 to 4 spikes) and increased enemy roaming frequency.
+- Synthesized 3-phase Demon Slime metamorphosis sound sequence ($5.5\text{s}$).
+- Remapped Shift Mode toggle to dedicated `[Y]` key to eliminate conflicts with `[T]` Tutorial window.
 
 ### [v0.6.6] - 2026-10-25 (Updated Slime Animations & Boss Demon Slime Platform Jump Mechanics)
 - **Updated Slime Animation Spritesheets**:

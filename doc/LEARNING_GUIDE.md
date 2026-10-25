@@ -703,6 +703,22 @@ Instead of flat, plain-color geometric rectangles, the world is constructed from
       - On taking damage from hazards or enemies, the engine deducts 1 life pip, triggers a $1.25\,\text{s}$ invulnerability grace period (`postHitInvulnTimer = 1.25f`), and displays on-screen remaining life counters.
       - Ruby heart relics spawn alongside defensive shields, restoring lost lives or conferring +150 overheal score bonuses.
 
+18. **Defensive Guard / Parry Mechanics & Audio Synchronization (`v0.6.9`)**:
+    - **Defensive Guard State Machine & Spritesheet Integration**:
+      - Pressing **Right Mouse Click** (or `K`) transitions the player into `isBlocking = true`, anchoring horizontal velocity to zero and playing the dedicated 8-frame defensive stance (`assets/samurai/Defend_nobg.png`).
+      - Guard remains active for up to $1.0\text{s}$ (`blockTimer <= 1.0f`), presenting an intuitive visual cue of prepared deflection.
+    - **Damage Negation & Parry Clang Feedback**:
+      - When active, `isBlocking` acts as an absolute damage absorption shield against all incoming enemy threats: Slime body blows, Bringer of Death melee scythe sweeps, multi-layer telegraphed thunder strikes, and Demon Slime Boss charges, cleaves, and ground slams.
+      - Upon deflecting an attack:
+        1. Player life deduction is completely bypassed.
+        2. A metallic steel clink and dual resonant harmonic bell (`SFX_BLOCK`) plays.
+        3. A floating world-space text alert (`"[PARRY]"`) manifests at the player's position.
+        4. A brief $0.6\text{s}$ invulnerability grace window prevents multi-hit chain locks.
+        5. A mandatory $2.0\text{s}$ cooldown (`blockCooldown = 2.0f`) is initiated, preventing continuous parry spamming.
+    - **Telegraph Windup & Audio Event Pre-Alignment**:
+      - Complex audio files often feature a preamble or build-up (such as the initial electrical crackle in `thunder-after-crackle.mp3` before the explosive bass thunderclap at $t \approx 1.1\text{s}$).
+      - Rather than playing sound when the impact occurs, the audio trigger is advanced to the start of the enemy's casting wind-up (`ENEMY_STATE_CAST`). As the Bringer of Death raises its scythe and channels dark lightning for $\sim 1.0\text{s}$, the audio crackle intensifies, so the sudden thunder boom coincides with the appearance of the lethal ground cloud strike.
+
 ---
 
 ## 6. Quick Reference & Math Cheatsheet

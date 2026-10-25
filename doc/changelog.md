@@ -11,6 +11,16 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ## Table of Versions
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
+|---|---|---|---|
+| **v0.6.15** | [v5.15](#v515---boss-demon-slime-death-animation-calibration-to-match-updated-dying-roar-audio) | 2026-10-26 | Boss Demon Slime Death Animation Calibration: Slowed `05_d_death.gif` to 6.0 FPS (3.67s) & Extended Despawn Timer to 4.0s Synchronized with 3.96s `dyingRoar.mp3` |
+| **v0.6.14** | [v5.14](#v514---slime-ground-placement--ai-unfreezing-and-boss-demon-slime-dying-roar-audio-integration) | 2026-10-26 | Slime Ground Placement & AI Unfreezing, and Boss Demon Slime Dying Roar Audio Integration (`dyingRoar.mp3` for `05_d_death.gif`) |
+| **v0.6.13** | [v5.13](#v513---scale-down-player-defend-animation-to-match-idle-spritesheet-proportions) | 2026-10-25 | Player Defend Animation Proportional Rescaling: Downscaled `Defend_nobg.png` by $0.338\times$, Aligned $Y=121$ Footing & $X=94$ Centering to Match `Idle.png` Pixel-for-Pixel |
+| **v0.6.12** | [v5.12](#v512---increase-slime-enemy-spawn-frequency-and-multi-elevation-density) | 2026-10-25 | Slime Enemy Spawn Frequency & Multi-Elevation Density: 2–4 Slimes per Chunk, Initial Starter Slimes, Cavern Spawning & Vertical-Aware Separation Buffers |
+| **v0.6.11** | [v5.11](#v511---mid-animation-death-spell-damage-and-visual-telegraph-window) | 2026-10-25 | Mid-Animation Death Spell Damage Timing: 0.58s Visual Cloud Gathering Telegraph & Frames 7–10 Thunder Strike Ground Damage |
+| **v0.6.10** | [v5.10](#v510---documentation-and-academic-guide-synchronization-with-modern-subsystems) | 2026-10-25 | Documentation & Academic Guide Synchronization: Modern OpenGL 2D Sprites Guide, 8 Modular Subsystems, Combat/Defend Mechanics & Viva Q&A |
+| **v0.6.9** | [v5.9](#v59---synchronized-thunder-spell-sfx-and-right-click-katana-defend-mechanic) | 2026-10-25 | Synchronized Thunder Spell SFX (`thunder-after-crackle.mp3`), Katana Defend / Block Stance (`Defend_nobg.png`), 1.0s Guard Window & 2.0s Parry Cooldown |
+| **v0.6.8** | [v5.8](#v58---delayed-multi-layer-thunder-spell-bgm-integration-free-exploration-default-and-enemy-separation) | 2026-10-25 | Delayed Multi-Layer Thunder Spell (`thunder-after-crackle.mp3`), BGM Integration (`Quarter_in_the_Slot.mp3` with Mute `M`), Free Exploration Default & Enemy Separation (12m) |
+| **v0.6.7** | [v5.7](#v57---shift-control-remap-bod-centering--spell-attack-spike-clusters-and-boss-transformation-sfx) | 2026-10-25 | Shift Control Remap (`Y`), Tutorial Window Persistence, BOD Sprite Centering & Thunder Spell, Grouped Platform Spikes & Boss Sequenced Audio |
 | **v0.6.6** | [v5.6](#v56---updated-slime-animations-and-boss-demon-slime-platform-jump-mechanics) | 2026-10-25 | Slime Animation Refresh & Boss Demon Slime Platform Jump Mechanics (`06_Smash.gif` Integration) |
 | **v0.6.5** | [v5.5](#v55---lock-boss-attack-direction-and-directional-damage-sector) | 2026-10-25 | Directional Attack Commitment: Locked Boss Demon Slime & Bringer of Death Facing Direction & Frontal Damage Sector |
 | **v0.6.4** | [v5.4](#v54---fix-bringer-of-death-facing-realistic-katana-slash-sfx-guaranteed-tutorial-window-and-idle-stillness-on-restart) | 2026-10-25 | Fixed Enemy Facing Direction (Inverted UV Flip), Metallic Katana Slash SFX, Guaranteed Post-Intro Tutorial Window & Idle Stillness on Restart |
@@ -48,6 +58,121 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ## Detailed Version Logs
+
+### [v0.6.15] - 2026-10-26
+#### Session Archive: [`v5.15 - Boss Demon Slime Death Animation Calibration to Match Updated Dying Roar Audio.md`](/doc/prompts/v5.15%20-%20Boss%20Demon%20Slime%20Death%20Animation%20Calibration%20to%20Match%20Updated%20Dying%20Roar%20Audio.md)
+* **Boss Demon Slime Death Animation Timing Calibration (`05_d_death.gif` / `demon_death.png`)**:
+  - **Acoustic Waveform Analysis**: Measured the newly updated [`assets/dyingRoar.mp3`](/assets/dyingRoar.mp3) audio stream, determining an exact total duration of $3.958\,\text{seconds}$ ($44,100\,\text{Hz}$, 16-bit mono) with sustained acoustic reverberations persisting up to $4.0\,\text{seconds}$.
+  - **Framerate Deceleration ($6.0\,\text{FPS}$)**: Decelerated the 22-frame death animation playback rate from $10.0\,\text{FPS}$ down to $6.0\,\text{FPS}$ (`eFrame = std::min(static_cast<int>(enemy.animTimer * 6.0f), 21)`). This expands the visual death sequence across $3.67\,\text{seconds}$, giving the boss's agony collapse and dissolution deliberate, dramatic weight.
+  - **Despawn Timer Alignment**: Extended the active death state threshold from $2.4\,\text{seconds}$ to $4.0\,\text{seconds}$ (`enemy.animTimer >= 4.0f`), allowing the final dissipating smoke frames to linger smoothly and dissolve in unison with the closing tail of the audio roar.
+
+### [v0.6.14] - 2026-10-26
+#### Session Archive: [`v5.14 - Slime Ground Placement & AI Unfreezing, and Boss Demon Slime Dying Roar Audio Integration.md`](/doc/prompts/v5.14%20-%20Slime%20Ground%20Placement%20%26%20AI%20Unfreezing,%20and%20Boss%20Demon%20Slime%20Dying%20Roar%20Audio%20Integration.md)
+* **Slime Ground Placement & AI Unfreezing**:
+  - **Ground Alignment Fix**: Diagnosed and resolved issue where initial slimes were spawned with `spawnY = footY + 0.7f` instead of `spawnY = footY + 1.2f`. Because the slime render quad is $2.4\,\text{m}$ tall ($1.2\,\text{m}$ half-height) with pixels anchored at the bottom edge, a $0.7\,\text{m}$ offset placed the bottom of the slime at $Y = -0.5\,\text{m}$—sinking $0.5\,\text{m}$ (1 full tile layer) underground into the dirt.
+  - **AI Movement Unfreezing**: Fixed collision raycasting deadlock where `footY` was evaluated at $0.7\,\text{m} - 1.2\,\text{m} = -0.5\,\text{m}$. Because surface platform tiles have tops at $Y = 0.0\,\text{m}$, the difference ($0.5\,\text{m}$) exceeded the $0.4\,\text{m}$ ground tolerance check (`hasSolidGroundAt`), causing the slime AI to believe it was perpetually falling into an abyss and freezing its movement in place every frame. With `spawnY = footY + 1.2f`, `footY` evaluates precisely to $0.0\,\text{m}$ (surface) and $-4.0\,\text{m}$ (caverns), restoring active hopping patrols.
+  - **Free Roaming Ledge Turnaround**: Removed unconditional facing updates during patrol mode outside 8m, allowing patrolling slimes to turn around at platform edges without having their orientation immediately overridden towards the player on the subsequent frame.
+* **Boss Demon Slime Dying Roar Audio Integration (`dyingRoar.mp3`)**:
+  - Integrated authentic monster dying vocalization [`assets/dyingRoar.mp3`](/assets/dyingRoar.mp3) into `AudioManager::playBossDyingRoar()`.
+  - Triggered asynchronous playback via Windows MCI when the Boss Demon Slime reaches 0 HP, accompanying the full 22-frame death animation sequence (`05_d_death.gif` / `demon_death.png`) and smoke dissipation.
+
+### [v0.6.13] - 2026-10-25
+#### Session Archive: [`v5.13 - Scale Down Player Defend Animation to Match Idle Spritesheet Proportions.md`](/doc/prompts/v5.13%20-%20Scale%20Down%20Player%20Defend%20Animation%20to%20Match%20Idle%20Spritesheet%20Proportions.md)
+* **Player Defend Animation Proportional Rescaling (`Defend_nobg.png`)**:
+  - **Empirical Pixel Analysis**: Evaluated sprite coordinate bounding boxes across all character animations. In [`assets/samurai/Idle.png`](/assets/samurai/Idle.png), [`Run.png`](/assets/samurai/Run.png), and [`Attack1.png`](/assets/samurai/Attack1.png), Samurai Mack is drawn inside $200\times 200$ frames with an average body height of $51$–$52\,\text{px}$, centered horizontally at $X = 94\,\text{px}$ with feet grounded at $Y = 121\,\text{px}$. In contrast, [`Defend_nobg.png`](/assets/samurai/Defend_nobg.png) had the character drawn at $154$–$190\,\text{px}$ height with feet at $Y = 194\,\text{px}$, causing the player to balloon to $3.0\times$ normal size and sink below platforms when guarding.
+  - **Super-Sampled Resampling ($0.3377\times$)**: Executed a precision 64-sample box area resampler across all 8 frames of [`Defend_nobg.png`](/assets/samurai/Defend_nobg.png), scaling down the character by scale factor $S = 52.0 / 154.0 \approx 0.33766$.
+  - **Grounding & Centering Alignment**: Mapped source pivot $(X=98, Y=194)$ directly onto destination pivot $(X=94, Y=121)$. The resulting guard stance frames have an exact height of $51$–$53\,\text{px}$ (overhead raised blade reaches $65\,\text{px}$, matching [`Attack1.png`](/assets/samurai/Attack1.png) at $69\,\text{px}$), $X=93$–$96$ horizontal centering, and $Y=121$ foot alignment.
+  - **Seamless In-Engine Compatibility**: Because the texture itself now adheres to the exact coordinate reference frame of all other Samurai Mack sprites, the uniform `playerRenderSize = (5.5f, 5.5f)` and vertical offset `playerPos.y - 0.10f` in [`src/main.cpp`](/src/main.cpp) render the defensive stance with perfect visual continuity and zero size jump.
+
+### [v0.6.12] - 2026-10-25
+#### Session Archive: [`v5.12 - Increase Slime Enemy Spawn Frequency and Multi-Elevation Density.md`](/doc/prompts/v5.12%20-%20Increase%20Slime%20Enemy%20Spawn%20Frequency%20and%20Multi-Elevation%20Density.md)
+* **Increased Slime Spawn Frequency & Encounter Density**:
+  - **Guaranteed Starter Slimes in Spawn Chunk**: Added two guaranteed initial slime enemies on the surface at $X = +17.5\,\text{m}$ (moving left) and $X = -18.0\,\text{m}$ (moving right) upon game initialization, providing immediate, engaging combat encounters without requiring players to trek into distant chunks.
+  - **100% Chunk Spawning Rate**: Removed the prior $60\%$ probabilistic roll, guaranteeing that every newly generated $35\,\text{m}$ procedural world chunk spawns slimes.
+  - **Increased Slime Pack Multiplicity**: Boosted procedural slime count per chunk from 1–2 to 2–4 slimes (`numSlimes = 2 + (std::rand() % 3)`), creating lively, dynamic combat encounters.
+  - **Multi-Elevation Cavern Spawning**: Implemented a 33% probability for slimes to spawn in subterranean caverns (`CAVERN_FLOOR_Y + 0.5\,\text{m}`), transforming underground exploration into perilous, combat-rich zones alongside surface runs.
+  - **Vertical-Aware Separation Buffers**: Refined the enemy distance deconfliction check: Bringer of Death and Slimes now require a $9.0\,\text{m}$ horizontal separation buffer only when sharing the same elevation tier ($\Delta y < 2.5\,\text{m}$). This allows surface Bringers of Death and cavern slimes to coexist within the same horizontal coordinates without mutually blocking spawns. Slime-to-slime spacing is tightened to $4.0\,\text{m}$, and candidate placement search attempts were doubled from 12 to 24 per slime.
+
+### [v0.6.11] - 2026-10-25
+#### Session Archive: [`v5.11 - Mid-Animation Death Spell Damage and Visual Telegraph Window.md`](/doc/prompts/v5.11%20-%20Mid-Animation%20Death%20Spell%20Damage%20and%20Visual%20Telegraph%20Window.md)
+* **Mid-Animation Death Spell Damage Calibration**:
+  - Diagnosed and resolved issue where Bringer of Death thundercloud spells dealt damage immediately upon initial frame manifestation ($t = 0.0\text{s}$), making hits unavoidable if the player was at the target location.
+  - Aligned damage collision evaluation strictly to the cloud's mid-animation strike phase (frames 7–10 at 12 FPS, $t \in [0.58\text{s}, 0.85\text{s}]$), where the lightning bolt visually extends and crashes into the ground.
+  - Granted a generous $0.58\text{s}$ visual telegraph window (frames 0–6) accompanied by a `"THUNDER CLOUD GATHERING! MOVE!"` floating text alert, providing ample reaction time for players to sprint, dash, jump away, or raise their Katana Defend guard (`RMB`/`K`) to parry the strike.
+
+### [v0.6.10] - 2026-10-25
+#### Session Archive: [`v5.10 - Documentation and Academic Guide Synchronization with Modern Subsystems.md`](/doc/prompts/v5.10%20-%20Documentation%20and%20Academic%20Guide%20Synchronization%20with%20Modern%20Subsystems.md)
+* **Academic Guide Enhancement (`/doc/explain.md`)**:
+  - Authored a dedicated technical chapter on **"How 2D Sprites Work in Modern OpenGL"**:
+    - Explains single-quad GPU VBO/VAO instancing, normalized UV coordinate space ($U \in [0, 1], V \in [0, 1]$), spritesheet frame slicing math ($u_0 = i/N, u_1 = (i+1)/N$), horizontal UV mirroring (`flipHorizontal`), fragment shader alpha discard (`if (texColor.a < 0.1) discard;`), and orthographic MVP matrix projection.
+  - Synchronized architectural documentation to present all 8 modular engine subsystems (`main.cpp`, `Common.h`, `Renderer.cpp`, `World.cpp`, `Audio.cpp`, `UIManager.cpp`, `LadderScene.cpp`, `SkyFallScene.cpp`, `VideoPlayer.cpp`).
+  - Added full explanations of combat mechanics: Katana slash active frames, Right-Click Defend stance ($1.0\text{s}$ duration, metallic parry SFX, $2.0\text{s}$ cooldown), enemy AI state machines, and expanded Viva Q&A with 6 core evaluation questions.
+* **System Documentation Overhaul (`/doc/documentation.md`)**:
+  - Completely updated technical documentation to capture the latest engine state, calibrated physics, hybrid audio architecture (procedural synthesis + Windows MCI hardware-accelerated streaming), circular shield fragment discard mathematics, and Media Foundation video player linking.
+* **Quick Start Build Sync (`/README.md`)**:
+  - Updated direct `g++` compilation command to link all modular sources (`UIManager.cpp`, `LadderScene.cpp`, `SkyFallScene.cpp`).
+
+### [v0.6.9] - 2026-10-25
+#### Session Archive: [`v5.9 - Synchronized Thunder Spell SFX and Right-Click Katana Defend Mechanic.md`](/doc/prompts/v5.9%20-%20Synchronized%20Thunder%20Spell%20SFX%20and%20Right-Click%20Katana%20Defend%20Mechanic.md)
+* **Synchronized Bringer of Death Spellcast SFX**:
+  - Re-anchored `audioMgr.playThunderSpell()` (`assets/thunder-after-crackle.mp3`) to trigger immediately upon the Bringer of Death initiating its spellcast attack animation (`ENEMY_STATE_CAST`).
+  - By matching the wraith's cast wind-up duration ($9\text{ frames} / 7.5\text{ fps} \approx 1.2\text{s}$) with the audio's 1.0s initial electrical crackle build-up, the explosive lightning thunderclap impacts precisely as the ground thunder cloud animation spawns at the player's ground coordinate.
+* **Player Defend / Parry Stance (`assets/samurai/Defend_nobg.png`)**:
+  - Loaded full 8-frame defensive guard animation using `assets/samurai/Defend_nobg.png` ($1600\times 200$, $200\times 200$ px/frame) triggered via **Right Mouse Click** (`GLFW_MOUSE_BUTTON_RIGHT`) or `K` key.
+  - While defending, horizontal movement is anchored in place, and the samurai holds a guarded stance for up to **1.0 second**.
+  - Deflecting any enemy hazard (Slime collision, Bringer of Death scythe slash, Thunder cloud strike, Boss Demon Slime charge, cleave, or ground slam) completely absorbs the damage, plays a newly synthesized metallic katana deflection clang (`SFX_BLOCK`), spawns `"[PARRY]"` floating text, grants 0.6s grace invulnerability, and applies a **2.0-second cooldown** (`blockCooldown = 2.0f`).
+* **HUD and UI Tutorials**:
+  - Added real-time HUD status badge for Guard state: displays cyan `[GUARD: ACTIVE]` when blocking, or red `[DEF: X.Xs]` during active cooldown.
+  - Updated Tutorial modal window and Pause Menu with Defend controls and combat instructions.
+
+### [v0.6.8] - 2026-10-25
+#### Session Archive: [`v5.8 - Delayed Multi-Layer Thunder Spell, BGM Integration, Free Exploration Default, and Enemy Separation.md`](/doc/prompts/v5.8%20-%20Delayed%20Multi-Layer%20Thunder%20Spell,%20BGM%20Integration,%20Free%20Exploration%20Default,%20and%20Enemy%20Separation.md)
+* **Telegraphed Multi-Layer Thunder Spells & Audio Synchronization**:
+  - Broadened Bringer of Death vertical spell targeting threshold from `absY < 2.8f` to `absY < 14.0f` and horizontal range to `[3.0m, 14.0m]`, enabling underground cavern enemies to detect and cast thunder spells at players exploring ground-level or high sky-canopy platforms.
+  - Implemented a 3-phase `SpellHazard` lifecycle:
+    1. **Telegraph Warning Phase ($t \in [0.0\text{s}, 1.0\text{s}]$, frames 0–5)**: Dark storm cloud slowly gathers overhead at 5.0 FPS with an on-screen floating text alert (`"THUNDER CLOUD GATHERING! MOVE!"`), giving the player 1.0 full second to dash or jump away.
+    2. **Impact & Strike Phase ($t \in [1.0\text{s}, 1.5\text{s}]$, frames 6–11)**: Directly on $t = 1.0\text{s}$, `audioMgr.playThunderSpell()` triggers the crackling thunder audio [`assets/thunder-after-crackle.mp3`](/assets/thunder-after-crackle.mp3). Deals damage only if the player remains within the $1.4\text{m}$ blast radius during this active impact window.
+    3. **Dissipation Phase ($t \in [1.5\text{s}, 1.9\text{s}]$, frames 12–15)**: Lingering electric sparks and cloud remnants fade out smoothly before the hazard despawns at $t = 1.9\text{s}$.
+* **Background Music System & Dynamic Mute**:
+  - Integrated [`assets/Quarter_in_the_Slot.mp3`](/assets/Quarter_in_the_Slot.mp3) as looping in-game BGM using Windows MCI (`mciSendStringA`) streaming.
+  - Initialized playback volume to 50% by default (`setaudio bgm volume to 500`).
+  - Added dedicated `[M]` key toggle (`GLFW_KEY_M`) enabling players to mute/unmute music at will, featuring dynamic HUD status cards and floating notification popups (`"MUSIC: MUTED"` / `"MUSIC: UNMUTED (50%)"`).
+  - Updated pause menu with interactive BGM audio status indicator.
+* **Free Exploration Mode as Default**:
+  - Re-anchored game design so Free Exploration Mode (`freeExplorationMode = true`) is active by default upon game launch and restart.
+  - Player character retains idle breathing stillness when stationary and moves solely via manual `A`/`D` navigation.
+  - Autonomous continuous sprint runner mode is preserved as an optional mechanic toggled via `[F]`.
+  - Enriched Tutorial Window (`renderTutorialModal`) and Pause Menu (`renderPauseMenu`) with exhaustive descriptions of the new default exploration controls, katana attacks, spell dodging, and BGM mute key.
+* **Enemy Separation Buffer**:
+  - Added a strict 12.0m horizontal distance buffer in [`src/World.cpp`](/src/World.cpp) between Bringer of Death and Slime spawns, preventing enemy crowding and ensuring distinct, readable combat encounters.
+* **Redundant Asset Cleanup**:
+  - Removed obsolete `assets/enemies/bringer_of_death/Bringer-Of-Death/Individual Sprite/No Effect Sprites` directory and registered it under [`.gitignore`](/.gitignore).
+
+### [v0.6.7] - 2026-10-25
+#### Session Archive: [`v5.7 - Shift Control Remap, BOD Centering & Spell Attack, Spike Clusters, and Boss Transformation SFX.md`](/doc/prompts/v5.7%20-%20Shift%20Control%20Remap,%20BOD%20Centering%20&%20Spell%20Attack,%20Spike%20Clusters,%20and%20Boss%20Transformation%20SFX.md)
+* **Shift Mode Control Decoupled & Tutorial Window Flash Bug Resolved**:
+  - Remapped Shift Mode toggle from `[T]` to `[Y]` (`GLFW_KEY_Y`), eliminating the conflict where pressing `T` simultaneously triggered autonomous direction shifts and opened the tutorial window.
+  - Diagnosed and fixed the "split-second flash and disappear" bug of the Tutorial Window: when opening the modal via `[T]` in the pause menu, the keypress was being captured on the very next frame by the modal's dismissal check, immediately closing it. Added `tutDismissLast = true` upon modal trigger to enforce a fresh key-release cycle before dismissal can occur.
+  - Updated both `renderPauseMenu` and `renderTutorialModal` to display `[Y] Shift Mode` status (`Auto Timer` vs `Manual Relics`) and comprehensive control instructions.
+* **Bringer of Death Exact Pixel Centering**:
+  - Analyzed the raw $140\times 93$ sprite canvas: the character's body sits at horizontal pixel range $X \in [81, 127]$ with its center at $X = 103.5$ (displaced $+33.5\text{ px}$ from canvas center $70.0$, or $+23.9\%$ of canvas width).
+  - Calculated exact world-space quad offset: $0.2393 \times 4.5\text{m} = 1.077\text{m}$.
+  - Applied offset translation ($-1.077\text{m}$ when facing left, $+1.077\text{m}$ when facing right), ensuring the visible Bringer of Death model is centered on its world entity position `enemy.pos.x` and platform hitbox.
+* **Bringer of Death Ranged Thunder Spell Attack**:
+  - Stitched `Individual Sprite/Cast` (9 frames) into `assets/enemies/bod_cast.png` ($1260\times 93$) and `Individual Sprite/Spell` (16 frames) into `assets/enemies/bod_spell.png` ($2240\times 93$).
+  - Implemented distance-based spell casting AI: when player is at a distance ($3.8\text{m}$ to $12.0\text{m}$), Bringer of Death stops, locks facing direction, and casts a thunder spell (9 frames at 9 FPS).
+  - Spawns an animated `SpellHazard` at the player's ground location: frames 0–5 depict a swirling thundercloud forming overhead (telegraph warning); frames 6–11 strike down as a lightning pillar inflicting damage/breaking shields; frames 12–15 dissipate into sparks.
+* **Grouped Platform Trap Spikes & Increased Enemy Density**:
+  - Elevated platforms now spawn grouped clusters of 2 to 4 spikes (`SpikeTrap`), creating distinct hazardous obstacles requiring calculated jumps, slides, or dashes.
+  - Substantially increased non-initial chunk enemy spawning: allows 1 to 3 Bringers of Death per chunk with staggered spell cooldowns and increases Initial Slime spawn probability to 60% with multi-slime support.
+* **3-Phase Sequenced Slime Transformation Audio & Slower Animation**:
+  - Integrated native Windows MCI audio playback in `AudioManager` to stream 3 sequenced MP3 tracks during slime metamorphosis:
+    1. `universfield-wet-splat-impact-567197.mp3` immediately upon slime defeat ($t = 0.0\text{s}$).
+    2. `freesound_community-acid-bubbling-105397.mp3` during acid puddle dissolution ($t = 0.85\text{s}$).
+    3. `audiopapkin-monster-roar-ps-o24-333057.mp3` as the giant Demon Slime awakens and rises ($t = 2.8\text{s}$).
+  - Slowed down transformation animation to 6.0 FPS over 33 frames ($5.5\text{s}$ duration), synchronizing sprite visual phases with the audio progression.
+* **Boss Demon Slime Smash Impact Audio**:
+  - Replaced the placeholder bounce thump on `06_Smash.gif` platform touchdown with `dragon-studio-distant-bang-472364.mp3`, delivering a resonant impact on ground slam.
 
 ### [v0.6.6] - 2026-10-25
 #### Session Archive: [`v5.6 - Updated Slime Animations and Boss Demon Slime Platform Jump Mechanics.md`](/doc/prompts/v5.6%20-%20Updated%20Slime%20Animations%20and%20Boss%20Demon%20Slime%20Platform%20Jump%20Mechanics.md)
@@ -174,7 +299,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Shield relics rebalanced to spawn less frequently (1 in 5 platform roll) and positioned strictly on separate platforms away from direction-change relics.
 
 ### [v0.5.15] - 2026-10-25
-#### Session Archive: [`v4.17 - Ladder Hero Scale Fix, Post-Intro Tutorial Modal, Shield Pickup Icon, and Scene Exit Timers.md`](/doc/prompts/v4.17%20-%20Ladder%20Hero%20Scale%20Fix,%20Post-Intro%20Tutorial%20Modal,%20Shield%20Pickup%20Icon,%20and%20Scene%20Exit%20Timers.md)
+#### Session Archive: [`Ladder Hero Scale Fix, Post-Intro Tutorial Modal, Shield Pickup Icon, and Scene Exit Timers - v4.17`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#ladder-hero-scale-fix-post-intro-tutorial-modal-shield-pickup-icon-and-scene-exit-timers---v417)
 * **Visual Presentation & Proportions**:
   - **Ladder Climb Hero Scale Restoration**:
     - *Root Cause*: In `SCENE_LADDER_CLIMB`, the climbing Samurai Mack sprite quad was translated without matrix scaling, rendering at a tiny default $1.0\times 1.0$ meter dimension ($5.5\times$ smaller than intended).
@@ -195,7 +320,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
     - *Definitive Exit Notice*: When the 15-second survival trial completes, triggers an audio cue and displays a prominent glowing banner: `=== EXIT APPEARED! === [TOUCH A DIRECTION ARROW TO RETURN]` alongside directional arrow relics positioned visibly ahead on the tracks/sky lanes.
 
 ### [v0.5.14] - 2026-10-25
-#### Session Archive: [`v4.16 - Circular Energy Shield Bubble and Single-Hit Trap Absorption.md`](/doc/prompts/v4.16%20-%20Circular%20Energy%20Shield%20Bubble%20and%20Single-Hit%20Trap%20Absorption.md)
+#### Session Archive: [`Circular Energy Shield Bubble and Single-Hit Trap Absorption - v4.16`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#circular-energy-shield-bubble-and-single-hit-trap-absorption---v416)
 * **Mechanics & Combat State**:
   - **Single-Hit Shield Trap Absorption**:
     - *Root Cause of Deflection Loop*: The fruit shield timer (`shieldTimer`) was never reduced or cleared upon colliding with hazards, allowing players to overlap spikes, mines, or raptors for up to 10 seconds while spamming "DEFLECTED" sound and visual notifications on every single frame.
@@ -210,7 +335,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
     - *Glowing Electric Rim*: Applies a power-curve rim glow formula $\text{rim} = \text{pow}(\text{dist} \times 2.0, \text{uRimPower})$, yielding a translucent protective core and an intense, shimmering electric perimeter wrapped snugly around the hero.
 
 ### [v0.5.13] - 2026-10-25
-#### Session Archive: [`v4.13 - Mini-Game Scene Exit Restrictions and Underground Ladder Descent Fix.md`](/doc/prompts/v4.13%20-%20Mini-Game%20Scene%20Exit%20Restrictions%20and%20Underground%20Ladder%20Descent%20Fix.md)
+#### Session Archive: [`Mini-Game Scene Exit Restrictions and Underground Ladder Descent Fix - v4.13`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#mini-game-scene-exit-restrictions-and-underground-ladder-descent-fix---v413)
 * **Mechanics & Level Interactivity**:
   - **Mini-Game Scene Exit Restrictions**:
     - *Disallowed Key Switching*: Removed arbitrary manual key transitions that switched between `SCENE_LADDER_CLIMB` and `SCENE_SKY_FALL` via Up/Down keys, and disabled leaping off outer edge lanes to exit.
@@ -229,7 +354,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
       5. Added support for `GLFW_KEY_DOWN` alongside `GLFW_KEY_S` for dropping through one-way tiles and descending ladders.
 
 ### [v0.5.12] - 2026-10-25
-#### Session Archive: [`v4.12 - Free Exploration Mode and Manual Movement Toggle.md`](/doc/prompts/v4.12%20-%20Free%20Exploration%20Mode%20and%20Manual%20Movement%20Toggle.md)
+#### Session Archive: [`Free Exploration Mode and Manual Movement Toggle - v4.12`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#free-exploration-mode-and-manual-movement-toggle---v412)
 * **Mechanics & Player Controls**:
   - **Free Exploration Mode (`F` Key)**:
     - *Motivation*: The default game mode operates as a continuous high-speed endless runner where the Samurai sprints forward autonomously. Players exploring intricate platforms, cavern shafts, or avoiding obstacles needed full, unhurried manual control.
@@ -239,7 +364,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
     - *UI & Feedback*: Displays floating popup `FREE EXPLORATION: ON / OFF`, adds on-screen HUD badge in top-left, updates window title, and adds status item `[F] MODE: FREE EXPLORATION` in the ESC Pause Menu.
 
 ### [v0.5.11] - 2026-10-25
-#### Session Archive: [`v4.11 - Fix Standalone Missing DLL and Video Rendering Alpha Discard.md`](/doc/prompts/v4.11%20-%20Fix%20Standalone%20Missing%20DLL%20and%20Video%20Rendering%20Alpha%20Discard.md)
+#### Session Archive: [`Fix Standalone Missing DLL and Video Rendering Alpha Discard - v4.11`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#fix-standalone-missing-dll-and-video-rendering-alpha-discard---v411)
 * **Resolved Issues & Edge Cases**:
   - **`msys-stdc++-6.dll` Missing System Error**:
     - *Root Cause*: The default compiler configuration dynamically linked against MSYS2's `libstdc++` and `libgcc`, causing runtime failures on machines without an MSYS environment in PATH.
@@ -252,7 +377,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
       3. Added proper initial `glViewport` initialization based on active window framebuffer dimensions in [`src/main.cpp`](/src/main.cpp).
 
 ### [v0.5.10] - 2026-10-25
-#### Session Archive: [`v4.10 - Standalone Single-File Game Packaging Analysis.md`](/doc/prompts/v4.10%20-%20Standalone%20Single-File%20Game%20Packaging%20Analysis.md)
+#### Session Archive: [`Standalone Single-File Game Packaging Analysis - v4.10`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#standalone-single-file-game-packaging-analysis---v410)
 * **Packaging & Distribution Engineering**:
   - **Standalone Feasibility & Architecture**: Comprehensively analyzed all three technical methods for packaging *The Wenderer* into a standalone file:
     1. **Virtual Container / Single-File SFX**: Packaging `main.exe`, `glfw3.dll`, and `assets/` into a single self-contained `.exe` container with zero user extraction required.
@@ -262,7 +387,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Runtime Dependency Verification**: Inspected PE import tables via `objdump`, confirming standard Windows UCRT, Media Foundation (`MFPlat`, `MFReadWrite`), WinMM, and GDI32 system linkage across Windows 10 and 11 environments.
 
 ### [v0.5.9] - 2026-10-25
-#### Session Archive: [`v4.9 - In-Engine Intro Video Playback and Asset Embedding Analysis.md`](/doc/prompts/v4.9%20-%20In-Engine%20Intro%20Video%20Playback%20and%20Asset%20Embedding%20Analysis.md)
+#### Session Archive: [`In-Engine Intro Video Playback and Asset Embedding Analysis - v4.9`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#in-engine-intro-video-playback-and-asset-embedding-analysis---v49)
 * **Architectural Additions**:
   - **In-Engine Video Subsystem (`VideoPlayer`)**: Created [`include/VideoPlayer.h`](/include/VideoPlayer.h) and [`src/VideoPlayer.cpp`](/src/VideoPlayer.cpp) utilizing native Windows Media Foundation (`IMFSourceReader`) with zero external binary dependencies. Streams and decodes H.264 video frames directly to an OpenGL 2D texture (`GL_BGRA` / `glTexSubImage2D`) at native 1080p resolution while simultaneously decoding AAC audio streams into in-memory PCM Wave audio played asynchronously via `PlaySoundA`.
   - **Game State Transition**: Introduced `STATE_INTRO_VIDEO = 0` to `GameState` in [`include/Common.h`](/include/Common.h). The engine initializes into this state before the platformer begins.
@@ -273,7 +398,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Explained mathematical reasons why embedding an already-compressed H.264 MP4 file into executable binary files does **not** reduce its file size, and detailed real size-reduction strategies (transcoding to 720p H.265/AV1 or lowered bitrates).
 
 ### [v0.5.8] - 2026-10-25
-#### Session Archive: [`v4.8 - Sky-Fall Down Scene Left and Right Direction Relics.md`](/doc/prompts/v4.8%20-%20Sky-Fall%20Down%20Scene%20Left%20and%20Right%20Direction%20Relics.md)
+#### Session Archive: [`Sky-Fall Down Scene Left and Right Direction Relics - v4.8`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#sky-fall-down-scene-left-and-right-direction-relics---v48)
 * **Resolved Issues & Edge Cases**:
   - **Sky-Fall Direction Relic Scarcity & Missed Pickups**: In [`src/main.cpp`](/src/main.cpp), diving at $9.2\,\text{m/s}$ caused single small direction relics at random coordinates to be easily bypassed in $< 0.5\,\text{s}$. Pre-generated items below the player were previously only coins and fruit shields, leaving a dead zone upon 15s trial completion.
 * **Added & Improved**:
@@ -285,7 +410,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Seamless Platform Runner Resumption**: Touching any Left or Right arrow relic immediately calls `returnToPlatformerScene(true)`, snapping the player flush to solid ground via vertical raycast and resuming the horizontal runner in the indicated direction.
 
 ### [v0.5.7] - 2026-10-25
-#### Session Archive: [`v4.7 - Ladder Scene Direction Trigger Relics & Exit Spawning.md`](/doc/prompts/v4.7%20-%20Ladder%20Scene%20Direction%20Trigger%20Relics%20&%20Exit%20Spawning.md)
+#### Session Archive: [`Ladder Scene Direction Trigger Relics & Exit Spawning - v4.7`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#ladder-scene-direction-trigger-relics-exit-spawning---v47)
 * **Resolved Issues & Edge Cases**:
   - **Missing Left/Right Direction Objects on Ladders**: In [`src/main.cpp`](/src/main.cpp), `SCENE_LADDER_CLIMB` previously only spawned Gold Coins (`type = 0`) and Fruit Shields (`type = 1`), leaving players with no direction relic trigger objects to exit back to the platformer runner without dying to traps.
   - **Ladder Generation Boundary Sync**: Fixed `enterLadderScene()` which pre-generated up to 85m while leaving `ladderGenTopY = 8.0f`. Initial tier generation is now tightly bounded ($y \le 26.0\text{m}$) and synchronized with runtime generation.
@@ -297,7 +422,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Sky-Fall Parity & Leap Direction Alignment**: Extended identical post-15s direction relic spawning to `SCENE_SKY_FALL` and ensured outer-lane leaps off Lane 0 and Lane 2 explicitly orient `platformerSavedDir` to Left and Right.
 
 ### [v0.5.6] - 2026-10-25
-#### Session Archive: [`v4.6 - Left Chunk Persistence, Direction Arrows, Shield Fruits, Idle Start, Single Hero, and Down Scene Pacing.md`](/doc/prompts/v4.6%20-%20Left%20Chunk%20Persistence%2C%20Direction%20Arrows%2C%20Shield%20Fruits%2C%20Idle%20Start%2C%20Single%20Hero%2C%20and%20Down%20Scene%20Pacing.md)
+#### Session Archive: [`Left Chunk Persistence, Direction Arrows, Shield Fruits, Idle Start, Single Hero, and Down Scene Pacing - v4.6`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#left-chunk-persistence-direction-arrows-shield-fruits-idle-start-single-hero-and-down-scene-pacing---v46)
 * **Resolved Issues & Edge Cases**:
   - **Left Chunk Persistence & Unbounded Deletion Fix**: Fixed chunk eviction in [`src/World.cpp`](/src/World.cpp) where `leftGenEdge` was previously unbounded and failed to track culled chunks. Clamped `leftGenEdge = std::max(leftGenEdge, playerX - 80.0f)` and `rightGenEdge = std::min(rightGenEdge, playerX + 80.0f)`.
   - **Zero Airborne Floating on Scene Return**: Implemented `World::ensureGroundAround(targetX, theme)` and dynamic ground surface scanning upon returning from Up (Ladder) or Down (Sky-Fall) mini-games. If returning over a solid platform, player snaps flush to ground; if over an open chasm, player retains downward velocity with active gravity, preventing any mid-air floating.
@@ -309,7 +434,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Sky-Fall Scene Obstacle Deconfliction**: Increased vertical tier spacing from 5.0m to 14.0m, reduced bird spawn rate to 50% on alternate tiers, lowered spike mine frequency to 33%, and calibrated collision boxes from 1.15m to 0.85m for fair, readable evasive diving.
 
 ### [v0.5.5] - 2026-10-25
-#### Session Archive: [`v4.5 - Dynamic Day-Night Cycle, Thematic Background Sceneries, and Scene Cooldown.md`](/doc/prompts/v4.5%20-%20Dynamic%20Day-Night%20Cycle%2C%20Thematic%20Background%20Sceneries%2C%20and%20Scene%20Cooldown.md)
+#### Session Archive: [`Dynamic Day-Night Cycle, Thematic Background Sceneries, and Scene Cooldown - v4.5`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#dynamic-day-night-cycle-thematic-background-sceneries-and-scene-cooldown---v45)
 * **Added & Improved**:
   - **Four Thematic Background Scenery Assets**:
     - **Silvergrass Field** ([`assets/scenery_silvergrass.png`](/assets/scenery_silvergrass.png)): Shimmering Japanese Susuki grass / pampas plumes swaying along rolling hills.
@@ -337,7 +462,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.4] - 2026-10-25
-#### Session Archive: [`v4.4 - Dash Mechanic, Left Starting Platforms, and Dynamic Up-Down Mini-Game Scenes.md`](/doc/prompts/v4.4%20-%20Dash%20Mechanic%2C%20Left%20Starting%20Platforms%2C%20and%20Dynamic%20Up-Down%20Mini-Game%20Scenes.md)
+#### Session Archive: [`Dash Mechanic, Left Starting Platforms, and Dynamic Up-Down Mini-Game Scenes - v4.4`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#dash-mechanic-left-starting-platforms-and-dynamic-up-down-mini-game-scenes---v44)
 * **Added & Improved**:
   - **High-Velocity Dash Mechanic (`SHIFT` Key)**:
     - Implemented a burst dash ($15.0\,\text{m/s}$ for $0.22\,\text{s}$ with a $0.65\,\text{s}$ cooldown).
@@ -365,7 +490,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.3] - 2026-10-25
-#### Session Archive: [`v4.3 - Downward Ladder Entry and Procedural World Generation Analysis.md`](/doc/prompts/v4.3%20-%20Downward%20Ladder%20Entry%20and%20Procedural%20World%20Generation%20Analysis.md)
+#### Session Archive: [`Downward Ladder Entry and Procedural World Generation Analysis - v4.3`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#downward-ladder-entry-and-procedural-world-generation-analysis---v43)
 * **Added & Improved**:
   - **Downward Ladder Shaft Entry via `S`/`Down` Key**:
     - Players can now press `S` or `Down Arrow` while standing near the top of a ladder shaft to latch onto the ladder and descend into underground caverns.
@@ -380,7 +505,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.2] - 2026-10-25
-#### Session Archive: [`v4.2 - Floating Text for Fruit Pickups and Auto-Shift Disabling.md`](/doc/prompts/v4.2%20-%20Floating%20Text%20for%20Fruit%20Pickups%20and%20Auto-Shift%20Disabling.md)
+#### Session Archive: [`Floating Text for Fruit Pickups and Auto-Shift Disabling - v4.2`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#floating-text-for-fruit-pickups-and-auto-shift-disabling---v42)
 * **Added & Improved**:
   - **World-Space Floating Text Engine**:
     - Extended `Renderer::drawText` to support dynamic camera transformations via an optional `const glm::mat4& view` parameter.
@@ -396,7 +521,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.1] - 2026-10-25
-#### Session Archive: [`v4.1 - Slow Down Running and Climbing Animation Framerate.md`](/doc/prompts/v4.1%20-%20Slow%20Down%20Running%20and%20Climbing%20Animation%20Framerate.md)
+#### Session Archive: [`Slow Down Running and Climbing Animation Framerate - v4.1`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#slow-down-running-and-climbing-animation-framerate---v41)
 * **Bug Fixes & Animation Calibrations**:
   - **Eliminated Double-Multiplication Framerate Glitch**: Fixed an issue where `animTimer` was multiplied by $10.0$ in the update loop and then multiplied by $12.0$ in the frame index selector, causing the running animation to play at a glitchy $120\,\text{FPS}$ ($15$ full run cycles per second).
   - **Normalized Timer Accumulation**: `animTimer` now accumulates pure elapsed real-world seconds (`animTimer += deltaTime`).
@@ -407,7 +532,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.0] - 2026-10-24
-#### Session Archive: [`v4.0 - Samurai Ninja Player Animations Pause Menu and Score Counter.md`](/doc/prompts/v4.0%20-%20Samurai%20Ninja%20Player%20Animations%20Pause%20Menu%20and%20Score%20Counter.md)
+#### Session Archive: [`Samurai Ninja Player Animations Pause Menu and Score Counter - v4.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#samurai-ninja-player-animations-pause-menu-and-score-counter---v40)
 * **Added**:
   - **Samurai Mack & Shinobi Kenji Character Integration**:
     - Hand-crafted 2D pixel-art character animation sheets with high-resolution frames for **Samurai Mack** and **Shinobi Kenji**.
@@ -436,7 +561,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.3] - 2026-10-24
-#### Session Archive: [`v3.6 - Technical Documentation and Academic Guide Creation.md`](/doc/prompts/v3.6%20-%20Technical%20Documentation%20and%20Academic%20Guide%20Creation.md)
+#### Session Archive: [`Technical Documentation and Academic Guide Creation - v3.6`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#technical-documentation-and-academic-guide-creation---v36)
 * **Added**:
   - Created [`/doc/documentation.md`](/doc/documentation.md): Comprehensive technical progress report covering architecture, subsystem design, graphics pipeline, physics tuning, and build specifications.
   - Created [`/doc/explain.md`](/doc/explain.md): Accessible academic guide stripping away technical jargon, using everyday analogies (*Rulebook, Musician, Artist, Architect, Director*) to explain each code module for project presentations and lab viva exams.
@@ -445,7 +570,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.2] - 2026-10-24
-#### Session Archive: [`v3.5 - Modular Code Refactoring Ladder Stopping and Cavern Chasm Fixes.md`](/doc/prompts/v3.5%20-%20Modular%20Code%20Refactoring%20Ladder%20Stopping%20and%20Cavern%20Chasm%20Fixes.md)
+#### Session Archive: [`Modular Code Refactoring Ladder Stopping and Cavern Chasm Fixes - v3.5`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#modular-code-refactoring-ladder-stopping-and-cavern-chasm-fixes---v35)
 * **Architectural Refactoring**:
   - Decoupled the ~1,900-line monolithic `src/main.cpp` into 5 maintainable, focused modules:
     - [`/include/Common.h`](/include/Common.h): Central shared constants, calibrated physics parameters, and data models.
@@ -461,7 +586,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.1] - 2026-10-24
-#### Session Archive: [`v3.4 - Multi-Elevation Worlds Caverns Sky Tier and Midpoint Interrupts.md`](/doc/prompts/v3.4%20-%20Multi-Elevation%20Worlds%20Caverns%20Sky%20Tier%20and%20Midpoint%20Interrupts.md)
+#### Session Archive: [`Multi-Elevation Worlds Caverns Sky Tier and Midpoint Interrupts - v3.4`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#multi-elevation-worlds-caverns-sky-tier-and-midpoint-interrupts---v34)
 * **Added**:
   - **Horizontal Direction Memory (`lastHorizontalDir`)**: Ascending or descending ladder shafts now remembers the prior horizontal run direction (`DIR_RIGHT` or `DIR_LEFT`), resuming that direction upon summiting instead of forcing an arbitrary rightward turn.
   - **Mid-Slope Jumping & Traversal Interrupts**: Mid-slope sliding can now be interrupted at any point by jumping (`Space`/`W`/Up) or steering (`A`/`D`), giving full control over downward momentum.
@@ -473,7 +598,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.0] - 2026-10-24
-#### Session Archive: [`v3.2 - Tunnels Slopes Audio SFX Dynamic Endless Platforms and Corner HUD.md`](/doc/prompts/v3.2%20-%20Tunnels%20Slopes%20Audio%20SFX%20Dynamic%20Endless%20Platforms%20and%20Corner%20HUD.md)
+#### Session Archive: [`Tunnels Slopes Audio SFX Dynamic Endless Platforms and Corner HUD - v3.2`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#tunnels-slopes-audio-sfx-dynamic-endless-platforms-and-corner-hud---v32)
 * **Added**:
   - **Truly Endless Procedural Platforms**: Replaced fixed layer structures with a randomized multi-tier platform generator producing randomized elevations, lengths, and gaps.
   - **Vertical Ladder Tunnel Shafts**: Enclosed ladders within masonry-walled vertical shafts featuring shadowed interior backdrops and illuminated guide lines.
@@ -485,7 +610,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.3.0] - 2026-10-24
-#### Session Archive: [`v3.1 - Brackeys Assets Ladders Pitfalls Spikes and Direction Relics.md`](/doc/prompts/v3.1%20-%20Brackeys%20Assets%20Ladders%20Pitfalls%20Spikes%20and%20Direction%20Relics.md)
+#### Session Archive: [`Brackeys Assets Ladders Pitfalls Spikes and Direction Relics - v3.1`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#brackeys-assets-ladders-pitfalls-spikes-and-direction-relics---v31)
 * **Added**:
   - **Brackeys Platformer Asset Integration**: Integrated pixel-art textures from the Brackeys platformer bundle: `world_tileset.png`, `platforms.png`, `coin.png`, and `fruit.png`.
   - **Mystery Direction Relics**: Floating fruit pickups that immediately trigger autonomous direction shifts (`DIR_RIGHT`, `DIR_LEFT`, `DIR_UP`, `DIR_DOWN`) with an on-screen alert banner.
@@ -497,7 +622,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.2.0] - 2026-10-24
-#### Session Archive: [`v3.0 - Side-View Endless Runner Transition with Dynamic Direction and Sprites.md`](/doc/prompts/v3.0%20-%20Side-View%20Endless%20Runner%20Transition%20with%20Dynamic%20Direction%20and%20Sprites.md)
+#### Session Archive: [`Side-View Endless Runner Transition with Dynamic Direction and Sprites - v3.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#side-view-endless-runner-transition-with-dynamic-direction-and-sprites---v30)
 * **Major Perspective Shift**:
   - Converted the game from a top-down ribbon runner to a classic 2D side-view endless platformer.
   - Re-mapped physics coordinates: horizontal axis ($X$) represents travel progression, vertical axis ($Y$) represents elevation, jump physics, and downward gravity.
@@ -509,7 +634,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.2] - 2026-10-21
-#### Session Archive: [`v2.0 - Project Structure and Version Archiving Advice.md`](/doc/prompts/v2.0%20-%20Project%20Structure%20and%20Version%20Archiving%20Advice.md)
+#### Session Archive: [`Project Structure and Version Archiving Advice - v2.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#project-structure-and-version-archiving-advice---v20)
 * **Documentation & Repository Structure**:
   - Evaluated repository structure and documented the distinction between monolithic gameplay source files and external project dependencies (`glad.c`, `include/`, `lib/`).
   - Formulated version snapshot strategies and best practices for archiving game builds before major milestone refactoring.
@@ -517,7 +642,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.1] - 2026-10-21
-#### Session Archive: [`v1.2 - Convert File Paths to Root-Relative.md`](/doc/prompts/v1.2%20-%20Convert%20File%20Paths%20to%20Root-Relative.md)
+#### Session Archive: [`Convert File Paths to Root-Relative - v1.2`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#convert-file-paths-to-root-relative---v12)
 * **Standards & Compliance**:
   - Converted all internal documentation file paths and markdown links across `README.md`, `AGENTS.md`, and prompt archives to repository root-relative paths (`/doc/...`).
   - Eliminated machine-specific absolute file URIs (`file:///...`) for portability across platforms and remote Git hosting.
@@ -525,7 +650,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.0-hotfix] - 2026-10-18
-#### Session Archive: [`v1.1 - Fix Makefile for MSYS2 Sh Environment.md`](/doc/prompts/v1.1%20-%20Fix%20Makefile%20for%20MSYS2%20Sh%20Environment.md)
+#### Session Archive: [`Fix Makefile for MSYS2 Sh Environment - v1.1`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#fix-makefile-for-msys2-sh-environment---v11)
 * **Build System Fix**:
   - Diagnosed and resolved MSYS2 `/bin/sh` syntax error when executing `make win` on Windows.
   - Removed shell-dependent batch conditions from [`/Makefile`](/Makefile).
@@ -534,7 +659,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.0] - 2026-10-17
-#### Session Archive: [`v1.0 - Project Analysis and Phase 1 Implementation.md`](/doc/prompts/v1.0%20-%20Project%20Analysis%20and%20Phase%201%20Implementation.md)
+#### Session Archive: [`Project Analysis and Phase 1 Implementation - v1.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#project-analysis-and-phase-1-implementation---v10)
 * **Initial Release (Phase 1 Complete)**:
   - Implemented the core engine prototype using Modern OpenGL 3.3 Core Profile in C++.
   - Created a single reusable $1 \times 1$ Quad VAO/VBO and MVP GLSL shader replacing hardcoded geometry.

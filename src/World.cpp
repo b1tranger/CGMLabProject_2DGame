@@ -312,6 +312,34 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
             }
         }
 
+        // 3. Starter Slimes on initial surface (immediate combat encounters):
+        {
+            EnemyEntity slimeR;
+            slimeR.type = ENEMY_SLIME_INITIAL;
+            slimeR.state = ENEMY_STATE_PATROL;
+            slimeR.pos = glm::vec2(17.5f, SURFACE_GROUND_Y + 0.5f + 1.2f);
+            slimeR.size = glm::vec2(1.8f, 1.4f);
+            slimeR.vel = glm::vec2(-0.75f, 0.0f);
+            slimeR.hp = 2;
+            slimeR.maxHp = 2;
+            slimeR.facingLeft = true;
+            slimeR.animTimer = 0.0f;
+            slimeR.stateTimer = 0.0f;
+            slimeR.attackCooldown = 0.0f;
+            slimeR.jumpCooldown = 0.0f;
+            slimeR.spellCooldown = 0.0f;
+            slimeR.hurtTimer = 0.0f;
+            slimeR.active = true;
+            slimeR.hasHitPlayerThisAttack = false;
+            enemies.push_back(slimeR);
+
+            EnemyEntity slimeL = slimeR;
+            slimeL.pos = glm::vec2(-18.0f, SURFACE_GROUND_Y + 0.5f + 1.2f);
+            slimeL.vel = glm::vec2(0.75f, 0.0f);
+            slimeL.facingLeft = false;
+            enemies.push_back(slimeL);
+        }
+
         return;
     }
 
@@ -512,12 +540,16 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
                     continue;
                 }
 
-                // Check distance from already spawned enemies
+                // Check distance from already spawned enemies:
+                // Bringer of Death and Slime must NOT spawn together / close (12.0m buffer)!
                 bool tooClose = false;
                 for (const auto& existing : enemies) {
-                    if (std::abs(existing.pos.x - candX) < 3.5f && std::abs(existing.pos.y - spawnY) < 1.5f) {
-                        tooClose = true;
-                        break;
+                    float dx = std::abs(existing.pos.x - candX);
+                    float dy = std::abs(existing.pos.y - spawnY);
+                    if (existing.type == ENEMY_SLIME_INITIAL || existing.type == ENEMY_BOSS_DEMON_SLIME) {
+                        if (dx < 9.0f && dy < 2.5f) { tooClose = true; break; }
+                    } else {
+                        if (dx < 6.5f && dy < 2.0f) { tooClose = true; break; }
                     }
                 }
                 if (tooClose) continue;
@@ -544,54 +576,57 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
             }
         }
 
-        // Initial Slime (60% chance to spawn 1 or 2 per chunk):
-        if (std::rand() % 10 < 6) {
-            int numSlimes = 1 + (std::rand() % 2);
-            for (int s = 0; s < numSlimes; ++s) {
-                float footY = SURFACE_GROUND_Y + 0.5f;
-                float spawnY = footY + 1.2f;
+        // Initial Slimes (Guaranteed high-density spawning: 2 to 4 slimes per chunk across surface & caverns):
+        int numSlimes = 2 + (std::rand() % 3); // 2, 3, or 4 slimes per chunk!
+        for (int s = 0; s < numSlimes; ++s) {
+            bool inCavern = (std::rand() % 3 == 0); // 33% chance to spawn in subterranean caverns
+            float footY = inCavern ? (CAVERN_FLOOR_Y + 0.5f) : (SURFACE_GROUND_Y + 0.5f);
+            float spawnY = footY + 1.2f;
 
-                for (int attempt = 0; attempt < 12; ++attempt) {
-                    float candX = startX + 4.0f + static_cast<float>(std::rand() % static_cast<int>(std::max(4.0f, endX - startX - 8.0f)));
-                    if (isInsideChasm(candX - 1.8f) || isInsideChasm(candX) || isInsideChasm(candX + 1.8f)) {
-                        continue;
-                    }
-                    if (isUndergroundShaft(candX - 1.4f) || isUndergroundShaft(candX) || isUndergroundShaft(candX + 1.4f)) {
-                        continue;
-                    }
-                    if (!hasSolidGroundAt(candX, footY, 0.35f)) {
-                        continue;
-                    }
-
-                    bool tooClose = false;
-                    for (const auto& existing : enemies) {
-                        if (std::abs(existing.pos.x - candX) < 3.0f && std::abs(existing.pos.y - spawnY) < 1.5f) {
-                            tooClose = true;
-                            break;
-                        }
-                    }
-                    if (tooClose) continue;
-
-                    EnemyEntity slime;
-                    slime.type = ENEMY_SLIME_INITIAL;
-                    slime.state = ENEMY_STATE_PATROL;
-                    slime.pos = glm::vec2(candX, spawnY);
-                    slime.size = glm::vec2(1.8f, 1.4f);
-                    slime.vel = glm::vec2((std::rand() % 2 == 0) ? -0.75f : 0.75f, 0.0f);
-                    slime.hp = 2;
-                    slime.maxHp = 2;
-                    slime.facingLeft = (slime.vel.x < 0.0f);
-                    slime.animTimer = static_cast<float>(std::rand() % 10) * 0.1f;
-                    slime.stateTimer = 0.0f;
-                    slime.attackCooldown = 0.0f;
-                    slime.jumpCooldown = 0.0f;
-                    slime.spellCooldown = 0.0f;
-                    slime.hurtTimer = 0.0f;
-                    slime.active = true;
-                    slime.hasHitPlayerThisAttack = false;
-                    enemies.push_back(slime);
-                    break;
+            for (int attempt = 0; attempt < 24; ++attempt) {
+                float candX = startX + 3.0f + static_cast<float>(std::rand() % static_cast<int>(std::max(4.0f, endX - startX - 6.0f)));
+                if (!inCavern && (isInsideChasm(candX - 1.8f) || isInsideChasm(candX) || isInsideChasm(candX + 1.8f))) {
+                    continue;
                 }
+                if (isUndergroundShaft(candX - 1.4f) || isUndergroundShaft(candX) || isUndergroundShaft(candX + 1.4f)) {
+                    continue;
+                }
+                if (!hasSolidGroundAt(candX, footY, 0.35f)) {
+                    continue;
+                }
+
+                // Distance buffer: 9.0m from Bringer of Death if on same elevation tier (dy < 2.5m), 4.0m between slimes
+                bool tooClose = false;
+                for (const auto& existing : enemies) {
+                    float dx = std::abs(existing.pos.x - candX);
+                    float dy = std::abs(existing.pos.y - spawnY);
+                    if (existing.type == ENEMY_BRINGER_OF_DEATH) {
+                        if (dx < 9.0f && dy < 2.5f) { tooClose = true; break; }
+                    } else {
+                        if (dx < 4.0f && dy < 2.0f) { tooClose = true; break; }
+                    }
+                }
+                if (tooClose) continue;
+
+                EnemyEntity slime;
+                slime.type = ENEMY_SLIME_INITIAL;
+                slime.state = ENEMY_STATE_PATROL;
+                slime.pos = glm::vec2(candX, spawnY);
+                slime.size = glm::vec2(1.8f, 1.4f);
+                slime.vel = glm::vec2((std::rand() % 2 == 0) ? -0.75f : 0.75f, 0.0f);
+                slime.hp = 2;
+                slime.maxHp = 2;
+                slime.facingLeft = (slime.vel.x < 0.0f);
+                slime.animTimer = static_cast<float>(std::rand() % 10) * 0.1f;
+                slime.stateTimer = 0.0f;
+                slime.attackCooldown = 0.0f;
+                slime.jumpCooldown = 0.0f;
+                slime.spellCooldown = 0.0f;
+                slime.hurtTimer = 0.0f;
+                slime.active = true;
+                slime.hasHitPlayerThisAttack = false;
+                enemies.push_back(slime);
+                break;
             }
         }
     }
