@@ -9,6 +9,8 @@ out/
 *.obj
 *.pdb
 *.ilk
+*.zip
+dist/
 
 # CMake generated files
 CMakeFiles/
