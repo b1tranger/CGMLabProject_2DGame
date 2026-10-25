@@ -174,6 +174,26 @@ struct CornerNotification {
     int fruitType;
 };
 
+struct CharacterAnimSet {
+    unsigned int texRun     = 0;
+    unsigned int texIdle    = 0;
+    unsigned int texJump    = 0;
+    unsigned int texFall    = 0;
+    unsigned int texAttack  = 0;
+    unsigned int texDeath   = 0;
+    unsigned int texTakeHit = 0;
+
+    int runFrames     = 8;
+    int idleFrames    = 8;
+    int jumpFrames    = 2;
+    int fallFrames    = 2;
+    int attackFrames  = 6;
+    int deathFrames   = 6;
+    int takeHitFrames = 4;
+};
+
+extern CharacterAnimSet samuraiAnim;
+
 // -----------------------------------------------------------------------------
 // UV Atlases Calculation Helpers
 // -----------------------------------------------------------------------------
@@ -202,13 +222,17 @@ inline glm::vec4 getCoinUV(int frame) {
     return glm::vec4(u, v, du, dv);
 }
 
-inline glm::vec4 getFruitUV(int fruitIndex) {
-    int idx = (fruitIndex % 4);
+inline glm::vec4 getShieldUV(int frame = 0) {
+    int idx = (frame % 4);
     float u  = static_cast<float>(idx) * 0.25f;
     float v  = 0.0f;
     float du = 0.25f;
-    float dv = 0.25f;
+    float dv = 1.0f;
     return glm::vec4(u, v, du, dv);
+}
+
+inline glm::vec4 getFruitUV(int fruitIndex) {
+    return getShieldUV(fruitIndex);
 }
 
 inline glm::vec4 getDirectionArrowUV(RunDirection dir) {

@@ -74,6 +74,17 @@ mingw32-make package
 
 ## 📜 Version History (Changelog)
 
+### [v0.5.15] - 2026-10-25 (Ladder Hero Scale Fix, Post-Intro Tutorial Modal, Shield Icon Pickups & Scene Exit Timers)
+- **Ladder Climb Hero Scale Restored**: Fixed missing matrix scale transformation on `modelHero` in `SCENE_LADDER_CLIMB`, scaling the climbing Samurai Mack sprite by `playerRenderSize` ($5.5\times 5.5$) to match runner and sky-fall proportions.
+- **Post-Intro Tutorial Window Modal**:
+  - Displays a glassmorphic tutorial window automatically right after intro video playback (or skip), strictly once per application launch.
+  - Explains the essence of "Wandering": *"Endless runner with traps to avoid and shields to pickup. Change movement direction and find the end goal of this venture."*
+  - Instructs the player to inspect the Pause Menu for control details and press **`[T]`** while paused to reopen the tutorial guide at any time.
+- **Dedicated Shield Icon Pickups**: Replaced ambiguous Fruit sprites with a glowing, heraldic Shield icon (`assets/shield_pickup.png`) featuring golden/cyan trims and radiant star emblem, eliminating confusion between direction warps and defensive force fields.
+- **Mini-Game Scene Countdown & Exit Prompts**:
+  - Added an on-screen top-center countdown badge (`SURVIVE UNTIL EXIT: 15.0s -> 0.0s`) with an integrated progress bar in `SCENE_LADDER_CLIMB` and `SCENE_SKY_FALL`.
+  - Displays a prominent, glowing banner prompt: `=== EXIT APPEARED! === [TOUCH DIRECTION ARROW TO RETURN]` when the survival trial completes, cleanly alerting players as directional exit relics appear in the path.
+
 ### [v0.5.14] - 2026-10-25 (Circular Energy Shield Bubble & Single-Hit Trap Absorption)
 - **Single-Hit Trap Absorption & Removal**: Collecting fruits equips a protective energy shield that now absorbs exactly one trap/hazard hit and immediately breaks (`shieldTimer = 0.0f`).
 - **Post-Hit Grace Invulnerability Window**: Added a $0.75\,\text{s}$ grace period (`postHitInvulnTimer`) upon shield shatter, preventing instant death on the subsequent frame while the player clears the hazard bounding box.

@@ -11,6 +11,9 @@
 #include "Renderer.h"
 #include "World.h"
 #include "VideoPlayer.h"
+#include "UIManager.h"
+#include "LadderScene.h"
+#include "SkyFallScene.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -22,40 +25,27 @@
 GameState currentGameState = STATE_INTRO_VIDEO;
 std::string gameOverReason = "";
 
-// Character Animation Set Definition
-struct CharacterAnimSet {
-    unsigned int texRun     = 0;
-    unsigned int texIdle    = 0;
-    unsigned int texJump    = 0;
-    unsigned int texFall    = 0;
-    unsigned int texAttack  = 0;
-    unsigned int texDeath   = 0;
-    unsigned int texTakeHit = 0;
-
-    int runFrames     = 8;
-    int idleFrames    = 8;
-    int jumpFrames    = 2;
-    int fallFrames    = 2;
-    int attackFrames  = 6;
-    int deathFrames   = 6;
-    int takeHitFrames = 4;
-};
-
 // Global Character Set (Samurai Mack)
 CharacterAnimSet samuraiAnim;
 float deathAnimTimer = 0.0f;
 
 // Temporary Shield & Idle-Start State
-float shieldTimer        = 0.0f; // Temporary shield duration gained from fruit pickups
+float shieldTimer        = 0.0f; // Temporary shield duration gained from shield pickups
 float postHitInvulnTimer = 0.0f; // Brief post-shield break invulnerability to safely clear the hazard
 bool isGameIdleAtStart   = true; // Character stands still at start until player moves
 bool freeExplorationMode = false; // Toggle with 'F' key: allows full manual exploration without auto-run
+
+// Tutorial Modal Dialog State
+bool showTutorialModal        = false; // Tutorial window active
+bool hasShownInitialTutorial  = false; // Ensures tutorial appears only once after launch
+bool tutorialOpenedFromPause  = false; // Tracks if opened via [T] inside Pause Menu
+float exitAppearedBannerTimer = 0.0f;  // Pulsing banner timer when mini-game exit unlocks
 
 // World & Object Textures
 unsigned int worldTilesetTexture     = 0;
 unsigned int platformsTexture        = 0;
 unsigned int coinTexture             = 0;
-unsigned int fruitTexture            = 0;
+unsigned int fruitTexture            = 0; // Shield pickup icon texture
 unsigned int birdTexture             = 0;
 unsigned int directionArrowsTexture = 0;
 
@@ -93,72 +83,6 @@ GameScene currentScene = SCENE_PLATFORMER;
 glm::vec2 platformerSavedPos(0.0f, SURFACE_GROUND_Y + 1.2f);
 RunDirection platformerSavedDir = DIR_RIGHT;
 
-// Up Scene: 3 Parallel Endless Ladders
-constexpr float LADDER_TRACK_X[3] = { -3.2f, 0.0f, 3.2f };
-int ladderCurrentLane     = 1; // 0=Left, 1=Center, 2=Right
-int ladderTargetLane      = 1;
-float ladderPlayerY       = 0.0f;
-float ladderPlayerX       = 0.0f;
-float ladderClimbSpeed    = 5.4f;
-bool isLadderLeaping      = false;
-float ladderLeapProgress  = 1.0f;
-constexpr float LADDER_LEAP_TIME = 0.20f;
-bool isLadderHit          = false;
-float ladderHitVelY       = 0.0f;
-float ladderDarkAlpha     = 0.0f;
-bool isLadderResurrecting = false;
-float ladderResurrectTimer = 0.0f;
-
-struct LadderTrap {
-    int lane;
-    float y;
-    int type; // 0=spikes, 1=sawblade
-    bool active;
-};
-std::vector<LadderTrap> ladderTraps;
-
-struct LadderItem {
-    int lane;
-    float y;
-    int type; // 0=coin, 1=relic
-    int fruitType;
-    bool collected;
-};
-std::vector<LadderItem> ladderItems;
-float ladderGenTopY = 8.0f;
-
-// Down Scene: Sky-Fall with Birds & Traps
-glm::vec2 skyFallPos(0.0f, 0.0f);
-float skyFallVelX       = 0.0f;
-float skyFallSpeed      = 9.2f;
-bool isSkyFallHit       = false;
-float skyFallHitTimer   = 0.0f;
-float skyFallDarkAlpha  = 0.0f;
-
-struct SkyBirdObstacle {
-    glm::vec2 pos;
-    float vx;
-    float animTimer;
-    bool active;
-};
-std::vector<SkyBirdObstacle> skyBirdsList;
-
-struct SkySpikeTrap {
-    glm::vec2 pos;
-    glm::vec2 size;
-    bool active;
-};
-std::vector<SkySpikeTrap> skySpikesList;
-
-struct SkyItem {
-    glm::vec2 pos;
-    int type; // 0=coin, 1=relic
-    int fruitType;
-    bool collected;
-};
-std::vector<SkyItem> skyItemsList;
-float skyFallGenBottomY = -8.0f;
-
 float playerSpeed = BASE_RUN_SPEED;
 float scoreDistance = 0.0f;
 int coinsCollected  = 0;
@@ -171,34 +95,6 @@ RunDirection lastHorizontalDir = DIR_RIGHT;
 float directionSwitchTimer     = 6.5f;
 // By default, random timer shifts are disabled so direction shifts ONLY happen when collecting Mystery Fruit Relics!
 bool autoShiftEnabled          = false;
-
-// World-Space Floating Text System
-struct FloatingText {
-    std::string text;
-    glm::vec2 pos;
-    glm::vec4 color;
-    float charW;
-    float charH;
-    float timer;
-    float maxTime;
-    float riseSpeed;
-};
-std::vector<FloatingText> floatingTexts;
-
-void spawnFloatingText(const std::string& text, const glm::vec2& pos, const glm::vec4& color,
-                       float charW = 0.26f, float charH = 0.38f, float duration = 2.2f, float riseSpeed = 1.3f)
-{
-    FloatingText ft;
-    ft.text = text;
-    ft.pos = pos;
-    ft.color = color;
-    ft.charW = charW;
-    ft.charH = charH;
-    ft.timer = duration;
-    ft.maxTime = duration;
-    ft.riseSpeed = riseSpeed;
-    floatingTexts.push_back(ft);
-}
 
 // Dynamic Environment & Biome State
 EnvironmentTheme activeTheme = THEME_EMERALD_FOREST;
@@ -227,14 +123,7 @@ float daylightFactor = 0.0f; // 0.0 = deep night, 1.0 = bright daylight
 float scenePlayTime = 0.0f;
 bool sceneDirectionUnlockedNotified = false;
 
-// Celestial Stars for Night Sky
-struct CelestialStar {
-    float x;
-    float y;
-    float size;
-    float twinkleFreq;
-    float twinklePhase;
-};
+// Celestial Stars for Night Sky (struct defined in SkyFallScene.h)
 std::vector<CelestialStar> skyStars;
 
 // Sprite Animation Management
@@ -244,9 +133,6 @@ int currentAnimFrame = 0;
 
 // Side-View Camera
 glm::vec2 cameraPos(0.0f, 0.0f);
-
-// Corner Notification System
-CornerNotification activeNotice = {"", "", "", glm::vec4(0), 0.0f, 0.0f, 0, 0};
 
 // -----------------------------------------------------------------------------
 // Function Prototypes
@@ -258,26 +144,6 @@ void triggerRandomDirectionShift(const std::string& sourceName, RunDirection for
 void setEnvironmentTheme(EnvironmentTheme theme);
 void setSceneryTheme(SceneryTheme theme);
 std::string getSceneryName(SceneryTheme s);
-void showCornerNotification(const std::string& tag, const std::string& title,
-                            const std::string& detail, const glm::vec4& color,
-                            int iconType, int fruitType = 0);
-
-// -----------------------------------------------------------------------------
-// Corner HUD Notification Trigger
-// -----------------------------------------------------------------------------
-void showCornerNotification(const std::string& tag, const std::string& title,
-                            const std::string& detail, const glm::vec4& color,
-                            int iconType, int fruitType)
-{
-    activeNotice.tag = tag;
-    activeNotice.title = title;
-    activeNotice.detail = detail;
-    activeNotice.accentColor = color;
-    activeNotice.timer = 2.8f;
-    activeNotice.maxTime = 2.8f;
-    activeNotice.iconType = iconType;
-    activeNotice.fruitType = fruitType;
-}
 
 // -----------------------------------------------------------------------------
 // Environment Theme & Biome Transitions
@@ -344,88 +210,20 @@ void enterLadderScene() {
     currentScene = SCENE_LADDER_CLIMB;
     platformerSavedPos = playerPos;
     platformerSavedDir = lastHorizontalDir;
-    ladderCurrentLane = 1;
-    ladderTargetLane = 1;
-    ladderPlayerY = 0.0f;
-    ladderPlayerX = LADDER_TRACK_X[1];
-    isLadderLeaping = false;
-    ladderLeapProgress = 1.0f;
-    isLadderHit = false;
-    ladderHitVelY = 0.0f;
-    ladderDarkAlpha = 0.0f;
-    isLadderResurrecting = false;
-    ladderResurrectTimer = 0.0f;
-    ladderTraps.clear();
-    ladderItems.clear();
-    ladderGenTopY = 5.0f;
     scenePlayTime = 0.0f;
     sceneDirectionUnlockedNotified = false;
-
-    // Generate initial traps and collectibles across the 3 endless ladders (initial ~25m)
-    for (int i = 0; i < 6; ++i) {
-        float y = 5.0f + i * 4.2f;
-        int trapLane = std::rand() % 3;
-        ladderTraps.push_back({ trapLane, y, std::rand() % 2, true });
-
-        int itemLane = (trapLane + 1 + (std::rand() % 2)) % 3;
-        if (i % 2 == 0) {
-            ladderItems.push_back({ itemLane, y + 1.2f, 1, std::rand() % 4, false }); // Fruit shield
-        } else {
-            ladderItems.push_back({ itemLane, y + 1.2f, 0, 0, false }); // Coin
-        }
-        ladderGenTopY = y;
-    }
-
-    showCornerNotification("SCENE ENTER", "^^^ 3-LADDER ASCENT ^^^", "Survive 15s trial before direction shifts!", glm::vec4(0.35f, 0.95f, 0.4f, 1.0f), 1, 2);
-    spawnFloatingText("^^^ 3-LADDER TRIAL (15s) ^^^", glm::vec2(0.0f, 1.2f), glm::vec4(0.35f, 1.0f, 0.45f, 1.0f));
+    exitAppearedBannerTimer = 0.0f;
+    gameLadderScene.enter(playerPos, lastHorizontalDir);
 }
 
 void enterSkyFallScene() {
     currentScene = SCENE_SKY_FALL;
     platformerSavedPos = playerPos;
     platformerSavedDir = lastHorizontalDir;
-    skyFallPos = glm::vec2(0.0f, 0.0f);
-    skyFallVelX = 0.0f;
-    isSkyFallHit = false;
-    skyFallHitTimer = 0.0f;
-    skyFallDarkAlpha = 0.0f;
-    skyBirdsList.clear();
-    skySpikesList.clear();
-    skyItemsList.clear();
-    skyFallGenBottomY = -8.0f;
     scenePlayTime = 0.0f;
     sceneDirectionUnlockedNotified = false;
-
-    // Generate initial birds, spike mines, and items with spacious, fair pacing
-    for (int i = 0; i < 4; ++i) {
-        float y = -8.0f - i * 14.0f;
-
-        // Birds spawn on alternate tiers with moderate, readable speed
-        if (i % 2 == 0) {
-            bool fromLeft = (i % 4 == 0);
-            float birdX = fromLeft ? -9.5f : 9.5f;
-            float birdVx = fromLeft ? (3.0f + (std::rand() % 15) / 10.0f) : -(3.0f + (std::rand() % 15) / 10.0f);
-            skyBirdsList.push_back({ glm::vec2(birdX, y), birdVx, static_cast<float>(std::rand() % 10), true });
-        }
-
-        // Spike traps spawn rarely (every 3 tiers) leaving wide open escape lanes
-        if (i % 3 == 1) {
-            float trapX = ((std::rand() % 60) / 10.0f) - 3.0f;
-            skySpikesList.push_back({ glm::vec2(trapX, y - 3.0f), glm::vec2(0.85f, 0.85f), true });
-        }
-
-        // Spawn Gold Coins & Fruit Shield pickups
-        float itemX = ((std::rand() % 80) / 10.0f) - 4.0f;
-        if (i % 2 == 0) {
-            skyItemsList.push_back({ glm::vec2(itemX, y - 1.5f), 1, std::rand() % 4, false }); // Fruit pickup -> grants shield!
-        } else {
-            skyItemsList.push_back({ glm::vec2(itemX, y - 1.5f), 0, 0, false }); // Coin
-        }
-        skyFallGenBottomY = y;
-    }
-
-    showCornerNotification("SCENE ENTER", "vvv SKY FALL DIVE vvv", "Survive 15s trial! Steer A/D, SHIFT to Dash!", glm::vec4(0.95f, 0.85f, 0.2f, 1.0f), 1, 0);
-    spawnFloatingText("vvv SKY-FALL TRIAL (15s) vvv", glm::vec2(0.0f, 1.2f), glm::vec4(0.95f, 0.85f, 0.25f, 1.0f));
+    exitAppearedBannerTimer = 0.0f;
+    gameSkyFallScene.enter(playerPos, lastHorizontalDir);
 }
 
 void returnToPlatformerScene(bool fromJump) {
@@ -570,13 +368,14 @@ void resetGame()
     deathAnimTimer = 0.0f;
 
     cameraPos = glm::vec2(0.0f, 0.0f);
-    floatingTexts.clear();
+    UIManager::instance().clear();
 
     dayNightTimer = 0.0f; // Initial scene will be night time
     lastCycleIndex = 0;
     daylightFactor = 0.0f;
     scenePlayTime = 0.0f;
     sceneDirectionUnlockedNotified = false;
+    exitAppearedBannerTimer = 0.0f;
 
     setEnvironmentTheme(THEME_EMERALD_FOREST);
     gameWorld.reset(THEME_EMERALD_FOREST);
@@ -648,7 +447,7 @@ int main()
     worldTilesetTexture    = gameRenderer.loadTexture("assets/world_tileset.png");
     platformsTexture       = gameRenderer.loadTexture("assets/platforms.png");
     coinTexture            = gameRenderer.loadTexture("assets/coin.png");
-    fruitTexture           = gameRenderer.loadTexture("assets/fruit.png");
+    fruitTexture           = gameRenderer.loadTexture("assets/shield_pickup.png");
     birdTexture            = gameRenderer.loadTexture("assets/bird.png");
     directionArrowsTexture = gameRenderer.loadTexture("assets/direction_arrows.png");
 
@@ -681,6 +480,11 @@ int main()
         std::cerr << "Notice: Intro video not found or failed to load. Skipping intro." << std::endl;
         currentGameState = STATE_RUNNING;
         isGameIdleAtStart = true;
+        if (!hasShownInitialTutorial) {
+            showTutorialModal = true;
+            hasShownInitialTutorial = true;
+            tutorialOpenedFromPause = false;
+        }
     }
 
     float lastFrameTime = static_cast<float>(glfwGetTime());
@@ -721,6 +525,10 @@ int main()
             if (postHitInvulnTimer > 0.0f) {
                 postHitInvulnTimer -= deltaTime;
                 if (postHitInvulnTimer < 0.0f) postHitInvulnTimer = 0.0f;
+            }
+            if (exitAppearedBannerTimer > 0.0f) {
+                exitAppearedBannerTimer -= deltaTime;
+                if (exitAppearedBannerTimer < 0.0f) exitAppearedBannerTimer = 0.0f;
             }
         }
 
@@ -808,6 +616,11 @@ int main()
                 introVideoPlayer.close();
                 currentGameState = STATE_RUNNING;
                 isGameIdleAtStart = true;
+                if (!hasShownInitialTutorial) {
+                    showTutorialModal = true;
+                    hasShownInitialTutorial = true;
+                    tutorialOpenedFromPause = false;
+                }
             } else {
                 glClearColor(0.02f, 0.02f, 0.03f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
@@ -887,9 +700,8 @@ int main()
             audioMgr.updateCooldowns(deltaTime);
             if (slideInterruptCooldown > 0.0f) slideInterruptCooldown -= deltaTime;
 
-            if (activeNotice.timer > 0.0f) {
-                activeNotice.timer -= rawDeltaTime;
-            }
+            UIManager::instance().updateCornerNotification(rawDeltaTime);
+            UIManager::instance().updateFloatingTexts(rawDeltaTime);
 
             if (autoShiftEnabled) {
                 directionSwitchTimer -= deltaTime;
@@ -914,343 +726,42 @@ int main()
                 else ++it;
             }
 
-            // Update World-Space Floating Texts
-            for (auto it = floatingTexts.begin(); it != floatingTexts.end(); ) {
-                it->timer -= rawDeltaTime;
-                it->pos.y += it->riseSpeed * rawDeltaTime;
-                if (it->timer <= 0.0f) {
-                    it = floatingTexts.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-
             // -----------------------------------------------------------------
             // Branch By Current Game Scene
             // -----------------------------------------------------------------
             if (currentScene == SCENE_LADDER_CLIMB)
             {
-                scenePlayTime += deltaTime;
-                if (scenePlayTime >= SCENE_DIRECTION_COOLDOWN && !sceneDirectionUnlockedNotified) {
-                    sceneDirectionUnlockedNotified = true;
-                    audioMgr.play(SFX_RELIC);
-                    spawnFloatingText(">>> DIRECTION SHIFTS UNLOCKED! <<<", glm::vec2(ladderPlayerX, ladderPlayerY + 1.2f), glm::vec4(0.35f, 1.0f, 0.5f, 1.0f));
-                    showCornerNotification("TRIAL COMPLETE", "DIRECTION SHIFTS UNLOCKED!", "Left/Right arrow relics spawned! Touch to exit ladder!", glm::vec4(0.35f, 1.0f, 0.45f, 1.0f), 1, 0);
-
-                    // Immediately spawn Left and Right Direction Arrow Relics just ahead of the player!
-                    ladderItems.push_back({ 0, ladderPlayerY + 3.8f, 2, DIR_LEFT, false });
-                    ladderItems.push_back({ 2, ladderPlayerY + 6.8f, 2, DIR_RIGHT, false });
-                    ladderItems.push_back({ 1, ladderPlayerY + 10.2f, 2, DIR_LEFT, false });
+                scenePlayTime = gameLadderScene.getTrialTime();
+                bool reqExit = false;
+                RunDirection exitDir = DIR_RIGHT;
+                bool reqSky = false;
+                gameLadderScene.update(deltaTime, window, shieldTimer, postHitInvulnTimer, isDashing,
+                                       coinsCollected, relicsTriggered, scoreDistance,
+                                       reqExit, exitDir, reqSky);
+                if (reqExit) {
+                    platformerSavedDir = exitDir;
+                    lastHorizontalDir = exitDir;
+                    currentDirection = exitDir;
+                    returnToPlatformerScene(true);
+                } else if (reqSky) {
+                    enterSkyFallScene();
                 }
-
-                if (!isLadderHit && !isLadderResurrecting) {
-                    ladderPlayerY += ladderClimbSpeed * deltaTime;
-                    scoreDistance += ladderClimbSpeed * deltaTime;
-
-                    if (isLadderLeaping) {
-                        ladderLeapProgress += deltaTime / LADDER_LEAP_TIME;
-                        if (ladderLeapProgress >= 1.0f) {
-                            ladderLeapProgress = 1.0f;
-                            isLadderLeaping = false;
-                            ladderCurrentLane = ladderTargetLane;
-                            ladderPlayerX = LADDER_TRACK_X[ladderCurrentLane];
-                        } else {
-                            float fromX = LADDER_TRACK_X[ladderCurrentLane];
-                            float toX   = LADDER_TRACK_X[ladderTargetLane];
-                            ladderPlayerX = glm::mix(fromX, toX, ladderLeapProgress);
-                        }
-                    } else {
-                        ladderPlayerX = LADDER_TRACK_X[ladderCurrentLane];
-                    }
-
-                    // Procedural generation of traps and items on 3 ladders
-                    while (ladderGenTopY < ladderPlayerY + 25.0f) {
-                        ladderGenTopY += 4.5f;
-                        int trapLane = std::rand() % 3;
-                        ladderTraps.push_back({ trapLane, ladderGenTopY, std::rand() % 2, true });
-
-                        int itemLane = (trapLane + 1 + (std::rand() % 2)) % 3;
-                        if (scenePlayTime >= SCENE_DIRECTION_COOLDOWN) {
-                            // After 15s trial: Regularly spawn Left and Right Direction Arrow Relics!
-                            int roll = std::rand() % 10;
-                            if (roll < 4) {
-                                RunDirection arrowDir = (std::rand() % 2 == 0) ? DIR_LEFT : DIR_RIGHT;
-                                ladderItems.push_back({ itemLane, ladderGenTopY + 1.2f, 2, arrowDir, false });
-                            } else if (roll < 7) {
-                                ladderItems.push_back({ itemLane, ladderGenTopY + 1.2f, 1, std::rand() % 4, false }); // Fruit shield
-                            } else {
-                                ladderItems.push_back({ itemLane, ladderGenTopY + 1.2f, 0, 0, false }); // Coin
-                            }
-                        } else {
-                            if (std::rand() % 2 == 0) {
-                                ladderItems.push_back({ itemLane, ladderGenTopY + 1.2f, 1, std::rand() % 4, false });
-                            } else {
-                                ladderItems.push_back({ itemLane, ladderGenTopY + 1.2f, 0, 0, false });
-                            }
-                        }
-                    }
-
-                    // Trap collisions
-                    for (auto& trap : ladderTraps) {
-                        if (trap.active && trap.lane == ladderCurrentLane && std::abs(ladderPlayerY - trap.y) < 0.9f) {
-                            if (shieldTimer > 0.0f || isDashing) {
-                                trap.active = false;
-                                audioMgr.play(SFX_SLIDE);
-                                if (shieldTimer > 0.0f && !isDashing) {
-                                    shieldTimer = 0.0f; // Removed on first hit!
-                                    spawnFloatingText("SHIELD BROKE! [TRAP DEFLECTED]", glm::vec2(ladderPlayerX, ladderPlayerY + 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                                    showCornerNotification("SHIELD", "SHIELD BROKEN!", "Absorbed trap hit!", glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
-                                } else {
-                                    spawnFloatingText("DASH DEFLECTED TRAP!", glm::vec2(ladderPlayerX, ladderPlayerY + 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                                }
-                            } else {
-                                isLadderHit = true;
-                                ladderHitVelY = -6.0f;
-                                ladderDarkAlpha = 0.0f;
-                                audioMgr.play(SFX_DEATH);
-                                spawnFloatingText("STRUCK BY TRAP!", glm::vec2(ladderPlayerX, ladderPlayerY + 1.0f), glm::vec4(1.0f, 0.35f, 0.25f, 1.0f));
-                                showCornerNotification("FALL", "KNOCKED OFF LADDER!", "Falling through the dark...", glm::vec4(1.0f, 0.35f, 0.2f, 1.0f), 0);
-                                break;
-                            }
-                        }
-                    }
-
-                    // Collectibles collisions (Coins, Fruit Shields & Direction Arrow Relics)
-                    for (auto& itm : ladderItems) {
-                        if (!itm.collected && itm.lane == ladderCurrentLane && std::abs(ladderPlayerY - itm.y) < 1.0f) {
-                            itm.collected = true;
-                            if (itm.type == 0) {
-                                coinsCollected++;
-                                audioMgr.play(SFX_COIN);
-                                spawnFloatingText("+50", glm::vec2(ladderPlayerX, itm.y + 0.5f), glm::vec4(1.0f, 0.88f, 0.2f, 1.0f));
-                            } else if (itm.type == 1) {
-                                shieldTimer = 10.0f;
-                                audioMgr.play(SFX_RELIC);
-                                showCornerNotification("SHIELD", "10s TEMPORARY SHIELD!", "Hazard invulnerability active!", glm::vec4(0.2f, 0.95f, 1.0f, 1.0f), 0);
-                                spawnFloatingText("+10s SHIELD ACTIVE!", glm::vec2(ladderPlayerX, itm.y + 0.8f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                            } else if (itm.type == 2) {
-                                RunDirection targetDir = static_cast<RunDirection>(itm.fruitType);
-                                audioMgr.play(SFX_RELIC);
-                                relicsTriggered++;
-                                if (targetDir == DIR_LEFT || targetDir == DIR_RIGHT) {
-                                    platformerSavedDir = targetDir;
-                                    lastHorizontalDir = targetDir;
-                                    currentDirection = targetDir;
-                                    std::string dirStr = (targetDir == DIR_LEFT) ? "WARP <<< LEFT" : "WARP >>> RIGHT";
-                                    spawnFloatingText("DIRECTION TRIGGERED!\n" + dirStr, glm::vec2(ladderPlayerX, itm.y + 0.8f),
-                                                      glm::vec4(0.25f, 1.0f, 0.95f, 1.0f), 0.28f, 0.40f, 2.8f, 1.3f);
-                                    showCornerNotification("WARP", dirStr, "Exiting ladder climb to platform runner!", glm::vec4(0.25f, 0.95f, 1.0f, 1.0f), 1, 0);
-                                    returnToPlatformerScene(true);
-                                    break;
-                                } else if (targetDir == DIR_DOWN) {
-                                    spawnFloatingText("WARP vvv SKY-FALL", glm::vec2(ladderPlayerX, itm.y + 0.8f), glm::vec4(0.3f, 1.0f, 0.5f, 1.0f));
-                                    enterSkyFallScene();
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } else if (isLadderHit) {
-                    ladderPlayerY += ladderHitVelY * deltaTime;
-                    ladderHitVelY -= 22.0f * deltaTime;
-                    ladderDarkAlpha = std::min(1.0f, ladderDarkAlpha + deltaTime * 1.5f);
-                    if (ladderDarkAlpha >= 0.95f) {
-                        isLadderHit = false;
-                        isLadderResurrecting = true;
-                        ladderResurrectTimer = 0.0f;
-                    }
-                } else if (isLadderResurrecting) {
-                    ladderResurrectTimer += deltaTime;
-                    if (ladderResurrectTimer >= 1.25f) {
-                        isLadderResurrecting = false;
-                        returnToPlatformerScene(false);
-                    }
-                }
-
                 animTimer += deltaTime;
             }
             else if (currentScene == SCENE_SKY_FALL)
             {
-                scenePlayTime += deltaTime;
-                if (scenePlayTime >= SCENE_DIRECTION_COOLDOWN && !sceneDirectionUnlockedNotified) {
-                    sceneDirectionUnlockedNotified = true;
-                    audioMgr.play(SFX_RELIC);
-                    spawnFloatingText(">>> DIRECTION SHIFTS UNLOCKED! <<<", skyFallPos + glm::vec2(0.0f, 1.2f), glm::vec4(0.35f, 1.0f, 0.5f, 1.0f));
-                    showCornerNotification("TRIAL COMPLETE", "DIRECTION SHIFTS UNLOCKED!", "Left/Right arrow relics spawned! Steer into arrow to resume runner!", glm::vec4(0.35f, 1.0f, 0.45f, 1.0f), 1, 0);
-
-                    // 1. Immediately convert all uncollected items ahead of the falling player into Left/Right Direction Arrow Relics!
-                    for (auto& itm : skyItemsList) {
-                        if (!itm.collected && itm.pos.y < skyFallPos.y && itm.pos.y > skyFallPos.y - 35.0f) {
-                            itm.type = 2;
-                            itm.fruitType = (itm.pos.x <= 0.0f) ? DIR_LEFT : DIR_RIGHT;
-                        }
-                    }
-
-                    // 2. Immediately spawn staggered Left and Right Direction Arrow gates directly in the descent route!
-                    skyItemsList.push_back({ glm::vec2(-2.2f, skyFallPos.y - 5.0f), 2, DIR_LEFT, false });
-                    skyItemsList.push_back({ glm::vec2( 2.2f, skyFallPos.y - 5.0f), 2, DIR_RIGHT, false });
-
-                    skyItemsList.push_back({ glm::vec2(-3.0f, skyFallPos.y - 10.0f), 2, DIR_LEFT, false });
-                    skyItemsList.push_back({ glm::vec2( 0.0f, skyFallPos.y - 10.0f), 2, (lastHorizontalDir == DIR_RIGHT ? DIR_RIGHT : DIR_LEFT), false });
-                    skyItemsList.push_back({ glm::vec2( 3.0f, skyFallPos.y - 10.0f), 2, DIR_RIGHT, false });
-
-                    skyItemsList.push_back({ glm::vec2(-2.2f, skyFallPos.y - 15.0f), 2, DIR_LEFT, false });
-                    skyItemsList.push_back({ glm::vec2( 2.2f, skyFallPos.y - 15.0f), 2, DIR_RIGHT, false });
+                scenePlayTime = gameSkyFallScene.getTrialTime();
+                bool reqExit = false;
+                RunDirection exitDir = DIR_RIGHT;
+                gameSkyFallScene.update(deltaTime, window, shieldTimer, postHitInvulnTimer, isDashing,
+                                        coinsCollected, relicsTriggered, scoreDistance,
+                                        reqExit, exitDir);
+                if (reqExit) {
+                    platformerSavedDir = exitDir;
+                    lastHorizontalDir = exitDir;
+                    currentDirection = exitDir;
+                    returnToPlatformerScene(true);
                 }
-
-                if (!isSkyFallHit) {
-                    skyFallPos.y -= skyFallSpeed * deltaTime;
-                    scoreDistance += skyFallSpeed * deltaTime;
-                    skyFallPos.x += skyFallVelX * deltaTime;
-                    skyFallPos.x = std::clamp(skyFallPos.x, -7.0f, 7.0f);
-                    skyFallVelX *= 0.86f;
-
-                    while (skyFallGenBottomY > skyFallPos.y - 25.0f) {
-                        skyFallGenBottomY -= 14.0f;
-                        // Spaced out bird spawns (50% chance per 14m)
-                        if (std::rand() % 2 == 0) {
-                            bool fromLeft = (std::rand() % 2 == 0);
-                            float birdX = fromLeft ? -9.5f : 9.5f;
-                            float birdVx = fromLeft ? (3.0f + (std::rand() % 15) / 10.0f) : -(3.0f + (std::rand() % 15) / 10.0f);
-                            skyBirdsList.push_back({ glm::vec2(birdX, skyFallGenBottomY), birdVx, static_cast<float>(std::rand() % 10), true });
-                        }
-
-                        // Spaced out spike mines (33% chance per 14m) leaving clear evasive paths
-                        if (std::rand() % 3 == 0) {
-                            float trapX = ((std::rand() % 60) / 10.0f) - 3.0f;
-                            skySpikesList.push_back({ glm::vec2(trapX, skyFallGenBottomY - 3.0f), glm::vec2(0.85f, 0.85f), true });
-                        }
-
-                        if (scenePlayTime >= SCENE_DIRECTION_COOLDOWN) {
-                            // After 15s trial: Continuously spawn Left and Right Direction Arrow Relics at every tier!
-                            skyItemsList.push_back({ glm::vec2(-2.5f, skyFallGenBottomY - 2.5f), 2, DIR_LEFT, false });
-                            skyItemsList.push_back({ glm::vec2( 2.5f, skyFallGenBottomY - 2.5f), 2, DIR_RIGHT, false });
-                            skyItemsList.push_back({ glm::vec2( 0.0f, skyFallGenBottomY - 7.5f), 2, (std::rand() % 2 == 0 ? DIR_LEFT : DIR_RIGHT), false });
-                            if (std::rand() % 2 == 0) {
-                                skyItemsList.push_back({ glm::vec2(-4.0f, skyFallGenBottomY - 5.0f), 1, std::rand() % 4, false }); // Fruit shield
-                            } else {
-                                skyItemsList.push_back({ glm::vec2( 4.0f, skyFallGenBottomY - 5.0f), 0, 0, false }); // Coin
-                            }
-                        } else {
-                            float itemX = ((std::rand() % 80) / 10.0f) - 4.0f;
-                            if (std::rand() % 2 == 0) {
-                                skyItemsList.push_back({ glm::vec2(itemX, skyFallGenBottomY - 1.5f), 1, std::rand() % 4, false }); // Fruit -> grants shield
-                            } else {
-                                skyItemsList.push_back({ glm::vec2(itemX, skyFallGenBottomY - 1.5f), 0, 0, false }); // Coin
-                            }
-                        }
-                    }
-
-                    for (auto& bird : skyBirdsList) {
-                        bird.pos.x += bird.vx * deltaTime;
-                        bird.animTimer += deltaTime;
-
-                        if (bird.active &&
-                            std::abs(bird.pos.x - skyFallPos.x) < 0.85f &&
-                            std::abs(bird.pos.y - skyFallPos.y) < 0.85f)
-                        {
-                            if (shieldTimer > 0.0f || isDashing) {
-                                bird.active = false;
-                                audioMgr.play(SFX_SLIDE);
-                                if (shieldTimer > 0.0f && !isDashing) {
-                                    shieldTimer = 0.0f; // Removed on first hit!
-                                    spawnFloatingText("SHIELD BROKE! [BIRD DEFLECTED]", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                                    showCornerNotification("SHIELD", "SHIELD BROKEN!", "Absorbed aerial collision!", glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
-                                } else {
-                                    spawnFloatingText("DASH DEFLECTED BIRD!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                                }
-                            } else {
-                                isSkyFallHit = true;
-                                skyFallHitTimer = 0.0f;
-                                skyFallDarkAlpha = 0.0f;
-                                playerSpriteAngle = 90.0f; // 90 degree anticlockwise!
-                                audioMgr.play(SFX_DEATH);
-                                spawnFloatingText("STRUCK BY RAPTOR!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(1.0f, 0.35f, 0.2f, 1.0f));
-                                showCornerNotification("HIT", "AERIAL COLLISION!", "Rotating 90 deg CCW impact!", glm::vec4(1.0f, 0.4f, 0.2f, 1.0f), 0);
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!isSkyFallHit) {
-                        for (auto& trap : skySpikesList) {
-                            if (trap.active &&
-                                std::abs(trap.pos.x - skyFallPos.x) < 0.85f &&
-                                std::abs(trap.pos.y - skyFallPos.y) < 0.85f)
-                            {
-                                if (shieldTimer > 0.0f || isDashing) {
-                                    trap.active = false;
-                                    audioMgr.play(SFX_SLIDE);
-                                    if (shieldTimer > 0.0f && !isDashing) {
-                                        shieldTimer = 0.0f; // Removed on first hit!
-                                        spawnFloatingText("SHIELD BROKE! [MINE DEFLECTED]", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                                        showCornerNotification("SHIELD", "SHIELD BROKEN!", "Absorbed spike mine hit!", glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
-                                    } else {
-                                        spawnFloatingText("DASH DEFLECTED MINE!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                                    }
-                                } else {
-                                    isSkyFallHit = true;
-                                    skyFallHitTimer = 0.0f;
-                                    skyFallDarkAlpha = 0.0f;
-                                    playerSpriteAngle = 90.0f;
-                                    audioMgr.play(SFX_DEATH);
-                                    spawnFloatingText("MINE DETONATION!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(1.0f, 0.35f, 0.2f, 1.0f));
-                                    showCornerNotification("HIT", "AERIAL MINE EXPLODED!", "Returning to surface runner!", glm::vec4(1.0f, 0.4f, 0.2f, 1.0f), 0);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    for (auto& itm : skyItemsList) {
-                        float distThreshX = (itm.type == 2) ? 1.85f : 1.1f;
-                        float distThreshY = (itm.type == 2) ? 2.1f : 1.1f;
-                        if (!itm.collected &&
-                            std::abs(itm.pos.x - skyFallPos.x) < distThreshX &&
-                            std::abs(itm.pos.y - skyFallPos.y) < distThreshY)
-                        {
-                            itm.collected = true;
-                            if (itm.type == 0) {
-                                coinsCollected++;
-                                audioMgr.play(SFX_COIN);
-                                spawnFloatingText("+50", skyFallPos + glm::vec2(0.0f, 0.5f), glm::vec4(1.0f, 0.88f, 0.2f, 1.0f));
-                            } else if (itm.type == 1) {
-                                shieldTimer = 10.0f;
-                                audioMgr.play(SFX_RELIC);
-                                showCornerNotification("SHIELD", "10s TEMPORARY SHIELD!", "Hazard invulnerability active!", glm::vec4(0.2f, 0.95f, 1.0f, 1.0f), 0);
-                                spawnFloatingText("+10s SHIELD ACTIVE!", skyFallPos + glm::vec2(0.0f, 0.8f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
-                            } else if (itm.type == 2) {
-                                RunDirection targetDir = static_cast<RunDirection>(itm.fruitType);
-                                audioMgr.play(SFX_RELIC);
-                                relicsTriggered++;
-                                if (targetDir == DIR_LEFT || targetDir == DIR_RIGHT) {
-                                    platformerSavedDir = targetDir;
-                                    lastHorizontalDir = targetDir;
-                                    currentDirection = targetDir;
-                                    std::string dirStr = (targetDir == DIR_LEFT) ? "WARP <<< LEFT" : "WARP >>> RIGHT";
-                                    spawnFloatingText("DIRECTION TRIGGERED!\n" + dirStr, skyFallPos + glm::vec2(0.0f, 0.8f),
-                                                      glm::vec4(0.25f, 1.0f, 0.95f, 1.0f), 0.28f, 0.40f, 2.8f, 1.3f);
-                                    showCornerNotification("WARP", dirStr, "Resuming regular platform runner!", glm::vec4(0.25f, 0.95f, 1.0f, 1.0f), 1, 0);
-                                    returnToPlatformerScene(true);
-                                    break;
-                                } else if (targetDir == DIR_UP) {
-                                    spawnFloatingText("WARP ^^^ LADDER ASCENT", skyFallPos + glm::vec2(0.0f, 0.8f), glm::vec4(0.35f, 1.0f, 0.45f, 1.0f));
-                                    enterLadderScene();
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } else if (isSkyFallHit) {
-                    skyFallHitTimer += deltaTime;
-                    skyFallDarkAlpha = std::min(1.0f, skyFallDarkAlpha + deltaTime * 1.5f);
-                    if (skyFallHitTimer >= 1.0f) {
-                        isSkyFallHit = false;
-                        playerSpriteAngle = 0.0f;
-                        returnToPlatformerScene(false);
-                    }
-                }
-
                 animTimer += deltaTime;
             }
             else
@@ -1322,7 +833,7 @@ int main()
                                     audioMgr.slideCooldown = 0.26f;
                                 }
 
-                                if (activeNotice.timer <= 0.0f || activeNotice.tag != "SLOPE") {
+                                if (!UIManager::instance().isNoticeActive("SLOPE")) {
                                     showCornerNotification("SLOPE", "STEEP SLOPE SLIDE!", "Sliding rapidly! Press SPACE to jump midpoint!",
                                                            glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 0);
                                 }
@@ -1604,11 +1115,11 @@ int main()
         // Camera Follow
         // ---------------------------------------------------------------------
         if (currentScene == SCENE_LADDER_CLIMB) {
-            cameraPos.x = glm::mix(cameraPos.x, ladderPlayerX, rawDeltaTime * 6.0f);
-            cameraPos.y = glm::mix(cameraPos.y, ladderPlayerY + 1.2f, rawDeltaTime * 5.0f);
+            cameraPos.x = glm::mix(cameraPos.x, gameLadderScene.getPlayerX(), rawDeltaTime * 6.0f);
+            cameraPos.y = glm::mix(cameraPos.y, gameLadderScene.getPlayerY() + 1.2f, rawDeltaTime * 5.0f);
         } else if (currentScene == SCENE_SKY_FALL) {
-            cameraPos.x = glm::mix(cameraPos.x, skyFallPos.x, rawDeltaTime * 6.0f);
-            cameraPos.y = glm::mix(cameraPos.y, skyFallPos.y - 1.2f, rawDeltaTime * 5.0f);
+            cameraPos.x = glm::mix(cameraPos.x, gameSkyFallScene.getPlayerPos().x, rawDeltaTime * 6.0f);
+            cameraPos.y = glm::mix(cameraPos.y, gameSkyFallScene.getPlayerPos().y - 1.2f, rawDeltaTime * 5.0f);
         } else {
             float lookAhead = (currentDirection == DIR_RIGHT || (isOnLadder && lastHorizontalDir == DIR_RIGHT)) ? 3.0f : -3.0f;
             float targetCamX = playerPos.x + lookAhead;
@@ -1660,310 +1171,15 @@ int main()
 
         if (currentScene == SCENE_LADDER_CLIMB)
         {
-            // Thematic Scenery Backdrop behind ladders
-            glm::vec4 nightSceneryTint(0.42f, 0.48f, 0.70f, 1.0f);
-            glm::vec4 sunsetSceneryTint(1.08f, 0.72f, 0.58f, 1.0f);
-            glm::vec4 daySceneryTint(1.02f, 1.0f, 0.98f, 1.0f);
-            glm::vec4 curSceneryTint = glm::mix(nightSceneryTint, daySceneryTint, daylightFactor);
-            curSceneryTint = glm::mix(curSceneryTint, sunsetSceneryTint, twilightFactor * 0.55f);
-
-            glm::mat4 modelScenery = glm::mat4(1.0f);
-            modelScenery = glm::translate(modelScenery, glm::vec3(cameraPos.x, cameraPos.y, 0.0f));
-            modelScenery = glm::scale(modelScenery, glm::vec3(28.0f, 18.0f, 1.0f));
-            gameRenderer.drawQuad(modelScenery, view, projection, curSceneryTint * 0.72f,
-                                  (texScenery[activeScenery] != 0), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), texScenery[activeScenery]);
-
-            // 1. Dark Vertical Tower Backdrop
-            for (int i = -4; i <= 4; ++i) {
-                float bgX = i * 4.0f;
-                glm::mat4 modelBg = glm::mat4(1.0f);
-                modelBg = glm::translate(modelBg, glm::vec3(bgX, cameraPos.y, 0.0f));
-                modelBg = glm::scale(modelBg, glm::vec3(2.6f, 32.0f, 1.0f));
-                gameRenderer.drawQuad(modelBg, view, projection, glm::vec4(0.07f, 0.09f, 0.15f, 0.90f), false, glm::vec4(0), 0);
-            }
-
-            // 2. Render 3 Infinite Parallel Ladders
-            for (int lane = 0; lane < 3; ++lane) {
-                float lx = LADDER_TRACK_X[lane];
-                float minY = std::floor(cameraPos.y - 12.0f);
-                float maxY = std::ceil(cameraPos.y + 12.0f);
-
-                // Left & Right ladder rails
-                glm::mat4 modelRailL = glm::mat4(1.0f);
-                modelRailL = glm::translate(modelRailL, glm::vec3(lx - 0.72f, cameraPos.y, 0.0f));
-                modelRailL = glm::scale(modelRailL, glm::vec3(0.18f, 24.0f, 1.0f));
-                gameRenderer.drawQuad(modelRailL, view, projection, glm::vec4(0.48f, 0.34f, 0.20f, 1.0f), false, glm::vec4(0), 0);
-
-                glm::mat4 modelRailR = glm::mat4(1.0f);
-                modelRailR = glm::translate(modelRailR, glm::vec3(lx + 0.72f, cameraPos.y, 0.0f));
-                modelRailR = glm::scale(modelRailR, glm::vec3(0.18f, 24.0f, 1.0f));
-                gameRenderer.drawQuad(modelRailR, view, projection, glm::vec4(0.48f, 0.34f, 0.20f, 1.0f), false, glm::vec4(0), 0);
-
-                // Ladder Rungs
-                for (float ry = minY; ry <= maxY; ry += 0.85f) {
-                    glm::mat4 modelRung = glm::mat4(1.0f);
-                    modelRung = glm::translate(modelRung, glm::vec3(lx, ry, 0.0f));
-                    modelRung = glm::scale(modelRung, glm::vec3(1.30f, 0.24f, 1.0f));
-                    glm::vec4 rungUV = getTilesetUV(9, 4);
-                    gameRenderer.drawQuad(modelRung, view, projection, glm::vec4(1.0f), (worldTilesetTexture != 0), rungUV, worldTilesetTexture);
-                }
-            }
-
-            // 3. Render Ladder Traps (Spikes / Sawblades)
-            for (const auto& trap : ladderTraps) {
-                if (!trap.active) continue;
-                float tx = LADDER_TRACK_X[trap.lane];
-                glm::mat4 modelTrap = glm::mat4(1.0f);
-                modelTrap = glm::translate(modelTrap, glm::vec3(tx, trap.y, 0.0f));
-                modelTrap = glm::scale(modelTrap, glm::vec3(1.35f, 1.35f, 1.0f));
-                glm::vec4 trapUV = getTilesetUV(4, 8);
-                gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f, 0.3f, 0.3f, 1.0f), (worldTilesetTexture != 0), trapUV, worldTilesetTexture);
-            }
-
-            // 4. Render Ladder Collectibles (Coins, Fruit Shields & Direction Arrow Relics)
-            for (const auto& itm : ladderItems) {
-                if (itm.collected) continue;
-                float ix = LADDER_TRACK_X[itm.lane];
-                if (itm.type == 0) {
-                    glm::mat4 modelCoin = glm::mat4(1.0f);
-                    modelCoin = glm::translate(modelCoin, glm::vec3(ix, itm.y, 0.0f));
-                    modelCoin = glm::scale(modelCoin, glm::vec3(0.9f, 0.9f, 1.0f));
-                    gameRenderer.drawQuad(modelCoin, view, projection, glm::vec4(1.0f), (coinTexture != 0), getCoinUV(0), coinTexture);
-                } else if (itm.type == 1) {
-                    glm::mat4 modelFruit = glm::mat4(1.0f);
-                    modelFruit = glm::translate(modelFruit, glm::vec3(ix, itm.y, 0.0f));
-                    modelFruit = glm::scale(modelFruit, glm::vec3(1.2f, 1.2f, 1.0f));
-                    gameRenderer.drawQuad(modelFruit, view, projection, glm::vec4(1.0f), (fruitTexture != 0), getFruitUV(itm.fruitType), fruitTexture);
-                } else if (itm.type == 2) {
-                    RunDirection relicDir = static_cast<RunDirection>(itm.fruitType);
-                    float pulse = 1.35f + 0.15f * std::sin(static_cast<float>(glfwGetTime()) * 5.0f);
-                    glm::mat4 modelRelic = glm::mat4(1.0f);
-                    modelRelic = glm::translate(modelRelic, glm::vec3(ix, itm.y, 0.0f));
-                    modelRelic = glm::scale(modelRelic, glm::vec3(pulse, pulse, 1.0f));
-
-                    glm::vec4 arrowUV = getDirectionArrowUV(relicDir);
-                    glm::vec4 arrowTint(1.0f);
-                    if (relicDir == DIR_LEFT)       arrowTint = glm::vec4(0.2f, 0.95f, 1.0f, 1.0f);
-                    else if (relicDir == DIR_RIGHT) arrowTint = glm::vec4(1.0f, 0.85f, 0.2f, 1.0f);
-                    else if (relicDir == DIR_DOWN)  arrowTint = glm::vec4(0.3f, 1.0f, 0.5f, 1.0f);
-
-                    gameRenderer.drawQuad(modelRelic, view, projection, arrowTint, (directionArrowsTexture != 0), arrowUV, directionArrowsTexture);
-                }
-            }
-
-            // 5. Render Character on Ladder (Climber, Falling, or Reverse Death Resurrection!)
-            CharacterAnimSet& activeSet = samuraiAnim;
-            if (isLadderResurrecting) {
-                // Dark screen overlay
-                glm::mat4 modelDark = glm::mat4(1.0f);
-                modelDark = glm::translate(modelDark, glm::vec3(cameraPos.x, cameraPos.y, 0.0f));
-                modelDark = glm::scale(modelDark, glm::vec3(30.0f, 20.0f, 1.0f));
-                gameRenderer.drawQuad(modelDark, view, projection, glm::vec4(0.01f, 0.02f, 0.04f, 0.94f), false, glm::vec4(0), 0);
-
-                // Dramatic Resurrection Spotlight
-                glm::mat4 modelSpot = glm::mat4(1.0f);
-                modelSpot = glm::translate(modelSpot, glm::vec3(cameraPos.x, cameraPos.y - 0.2f, 0.0f));
-                modelSpot = glm::scale(modelSpot, glm::vec3(4.8f, 4.8f, 1.0f));
-                gameRenderer.drawQuad(modelSpot, view, projection, glm::vec4(0.25f, 0.85f, 1.0f, 0.28f), false, glm::vec4(0), 0);
-
-                // REVERSE Death Animation (frames from 5 down to 0)!
-                int totalFrames = activeSet.deathFrames;
-                int frameIdx = std::clamp(totalFrames - 1 - static_cast<int>(ladderResurrectTimer * 5.0f), 0, totalFrames - 1);
-                float u = static_cast<float>(frameIdx) / static_cast<float>(totalFrames);
-                float du = 1.0f / static_cast<float>(totalFrames);
-                glm::vec4 uvRect(u, 0.0f, du, 1.0f);
-
-                glm::mat4 modelHero = glm::mat4(1.0f);
-                modelHero = glm::translate(modelHero, glm::vec3(cameraPos.x, cameraPos.y - 0.10f, 0.0f));
-                modelHero = glm::scale(modelHero, glm::vec3(playerRenderSize.x, playerRenderSize.y, 1.0f));
-                gameRenderer.drawQuad(modelHero, view, projection, glm::vec4(1.0f), (activeSet.texDeath != 0), uvRect, activeSet.texDeath);
-
-                // Resurrection Title
-                std::string rezText = "=== RESURRECTION... RISE! ===";
-                float rezW = rezText.length() * 0.30f;
-                gameRenderer.drawText(rezText, cameraPos.x - rezW * 0.5f, cameraPos.y + 2.2f, 0.30f, 0.42f,
-                                      glm::vec4(1.0f, 0.85f, 0.3f, 1.0f), projection, view);
-            } else {
-                unsigned int activeTex = isLadderLeaping ? activeSet.texJump : activeSet.texJump;
-                int totalFrames = activeSet.jumpFrames;
-                int frameIdx = 0;
-
-                if (isLadderHit) {
-                    activeTex = activeSet.texFall;
-                    totalFrames = activeSet.fallFrames;
-                    frameIdx = 0;
-                } else if (!isLadderLeaping) {
-                    int climbStep = static_cast<int>(animTimer * 4.0f) % 2;
-                    activeTex = (climbStep == 0) ? activeSet.texJump : activeSet.texFall;
-                    totalFrames = (climbStep == 0) ? activeSet.jumpFrames : activeSet.fallFrames;
-                }
-
-                float u = static_cast<float>(frameIdx) / static_cast<float>(totalFrames);
-                float du = 1.0f / static_cast<float>(totalFrames);
-                glm::vec4 uvRect(u, 0.0f, du, 1.0f);
-
-                glm::mat4 modelHero = glm::mat4(1.0f);
-                modelHero = glm::translate(modelHero, glm::vec3(ladderPlayerX, ladderPlayerY - 0.10f, 0.0f));
-                gameRenderer.drawQuad(modelHero, view, projection, glm::vec4(1.0f), (activeTex != 0), uvRect, activeTex);
-
-                // Render Circular Shield Bubble wrapped around hero if active
-                if (shieldTimer > 0.0f) {
-                    float shieldPulse = 1.0f + std::sin(animTimer * 8.0f) * 0.06f;
-                    glm::mat4 modelShield = glm::mat4(1.0f);
-                    modelShield = glm::translate(modelShield, glm::vec3(ladderPlayerX, ladderPlayerY, 0.0f));
-                    modelShield = glm::scale(modelShield, glm::vec3(2.35f * shieldPulse, 2.35f * shieldPulse, 1.0f));
-                    float sAlpha = std::min(0.70f, 0.35f + (shieldTimer / 10.0f) * 0.35f);
-                    gameRenderer.drawCircle(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), 2.2f);
-                }
-
-                if (ladderDarkAlpha > 0.01f) {
-                    glm::mat4 modelDark = glm::mat4(1.0f);
-                    modelDark = glm::translate(modelDark, glm::vec3(cameraPos.x, cameraPos.y, 0.0f));
-                    modelDark = glm::scale(modelDark, glm::vec3(30.0f, 20.0f, 1.0f));
-                    gameRenderer.drawQuad(modelDark, view, projection, glm::vec4(0.0f, 0.0f, 0.0f, ladderDarkAlpha), false, glm::vec4(0), 0);
-                }
-            }
+            gameLadderScene.render(view, projection, cameraPos, animTimer, daylightFactor, twilightFactor,
+                                   worldTilesetTexture, coinTexture, fruitTexture, directionArrowsTexture,
+                                   texScenery[activeScenery], shieldTimer, playerRenderSize);
         }
         else if (currentScene == SCENE_SKY_FALL)
         {
-            // Dynamic Celestial Objects in Sky
-            if (daylightFactor < 0.75f) {
-                float starAlpha = (1.0f - daylightFactor) * 0.95f;
-                for (const auto& star : skyStars) {
-                    float tw = 0.5f + 0.5f * std::sin(glfwGetTime() * star.twinkleFreq + star.twinklePhase);
-                    float a = starAlpha * tw;
-                    if (a > 0.04f) {
-                        glm::mat4 modelStar = glm::mat4(1.0f);
-                        modelStar = glm::translate(modelStar, glm::vec3(cameraPos.x * 0.05f + star.x, cameraPos.y * 0.05f + star.y, 0.0f));
-                        modelStar = glm::scale(modelStar, glm::vec3(star.size, star.size, 1.0f));
-                        gameRenderer.drawQuad(modelStar, view, projection, glm::vec4(1.0f, 1.0f, 0.95f, a), false, glm::vec4(0), 0);
-                    }
-                }
-            }
-
-            // Distant Scenery Backdrop
-            glm::vec4 nightSceneryTint(0.42f, 0.48f, 0.70f, 1.0f);
-            glm::vec4 sunsetSceneryTint(1.08f, 0.72f, 0.58f, 1.0f);
-            glm::vec4 daySceneryTint(1.02f, 1.0f, 0.98f, 1.0f);
-            glm::vec4 curSceneryTint = glm::mix(nightSceneryTint, daySceneryTint, daylightFactor);
-            curSceneryTint = glm::mix(curSceneryTint, sunsetSceneryTint, twilightFactor * 0.55f);
-
-            glm::mat4 modelScenery = glm::mat4(1.0f);
-            modelScenery = glm::translate(modelScenery, glm::vec3(cameraPos.x, cameraPos.y, 0.0f));
-            modelScenery = glm::scale(modelScenery, glm::vec3(30.0f, 18.0f, 1.0f));
-            gameRenderer.drawQuad(modelScenery, view, projection, curSceneryTint * 0.65f,
-                                  (texScenery[activeScenery] != 0), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), texScenery[activeScenery]);
-
-            // 1. Endless Sky Clouds Backdrop
-            for (int i = -4; i <= 4; ++i) {
-                float bgX = i * 4.0f;
-                glm::mat4 modelBg = glm::mat4(1.0f);
-                modelBg = glm::translate(modelBg, glm::vec3(bgX, cameraPos.y, 0.0f));
-                modelBg = glm::scale(modelBg, glm::vec3(2.5f, 30.0f, 1.0f));
-                gameRenderer.drawQuad(modelBg, view, projection, glm::vec4(0.14f, 0.24f, 0.40f, 0.75f), false, glm::vec4(0), 0);
-            }
-
-            // 2. Render Floating Spike Traps
-            for (const auto& trap : skySpikesList) {
-                if (!trap.active) continue;
-                glm::mat4 modelTrap = glm::mat4(1.0f);
-                modelTrap = glm::translate(modelTrap, glm::vec3(trap.pos.x, trap.pos.y, 0.0f));
-                modelTrap = glm::scale(modelTrap, glm::vec3(1.3f, 1.3f, 1.0f));
-                glm::vec4 trapUV = getTilesetUV(4, 8);
-                gameRenderer.drawQuad(modelTrap, view, projection, glm::vec4(1.0f, 0.35f, 0.35f, 1.0f), (worldTilesetTexture != 0), trapUV, worldTilesetTexture);
-            }
-
-            // 3. Render Moving Birds (Flapping Raptor Asset)
-            for (const auto& bird : skyBirdsList) {
-                if (!bird.active) continue;
-                int bFrame = static_cast<int>(bird.animTimer * 7.0f) % 4;
-                float u = bFrame * 0.25f;
-                float du = 0.25f;
-                glm::vec4 birdUV = (bird.vx < 0.0f) ? glm::vec4(u + du, 0.0f, -du, 1.0f) : glm::vec4(u, 0.0f, du, 1.0f);
-
-                glm::mat4 modelBird = glm::mat4(1.0f);
-                modelBird = glm::translate(modelBird, glm::vec3(bird.pos.x, bird.pos.y, 0.0f));
-                modelBird = glm::scale(modelBird, glm::vec3(2.4f, 2.4f, 1.0f));
-                gameRenderer.drawQuad(modelBird, view, projection, glm::vec4(1.0f), (birdTexture != 0), birdUV, birdTexture);
-            }
-
-            // 4. Render Sky Collectibles (Coins, Fruit Shields & Direction Arrow Relics)
-            for (const auto& itm : skyItemsList) {
-                if (itm.collected) continue;
-                if (itm.type == 0) {
-                    glm::mat4 modelCoin = glm::mat4(1.0f);
-                    modelCoin = glm::translate(modelCoin, glm::vec3(itm.pos.x, itm.pos.y, 0.0f));
-                    modelCoin = glm::scale(modelCoin, glm::vec3(0.9f, 0.9f, 1.0f));
-                    gameRenderer.drawQuad(modelCoin, view, projection, glm::vec4(1.0f), (coinTexture != 0), getCoinUV(0), coinTexture);
-                } else if (itm.type == 1) {
-                    glm::mat4 modelFruit = glm::mat4(1.0f);
-                    modelFruit = glm::translate(modelFruit, glm::vec3(itm.pos.x, itm.pos.y, 0.0f));
-                    modelFruit = glm::scale(modelFruit, glm::vec3(1.2f, 1.2f, 1.0f));
-                    gameRenderer.drawQuad(modelFruit, view, projection, glm::vec4(1.0f), (fruitTexture != 0), getFruitUV(itm.fruitType), fruitTexture);
-                } else if (itm.type == 2) {
-                    RunDirection relicDir = static_cast<RunDirection>(itm.fruitType);
-                    float pulse = 1.65f + 0.20f * std::sin(static_cast<float>(glfwGetTime()) * 5.0f);
-                    glm::mat4 modelRelic = glm::mat4(1.0f);
-                    modelRelic = glm::translate(modelRelic, glm::vec3(itm.pos.x, itm.pos.y, 0.0f));
-                    modelRelic = glm::scale(modelRelic, glm::vec3(pulse, pulse, 1.0f));
-
-                    glm::vec4 arrowUV = getDirectionArrowUV(relicDir);
-                    glm::vec4 arrowTint(1.0f);
-                    if (relicDir == DIR_LEFT)       arrowTint = glm::vec4(0.2f, 0.95f, 1.0f, 1.0f);
-                    else if (relicDir == DIR_RIGHT) arrowTint = glm::vec4(1.0f, 0.85f, 0.2f, 1.0f);
-                    else if (relicDir == DIR_UP)    arrowTint = glm::vec4(1.0f, 0.35f, 0.35f, 1.0f);
-
-                    gameRenderer.drawQuad(modelRelic, view, projection, arrowTint, (directionArrowsTexture != 0), arrowUV, directionArrowsTexture);
-                }
-            }
-
-            // 5. Render Character in Sky-Fall (or Take Hit rotated 90 deg CCW!)
-            CharacterAnimSet& activeSet = samuraiAnim;
-            if (isSkyFallHit) {
-                // Show Take Hit rotated 90 degrees anti-clockwise!
-                unsigned int hitTex = (activeSet.texTakeHit != 0) ? activeSet.texTakeHit : activeSet.texDeath;
-                int totalFrames = (activeSet.texTakeHit != 0) ? activeSet.takeHitFrames : activeSet.deathFrames;
-                int fIdx = std::clamp(static_cast<int>(skyFallHitTimer * 6.0f), 0, totalFrames - 1);
-                float u = static_cast<float>(fIdx) / static_cast<float>(totalFrames);
-                float du = 1.0f / static_cast<float>(totalFrames);
-                glm::vec4 uvRect(u, 0.0f, du, 1.0f);
-
-                glm::mat4 modelHero = glm::mat4(1.0f);
-                modelHero = glm::translate(modelHero, glm::vec3(skyFallPos.x, skyFallPos.y, 0.0f));
-                modelHero = glm::rotate(modelHero, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // 90 DEGREE ANTICLOCKWISE ROTATION!
-                modelHero = glm::scale(modelHero, glm::vec3(playerRenderSize.x, playerRenderSize.y, 1.0f));
-                gameRenderer.drawQuad(modelHero, view, projection, glm::vec4(1.0f, 0.6f, 0.6f, 1.0f), (hitTex != 0), uvRect, hitTex);
-
-                if (skyFallDarkAlpha > 0.01f) {
-                    glm::mat4 modelDark = glm::mat4(1.0f);
-                    modelDark = glm::translate(modelDark, glm::vec3(cameraPos.x, cameraPos.y, 0.0f));
-                    modelDark = glm::scale(modelDark, glm::vec3(30.0f, 20.0f, 1.0f));
-                    gameRenderer.drawQuad(modelDark, view, projection, glm::vec4(0.0f, 0.0f, 0.0f, skyFallDarkAlpha), false, glm::vec4(0), 0);
-                }
-            } else {
-                // Falling pose
-                unsigned int activeTex = activeSet.texFall;
-                int totalFrames = activeSet.fallFrames;
-                int fIdx = 0;
-                float u = static_cast<float>(fIdx) / static_cast<float>(totalFrames);
-                float du = 1.0f / static_cast<float>(totalFrames);
-                bool faceLeft = (skyFallVelX < -0.1f);
-                glm::vec4 uvRect = faceLeft ? glm::vec4(u + du, 0.0f, -du, 1.0f) : glm::vec4(u, 0.0f, du, 1.0f);
-
-                glm::mat4 modelHero = glm::mat4(1.0f);
-                modelHero = glm::translate(modelHero, glm::vec3(skyFallPos.x, skyFallPos.y, 0.0f));
-                modelHero = glm::scale(modelHero, glm::vec3(playerRenderSize.x, playerRenderSize.y, 1.0f));
-                gameRenderer.drawQuad(modelHero, view, projection, glm::vec4(1.0f), (activeTex != 0), uvRect, activeTex);
-
-                if (shieldTimer > 0.0f) {
-                    float shieldPulse = 1.0f + std::sin(animTimer * 8.0f) * 0.06f;
-                    glm::mat4 modelShield = glm::mat4(1.0f);
-                    modelShield = glm::translate(modelShield, glm::vec3(skyFallPos.x, skyFallPos.y, 0.0f));
-                    modelShield = glm::scale(modelShield, glm::vec3(2.35f * shieldPulse, 2.35f * shieldPulse, 1.0f));
-                    float sAlpha = std::min(0.70f, 0.35f + (shieldTimer / 10.0f) * 0.35f);
-                    gameRenderer.drawCircle(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), 2.2f);
-                }
-            }
+            gameSkyFallScene.render(view, projection, cameraPos, animTimer, daylightFactor, twilightFactor,
+                                    birdTexture, worldTilesetTexture, coinTexture, fruitTexture,
+                                    directionArrowsTexture, texScenery[activeScenery], shieldTimer, playerRenderSize);
         }
         else
         {
@@ -2255,18 +1471,7 @@ int main()
         }
 
         // 8b. Render World-Space Floating Texts (Pickups, Direction Warps, Score Popups)
-        for (const auto& ft : floatingTexts) {
-            float alpha = std::min(1.0f, ft.timer / (ft.maxTime * 0.35f));
-            glm::vec4 col = ft.color;
-            col.a *= alpha;
-
-            size_t newlinePos = ft.text.find('\n');
-            size_t firstLineChars = (newlinePos != std::string::npos) ? newlinePos : ft.text.length();
-            float totalW = firstLineChars * ft.charW;
-            float startX = ft.pos.x - (totalW * 0.5f);
-
-            gameRenderer.drawText(ft.text, startX, ft.pos.y, ft.charW, ft.charH, col, projection, view);
-        }
+        UIManager::instance().renderFloatingTexts(view, projection);
 
         // 9. Transition Phase Energy Flash
         if (transitionPhaseTimer > 0.0f) {
@@ -2281,234 +1486,38 @@ int main()
         }
 
         // 10. Comprehensible Corner HUD Card
-        if (activeNotice.timer > 0.0f)
-        {
-            float alpha = std::min(activeNotice.timer * 2.0f, 1.0f);
-            glm::mat4 identityView = glm::mat4(1.0f);
-            glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
-
-            float cardW = 6.2f;
-            float cardH = 1.45f;
-            float cardX = -halfW + (cardW * 0.5f) + 0.6f;
-            float cardY = halfH - (cardH * 0.5f) - 0.6f;
-
-            glm::mat4 modelCard = glm::mat4(1.0f);
-            modelCard = glm::translate(modelCard, glm::vec3(cardX, cardY, 0.0f));
-            modelCard = glm::scale(modelCard, glm::vec3(cardW, cardH, 1.0f));
-            gameRenderer.drawQuad(modelCard, identityView, orthoUI, glm::vec4(0.03f, 0.05f, 0.09f, 0.92f * alpha), false, glm::vec4(0), 0);
-
-            glm::mat4 modelStripe = glm::mat4(1.0f);
-            modelStripe = glm::translate(modelStripe, glm::vec3(cardX - (cardW * 0.5f) + 0.08f, cardY, 0.0f));
-            modelStripe = glm::scale(modelStripe, glm::vec3(0.16f, cardH, 1.0f));
-            gameRenderer.drawQuad(modelStripe, identityView, orthoUI, glm::vec4(activeNotice.accentColor.r, activeNotice.accentColor.g, activeNotice.accentColor.b, alpha), false, glm::vec4(0), 0);
-
-            glm::mat4 modelIcon = glm::mat4(1.0f);
-            modelIcon = glm::translate(modelIcon, glm::vec3(cardX - (cardW * 0.5f) + 0.6f, cardY, 0.0f));
-            modelIcon = glm::scale(modelIcon, glm::vec3(0.9f, 0.9f, 1.0f));
-
-            if (activeNotice.iconType == 0) {
-                glm::vec4 coinUV = getCoinUV(frameCount / 4);
-                gameRenderer.drawQuad(modelIcon, identityView, orthoUI, glm::vec4(1.0f, 1.0f, 1.0f, alpha), (coinTexture != 0), coinUV, coinTexture);
-            } else {
-                glm::vec4 fruitUV = getFruitUV(activeNotice.fruitType);
-                gameRenderer.drawQuad(modelIcon, identityView, orthoUI, glm::vec4(1.0f, 1.0f, 1.0f, alpha), (fruitTexture != 0), fruitUV, fruitTexture);
-            }
-
-            glm::mat4 modelPill = glm::mat4(1.0f);
-            modelPill = glm::translate(modelPill, glm::vec3(cardX + 0.55f, cardY + 0.32f, 0.0f));
-            modelPill = glm::scale(modelPill, glm::vec3(4.3f, 0.36f, 1.0f));
-            gameRenderer.drawQuad(modelPill, identityView, orthoUI, glm::vec4(activeNotice.accentColor.r, activeNotice.accentColor.g, activeNotice.accentColor.b, 0.35f * alpha), false, glm::vec4(0), 0);
-        }
+        UIManager::instance().renderCornerNotification(halfW, halfH, frameCount, coinTexture, fruitTexture);
 
         // 11. Top-Right On-Screen Score Counter HUD
-        {
-            glm::mat4 identityView = glm::mat4(1.0f);
-            glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
-
-            int totalScore = static_cast<int>(scoreDistance) * 10 + coinsCollected * 50 + relicsTriggered * 100;
-
-            float scoreCardW = 5.6f;
-            float scoreCardH = 1.45f;
-            float scoreCardX = halfW - (scoreCardW * 0.5f) - 0.6f;
-            float scoreCardY = halfH - (scoreCardH * 0.5f) - 0.6f;
-
-            // Glassmorphism background card
-            glm::mat4 modelScoreCard = glm::mat4(1.0f);
-            modelScoreCard = glm::translate(modelScoreCard, glm::vec3(scoreCardX, scoreCardY, 0.0f));
-            modelScoreCard = glm::scale(modelScoreCard, glm::vec3(scoreCardW, scoreCardH, 1.0f));
-            gameRenderer.drawQuad(modelScoreCard, identityView, orthoUI, glm::vec4(0.03f, 0.05f, 0.09f, 0.92f), false, glm::vec4(0), 0);
-
-            // Glowing Golden Accent Stripe on Right Edge
-            glm::mat4 modelScoreStripe = glm::mat4(1.0f);
-            modelScoreStripe = glm::translate(modelScoreStripe, glm::vec3(scoreCardX + (scoreCardW * 0.5f) - 0.08f, scoreCardY, 0.0f));
-            modelScoreStripe = glm::scale(modelScoreStripe, glm::vec3(0.16f, scoreCardH, 1.0f));
-            gameRenderer.drawQuad(modelScoreStripe, identityView, orthoUI, glm::vec4(1.0f, 0.82f, 0.20f, 1.0f), false, glm::vec4(0), 0);
-
-            // Spinning Gold Coin Icon
-            glm::mat4 modelCoinHUD = glm::mat4(1.0f);
-            modelCoinHUD = glm::translate(modelCoinHUD, glm::vec3(scoreCardX - (scoreCardW * 0.5f) + 0.6f, scoreCardY, 0.0f));
-            modelCoinHUD = glm::scale(modelCoinHUD, glm::vec3(0.9f, 0.9f, 1.0f));
-            glm::vec4 coinHUDUV = getCoinUV(frameCount / 4);
-            gameRenderer.drawQuad(modelCoinHUD, identityView, orthoUI, glm::vec4(1.0f), (coinTexture != 0), coinHUDUV, coinTexture);
-
-            // Text Lines (Crisp 8x8 font rendered on screen)
-            std::string scoreStr = "SCORE " + std::to_string(totalScore);
-            std::string statsStr = "COIN " + std::to_string(coinsCollected) + "  DIST " + std::to_string(static_cast<int>(scoreDistance)) + "m";
-            if (shieldTimer > 0.0f) {
-                statsStr += "  SHIELD " + std::to_string(static_cast<int>(shieldTimer + 0.9f)) + "s";
-            }
-            gameRenderer.drawText(scoreStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f, scoreCardY + 0.16f, 0.26f, 0.38f,
-                                  glm::vec4(1.0f, 0.86f, 0.22f, 1.0f), orthoUI);
-            gameRenderer.drawText(statsStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f, scoreCardY - 0.38f, 0.20f, 0.30f,
-                                  (shieldTimer > 0.0f) ? glm::vec4(0.3f, 0.95f, 1.0f, 1.0f) : glm::vec4(0.85f, 0.94f, 1.0f, 0.95f), orthoUI);
-        }
+        int totalScore = static_cast<int>(scoreDistance) * 10 + coinsCollected * 50 + relicsTriggered * 100;
+        UIManager::instance().renderScoreHUD(halfW, halfH, totalScore, coinsCollected, scoreDistance, shieldTimer, frameCount, coinTexture);
 
         // On-Screen Start Hint Banner (when standing still in idle animation at game start)
         if (currentScene == SCENE_PLATFORMER && isGameIdleAtStart && currentGameState == STATE_RUNNING) {
-            glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
-            float bannerPulse = 0.82f + 0.18f * std::sin(animTimer * 5.0f);
-            gameRenderer.drawText("PRESS [A] OR [D] TO RUN  |  [SPACE] TO JUMP", -6.4f, -2.6f, 0.24f, 0.34f,
-                                  glm::vec4(1.0f, 0.9f, 0.25f, bannerPulse), orthoUI);
+            UIManager::instance().renderStartHintBanner(halfW, halfH, animTimer);
+        }
+
+        // Top-Center Mini-Game Scene Countdown & Exit Banner HUD
+        if ((currentScene == SCENE_LADDER_CLIMB || currentScene == SCENE_SKY_FALL) && currentGameState == STATE_RUNNING) {
+            float trialTimeLeft = std::max(0.0f, SCENE_DIRECTION_COOLDOWN - scenePlayTime);
+            UIManager::instance().renderTrialBadge(halfW, halfH, trialTimeLeft, SCENE_DIRECTION_COOLDOWN, static_cast<float>(glfwGetTime()));
         }
 
         // 12. Pause Menu Modal Dialog (ESC Key)
-        if (currentGameState == STATE_PAUSED)
-        {
-            glm::mat4 identityView = glm::mat4(1.0f);
-            glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
-
-            // Dark translucent overlay backdrop
-            glm::mat4 modelOverlay = glm::mat4(1.0f);
-            modelOverlay = glm::scale(modelOverlay, glm::vec3(halfW * 2.0f, halfH * 2.0f, 1.0f));
-            gameRenderer.drawQuad(modelOverlay, identityView, orthoUI, glm::vec4(0.02f, 0.03f, 0.06f, 0.78f), false, glm::vec4(0), 0);
-
-            // Modal Box
-            float menuW = 12.8f;
-            float menuH = 10.7f;
-            glm::mat4 modelMenu = glm::mat4(1.0f);
-            modelMenu = glm::scale(modelMenu, glm::vec3(menuW, menuH, 1.0f));
-            gameRenderer.drawQuad(modelMenu, identityView, orthoUI, glm::vec4(0.05f, 0.07f, 0.12f, 0.96f), false, glm::vec4(0), 0);
-
-            // Golden Top Header Bar
-            glm::mat4 modelHeaderStripe = glm::mat4(1.0f);
-            modelHeaderStripe = glm::translate(modelHeaderStripe, glm::vec3(0.0f, menuH * 0.5f - 0.1f, 0.0f));
-            modelHeaderStripe = glm::scale(modelHeaderStripe, glm::vec3(menuW, 0.2f, 1.0f));
-            gameRenderer.drawQuad(modelHeaderStripe, identityView, orthoUI, glm::vec4(1.0f, 0.82f, 0.20f, 1.0f), false, glm::vec4(0), 0);
-
-            int totalScore = static_cast<int>(scoreDistance) * 10 + coinsCollected * 50 + relicsTriggered * 100;
-            float textX = -menuW * 0.5f + 0.9f;
-            float curY  = menuH * 0.5f - 0.9f;
-
-            gameRenderer.drawText("=== GAME PAUSED ===", textX + 1.8f, curY, 0.34f, 0.48f,
-                                  glm::vec4(1.0f, 0.85f, 0.25f, 1.0f), orthoUI);
-            curY -= 0.80f;
-
-            gameRenderer.drawText("HERO: SAMURAI MACK [KATANA MASTER]", textX, curY, 0.22f, 0.32f,
-                                  glm::vec4(0.35f, 0.95f, 1.0f, 1.0f), orthoUI);
-            curY -= 0.48f;
-
-            gameRenderer.drawText("TOTAL SCORE: " + std::to_string(totalScore) + " PTS", textX, curY, 0.23f, 0.34f,
-                                  glm::vec4(1.0f, 0.9f, 0.35f, 1.0f), orthoUI);
-            curY -= 0.45f;
-
-            gameRenderer.drawText("DISTANCE: " + std::to_string(static_cast<int>(scoreDistance)) + "m   COINS: " +
-                                  std::to_string(coinsCollected) + "   RELICS: " + std::to_string(relicsTriggered),
-                                  textX, curY, 0.19f, 0.28f, glm::vec4(0.85f, 0.92f, 0.98f, 0.95f), orthoUI);
-            curY -= 0.55f;
-
-            // Thin divider
-            glm::mat4 modelDiv = glm::mat4(1.0f);
-            modelDiv = glm::translate(modelDiv, glm::vec3(0.0f, curY + 0.12f, 0.0f));
-            modelDiv = glm::scale(modelDiv, glm::vec3(menuW - 1.8f, 0.05f, 1.0f));
-            gameRenderer.drawQuad(modelDiv, identityView, orthoUI, glm::vec4(0.3f, 0.45f, 0.6f, 0.6f), false, glm::vec4(0), 0);
-            curY -= 0.42f;
-
-            gameRenderer.drawText("[ESC / SPACE]   RESUME GAME", textX, curY, 0.23f, 0.32f,
-                                  glm::vec4(0.35f, 1.0f, 0.55f, 1.0f), orthoUI);
-            curY -= 0.48f;
-
-            std::string modeMenuStr = freeExplorationMode ? "FREE EXPLORATION [MANUAL A/D]" : "AUTO-RUNNER [CONTINUOUS SPRINT]";
-            glm::vec4 modeMenuCol = freeExplorationMode ? glm::vec4(0.35f, 1.0f, 0.55f, 1.0f) : glm::vec4(0.25f, 0.85f, 1.0f, 1.0f);
-            gameRenderer.drawText("[F]             MODE: " + modeMenuStr, textX, curY, 0.21f, 0.30f,
-                                  modeMenuCol, orthoUI);
-            curY -= 0.48f;
-
-            std::string scenStr = getSceneryName(activeScenery);
-            gameRenderer.drawText("[B]             SCENERY: " + scenStr, textX, curY, 0.23f, 0.32f,
-                                  glm::vec4(0.3f, 0.95f, 0.85f, 1.0f), orthoUI);
-            curY -= 0.48f;
-
-            std::string cycleStr = (isNight ? "NIGHT TIME (" : "DAY TIME (") + std::to_string(static_cast<int>(DAY_NIGHT_CYCLE_DURATION - phaseTime)) + "s left)";
-            gameRenderer.drawText("[N]             CYCLE: " + cycleStr, textX, curY, 0.23f, 0.32f,
-                                  isNight ? glm::vec4(0.5f, 0.75f, 1.0f, 1.0f) : glm::vec4(1.0f, 0.85f, 0.35f, 1.0f), orthoUI);
-            curY -= 0.48f;
-
-            std::string autoShiftStatus = autoShiftEnabled ? "ENABLED (TIMER + RELICS)" : "DISABLED (RELICS ONLY)";
-            glm::vec4 autoShiftCol = autoShiftEnabled ? glm::vec4(1.0f, 0.65f, 0.2f, 1.0f) : glm::vec4(0.4f, 0.95f, 1.0f, 1.0f);
-            gameRenderer.drawText("[T]             AUTO SHIFTS: " + autoShiftStatus, textX, curY, 0.21f, 0.30f,
-                                  autoShiftCol, orthoUI);
-            curY -= 0.48f;
-
-            gameRenderer.drawText("[R]             RESTART RUN", textX, curY, 0.23f, 0.32f,
-                                  glm::vec4(0.95f, 0.85f, 0.3f, 1.0f), orthoUI);
-            curY -= 0.48f;
-
-            gameRenderer.drawText("[Q]             QUIT TO DESKTOP", textX, curY, 0.23f, 0.32f,
-                                  glm::vec4(1.0f, 0.4f, 0.4f, 1.0f), orthoUI);
-            curY -= 0.56f;
-
-            gameRenderer.drawText("CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE/DROP  [SHIFT] DASH  [F] FREE EXPLORE",
-                                  textX - 0.45f, curY, 0.15f, 0.22f, glm::vec4(0.6f, 0.7f, 0.85f, 0.8f), orthoUI);
+        if (currentGameState == STATE_PAUSED) {
+            UIManager::instance().renderPauseMenu(halfW, halfH, totalScore, coinsCollected, relicsTriggered,
+                                                  scoreDistance, freeExplorationMode, static_cast<int>(activeScenery),
+                                                  isNight, DAY_NIGHT_CYCLE_DURATION - phaseTime);
         }
 
         // 13. Game Over Screen
-        if (currentGameState == STATE_GAME_OVER)
-        {
-            glm::mat4 identityView = glm::mat4(1.0f);
-            glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
+        if (currentGameState == STATE_GAME_OVER) {
+            UIManager::instance().renderGameOver(halfW, halfH, gameOverReason, totalScore, coinsCollected, scoreDistance);
+        }
 
-            glm::mat4 modelOverlay = glm::mat4(1.0f);
-            modelOverlay = glm::scale(modelOverlay, glm::vec3(halfW * 2.0f, halfH * 2.0f, 1.0f));
-            gameRenderer.drawQuad(modelOverlay, identityView, orthoUI, glm::vec4(0.12f, 0.02f, 0.04f, 0.82f), false, glm::vec4(0), 0);
-
-            float overW = 11.5f;
-            float overH = 7.0f;
-            glm::mat4 modelOver = glm::mat4(1.0f);
-            modelOver = glm::scale(modelOver, glm::vec3(overW, overH, 1.0f));
-            gameRenderer.drawQuad(modelOver, identityView, orthoUI, glm::vec4(0.08f, 0.03f, 0.05f, 0.96f), false, glm::vec4(0), 0);
-
-            glm::mat4 modelOverStripe = glm::mat4(1.0f);
-            modelOverStripe = glm::translate(modelOverStripe, glm::vec3(0.0f, overH * 0.5f - 0.1f, 0.0f));
-            modelOverStripe = glm::scale(modelOverStripe, glm::vec3(overW, 0.2f, 1.0f));
-            gameRenderer.drawQuad(modelOverStripe, identityView, orthoUI, glm::vec4(1.0f, 0.25f, 0.3f, 1.0f), false, glm::vec4(0), 0);
-
-            int totalScore = static_cast<int>(scoreDistance) * 10 + coinsCollected * 50 + relicsTriggered * 100;
-            float textX = -overW * 0.5f + 1.0f;
-            float curY  = overH * 0.5f - 0.9f;
-
-            gameRenderer.drawText("=== GAME OVER ===", textX + 2.0f, curY, 0.34f, 0.48f,
-                                  glm::vec4(1.0f, 0.28f, 0.32f, 1.0f), orthoUI);
-            curY -= 0.85f;
-
-            gameRenderer.drawText("CAUSE: " + gameOverReason, textX, curY, 0.22f, 0.32f,
-                                  glm::vec4(1.0f, 0.7f, 0.7f, 1.0f), orthoUI);
-            curY -= 0.65f;
-
-            gameRenderer.drawText("FINAL SCORE : " + std::to_string(totalScore) + " PTS", textX, curY, 0.26f, 0.38f,
-                                  glm::vec4(1.0f, 0.88f, 0.22f, 1.0f), orthoUI);
-            curY -= 0.60f;
-
-            gameRenderer.drawText("DISTANCE    : " + std::to_string(static_cast<int>(scoreDistance)) + " METERS",
-                                  textX, curY, 0.20f, 0.30f, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), orthoUI);
-            curY -= 0.50f;
-
-            gameRenderer.drawText("GOLD COINS  : " + std::to_string(coinsCollected) + " (+ " +
-                                  std::to_string(coinsCollected * 50) + " PTS)",
-                                  textX, curY, 0.20f, 0.30f, glm::vec4(1.0f, 0.85f, 0.3f, 1.0f), orthoUI);
-            curY -= 0.85f;
-
-            gameRenderer.drawText("PRESS [SPACE] OR [R] TO RETRY RUN", textX + 0.8f, curY, 0.24f, 0.35f,
-                                  glm::vec4(0.35f, 1.0f, 0.6f, 1.0f), orthoUI);
+        // 14. Tutorial Window Modal Dialog (Shown once after Intro & via [T] in Pause Menu)
+        if (showTutorialModal) {
+            UIManager::instance().renderTutorialModal(halfW, halfH, tutorialOpenedFromPause);
         }
 
         glfwSwapBuffers(window);
@@ -2550,6 +1559,25 @@ void processInput(GLFWwindow* window, float deltaTime)
     static bool escPressedLast = false;
     static bool rKeyLast = false;
 
+    // Handle Tutorial Window Dismissal
+    static bool tutDismissLast = false;
+    if (showTutorialModal) {
+        bool dismissPressed = (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ||
+                               glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
+                               glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS ||
+                               glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS);
+        if (dismissPressed && !tutDismissLast) {
+            showTutorialModal = false;
+            if (!tutorialOpenedFromPause) {
+                currentGameState = STATE_RUNNING;
+                isGameIdleAtStart = true;
+            }
+        }
+        tutDismissLast = dismissPressed;
+        return; // Modal captures input exclusively
+    }
+    tutDismissLast = false;
+
     // Intro Video Input: Press Space, Enter, or Esc to skip intro
     if (currentGameState == STATE_INTRO_VIDEO) {
         if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS ||
@@ -2559,6 +1587,11 @@ void processInput(GLFWwindow* window, float deltaTime)
             introVideoPlayer.close();
             currentGameState = STATE_RUNNING;
             isGameIdleAtStart = true;
+            if (!hasShownInitialTutorial) {
+                showTutorialModal = true;
+                hasShownInitialTutorial = true;
+                tutorialOpenedFromPause = false;
+            }
         }
         return;
     }
@@ -2583,14 +1616,19 @@ void processInput(GLFWwindow* window, float deltaTime)
     }
     rKeyLast = rKeyPressed;
 
-    // Toggle Autonomous Direction Shifts (T key)
+    // Tutorial / Shift Toggle Key (T key)
     static bool tKeyLast = false;
     bool tKeyPressed = (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS);
     if (tKeyPressed && !tKeyLast) {
-        autoShiftEnabled = !autoShiftEnabled;
-        showCornerNotification("SHIFT MODE", autoShiftEnabled ? "AUTO SHIFTS ON" : "AUTO SHIFTS OFF",
-                               autoShiftEnabled ? "Timer shifts enabled (every 6.5s)" : "Direction shifts via Mystery Fruits only!",
-                               autoShiftEnabled ? glm::vec4(1.0f, 0.65f, 0.2f, 1.0f) : glm::vec4(0.35f, 0.95f, 0.45f, 1.0f), 1, 0);
+        if (currentGameState == STATE_PAUSED) {
+            showTutorialModal = true;
+            tutorialOpenedFromPause = true;
+        } else {
+            autoShiftEnabled = !autoShiftEnabled;
+            showCornerNotification("SHIFT MODE", autoShiftEnabled ? "AUTO SHIFTS ON" : "AUTO SHIFTS OFF",
+                                   autoShiftEnabled ? "Timer shifts enabled (every 6.5s)" : "Direction shifts via Direction Relics only!",
+                                   autoShiftEnabled ? glm::vec4(1.0f, 0.65f, 0.2f, 1.0f) : glm::vec4(0.35f, 0.95f, 0.45f, 1.0f), 1, 0);
+        }
     }
     tKeyLast = tKeyPressed;
 
@@ -2682,61 +1720,18 @@ void processInput(GLFWwindow* window, float deltaTime)
             playerVel.x = dirSign * DASH_SPEED_MAG;
             spawnFloatingText(">> SHADOW DASH >>", playerPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.2f, 0.9f, 1.0f, 1.0f));
         } else if (currentScene == SCENE_SKY_FALL) {
-            float steerSign = (skyFallVelX >= 0.0f) ? 1.0f : -1.0f;
-            skyFallVelX = steerSign * DASH_SPEED_MAG;
-            spawnFloatingText(">> SKY DASH >>", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.2f, 0.9f, 1.0f, 1.0f));
+            float steerSign = (gameSkyFallScene.getVelX() >= 0.0f) ? 1.0f : -1.0f;
+            gameSkyFallScene.applyDash(steerSign * DASH_SPEED_MAG);
+            spawnFloatingText(">> SKY DASH >>", gameSkyFallScene.getPlayerPos() + glm::vec2(0.0f, 1.0f), glm::vec4(0.2f, 0.9f, 1.0f, 1.0f));
         } else if (currentScene == SCENE_LADDER_CLIMB) {
-            ladderPlayerY += 2.2f;
-            spawnFloatingText(">> LADDER SURGE >>", glm::vec2(ladderPlayerX, ladderPlayerY + 1.0f), glm::vec4(0.3f, 1.0f, 0.5f, 1.0f));
+            gameLadderScene.applyDash(2.2f);
+            spawnFloatingText(">> LADDER SURGE >>", glm::vec2(gameLadderScene.getPlayerX(), gameLadderScene.getPlayerY() + 1.0f), glm::vec4(0.3f, 1.0f, 0.5f, 1.0f));
         }
         showCornerNotification("SKILL", "SHADOW DASH", "Burst speed & trap invulnerability!", glm::vec4(0.25f, 0.85f, 1.0f, 1.0f), 0);
     }
 
-    // -------------------------------------------------------------------------
-    // Scene-Specific Controls: 3-Ladder Climb & Sky-Fall Dive (with 15s Cooldown)
-    // -------------------------------------------------------------------------
-    if (currentScene == SCENE_LADDER_CLIMB) {
-        if (!isLadderHit && !isLadderResurrecting) {
-            static bool ladderLeftLast = false;
-            static bool ladderRightLast = false;
-
-            bool leftPressed  = (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
-            bool rightPressed = (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
-
-            if (leftPressed && !ladderLeftLast && !isLadderLeaping) {
-                if (ladderCurrentLane > 0) {
-                    ladderTargetLane = ladderCurrentLane - 1;
-                    isLadderLeaping = true;
-                    ladderLeapProgress = 0.0f;
-                    audioMgr.play(SFX_JUMP);
-                    spawnFloatingText("LEAP LEFT <<<", glm::vec2(ladderPlayerX - 1.0f, ladderPlayerY + 0.8f), glm::vec4(0.3f, 1.0f, 0.8f, 1.0f));
-                }
-            }
-            if (rightPressed && !ladderRightLast && !isLadderLeaping) {
-                if (ladderCurrentLane < 2) {
-                    ladderTargetLane = ladderCurrentLane + 1;
-                    isLadderLeaping = true;
-                    ladderLeapProgress = 0.0f;
-                    audioMgr.play(SFX_JUMP);
-                    spawnFloatingText(">>> LEAP RIGHT", glm::vec2(ladderPlayerX + 1.0f, ladderPlayerY + 0.8f), glm::vec4(0.3f, 1.0f, 0.8f, 1.0f));
-                }
-            }
-
-            ladderLeftLast  = leftPressed;
-            ladderRightLast = rightPressed;
-        }
-        return;
-    }
-
-    if (currentScene == SCENE_SKY_FALL) {
-        if (!isSkyFallHit) {
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-                skyFallVelX -= 40.0f * deltaTime;
-            }
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-                skyFallVelX += 40.0f * deltaTime;
-            }
-        }
+    // Scene-Specific Controls handled directly by LadderScene and SkyFallScene updates
+    if (currentScene == SCENE_LADDER_CLIMB || currentScene == SCENE_SKY_FALL) {
         return;
     }
 

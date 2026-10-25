@@ -12,6 +12,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
 | :--- | :--- | :--- | :--- |
+| **v0.5.15** | [v4.17](#v417---ladder-hero-scale-fix-post-intro-tutorial-modal-shield-pickup-icon-and-scene-exit-timers) | 2026-10-25 | Ladder Hero Sprite Scale Restoration, Post-Intro Tutorial Modal Dialog, Dedicated Shield Pickup Icon & Mini-Game Exit Timers |
 | **v0.5.14** | [v4.16](#v416---circular-energy-shield-bubble-and-single-hit-trap-absorption) | 2026-10-25 | Circular Energy Shield Bubble Rendering via Fragment Discard & Single-Hit Trap Absorption with Grace Invulnerability |
 | **v0.5.13** | [v4.13](#v413---mini-game-scene-exit-restrictions-and-underground-ladder-descent-fix) | 2026-10-25 | Mini-Game Scene Exit Restrictions (Relics/Hit Only) & Underground Ladder Descent Pass-Through Fix |
 | **v0.5.12** | [v4.12](#v412---free-exploration-mode-and-manual-movement-toggle) | 2026-10-25 | Free Exploration Mode (`F` Key) — Manual A/D Movement, Dynamic Idle Stance, Zero Auto-Run Drift & Ladder Hold |
@@ -41,6 +42,27 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ## Detailed Version Logs
+
+### [v0.5.15] - 2026-10-25
+#### Session Archive: [`v4.17 - Ladder Hero Scale Fix, Post-Intro Tutorial Modal, Shield Pickup Icon, and Scene Exit Timers.md`](/doc/prompts/v4.17%20-%20Ladder%20Hero%20Scale%20Fix,%20Post-Intro%20Tutorial%20Modal,%20Shield%20Pickup%20Icon,%20and%20Scene%20Exit%20Timers.md)
+* **Visual Presentation & Proportions**:
+  - **Ladder Climb Hero Scale Restoration**:
+    - *Root Cause*: In `SCENE_LADDER_CLIMB`, the climbing Samurai Mack sprite quad was translated without matrix scaling, rendering at a tiny default $1.0\times 1.0$ meter dimension ($5.5\times$ smaller than intended).
+    - *Resolution*: Added `modelHero = glm::scale(modelHero, glm::vec3(playerRenderSize.x, playerRenderSize.y, 1.0f));` restoring hero dimensions to $5.5\times 5.5$ meters, perfectly uniform with runner and sky-fall scenes.
+* **Onboarding & Tutorial Guidance**:
+  - **Post-Intro Tutorial Window Modal**:
+    - Automatically displays an elegant glassmorphic modal dialog upon conclusion or skip of the intro video, appearing strictly once per game launch (`hasShownInitialTutorial`).
+    - Communicates the narrative essence of "Wandering": *"Endless runner with traps to avoid and shields to pickup. Change movement direction and find the end goal of this venture."*
+    - Directs players to inspect the Pause Menu for full keybindings and reminds them that pressing **`[T]`** inside the Pause Menu reopens the tutorial dialog at any time.
+    - Updated Pause Menu key list to clearly feature: `[T]             TUTORIAL / HOW TO PLAY`.
+* **Collectibles & Visual Clarity**:
+  - **Dedicated Shield Icon Pickups**:
+    - *Eliminated Ambiguity*: Replaced fruit sprites with a dedicated heraldic Shield icon texture (`assets/shield_pickup.png`) generated with golden and cyan trims, radiant star core emblem, and glowing energy halo.
+    - Updated all pickup banners and notifications: `"+10s ENERGY SHIELD!"` and `"ENERGY SHIELD EQUIPPED [Absorbs 1 hazard hit!]"`.
+* **Scene Pacing & Exit Predictability**:
+  - **Top-Center Countdown & Exit Banner HUD**:
+    - *Eliminated Abrupt Transitions*: Replaced sudden direction relic pop-ins with a real-time top-center HUD badge displaying `SURVIVE UNTIL EXIT: XX.Xs` with an animated countdown progress bar.
+    - *Definitive Exit Notice*: When the 15-second survival trial completes, triggers an audio cue and displays a prominent glowing banner: `=== EXIT APPEARED! === [TOUCH A DIRECTION ARROW TO RETURN]` alongside directional arrow relics positioned visibly ahead on the tracks/sky lanes.
 
 ### [v0.5.14] - 2026-10-25
 #### Session Archive: [`v4.16 - Circular Energy Shield Bubble and Single-Hit Trap Absorption.md`](/doc/prompts/v4.16%20-%20Circular%20Energy%20Shield%20Bubble%20and%20Single-Hit%20Trap%20Absorption.md)

@@ -666,6 +666,21 @@ Instead of flat, plain-color geometric rectangles, the world is constructed from
         2. Immediately activate a post-hit grace invulnerability window (`postHitInvulnTimer = 0.75f`).
         3. Emit a single definitive notification: `"SHIELD BROKE! [TRAP DEFLECTED]"` with a single shield shatter audio cue.
 
+16. **Modal Dialog Systems, Sprite Transform Uniformity & Predictable Scene Pacing (`v0.5.15`)**:
+    - **Modal Dialog State Management**:
+      - Modal windows (such as onboarding tutorials) capture input exclusively while active, blocking underlying player controls from triggering accidental jumps or slides.
+      - Controlled via three state variables: `showTutorialModal` (active visibility), `hasShownInitialTutorial` (strictly one-shot after intro video), and `tutorialOpenedFromPause` (returns cleanly to `STATE_PAUSED` rather than unpausing).
+      - Reopening from the Pause Menu (`T` key) allows players to review objectives and controls at any point during gameplay.
+    - **Matrix Transformation Uniformity ($\mathbf{M} = \mathbf{T} \times \mathbf{R} \times \mathbf{S}$)**:
+      - When transitioning characters between diverse game scenes, omitting the scale matrix $\mathbf{S}$ causes sprites to render at their default unit quad size ($1.0\times 1.0\,\text{m}$), producing an unintended miniature sprite.
+      - Consistent application of `glm::scale(modelHero, glm::vec3(playerRenderSize.x, playerRenderSize.y, 1.0f))` across all scenes guarantees visual continuity.
+    - **Ludonarrative Iconographic Clarity**:
+      - In game design, pickup icons must clearly communicate their function. Using fruit for defensive invulnerability created confusion with direction relics.
+      - Generating a dedicated, high-contrast heraldic shield icon (`assets/shield_pickup.png`) immediately conveys protective armor to the player.
+    - **Temporal Pacing & Exit Predictability in Mini-Games**:
+      - Sudden appearance of collectibles without prior warning creates abrupt, jarring scene changes.
+      - Implementing a top-center real-time countdown timer (`SURVIVE UNTIL EXIT: XX.Xs`) coupled with a distinct audio/visual announcement banner (`=== EXIT APPEARED! ===`) gives players the necessary cognitive warning to adjust trajectory and choose their exit route intentionally.
+
 ---
 
 ## 6. Quick Reference & Math Cheatsheet
