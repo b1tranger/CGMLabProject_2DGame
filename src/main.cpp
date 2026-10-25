@@ -47,6 +47,7 @@ float deathAnimTimer = 0.0f;
 
 // Temporary Shield & Idle-Start State
 float shieldTimer        = 0.0f; // Temporary shield duration gained from fruit pickups
+float postHitInvulnTimer = 0.0f; // Brief post-shield break invulnerability to safely clear the hazard
 bool isGameIdleAtStart   = true; // Character stands still at start until player moves
 bool freeExplorationMode = false; // Toggle with 'F' key: allows full manual exploration without auto-run
 
@@ -556,6 +557,7 @@ void resetGame()
     directionShiftsCount = 0;
     gameOverReason = "";
     shieldTimer = 0.0f;
+    postHitInvulnTimer = 0.0f;
     freeExplorationMode = false;
 
     currentDirection  = DIR_RIGHT;
@@ -715,6 +717,10 @@ int main()
             if (shieldTimer > 0.0f) {
                 shieldTimer -= deltaTime;
                 if (shieldTimer < 0.0f) shieldTimer = 0.0f;
+            }
+            if (postHitInvulnTimer > 0.0f) {
+                postHitInvulnTimer -= deltaTime;
+                if (postHitInvulnTimer < 0.0f) postHitInvulnTimer = 0.0f;
             }
         }
 
@@ -990,7 +996,13 @@ int main()
                             if (shieldTimer > 0.0f || isDashing) {
                                 trap.active = false;
                                 audioMgr.play(SFX_SLIDE);
-                                spawnFloatingText("SHIELD DEFLECTED!", glm::vec2(ladderPlayerX, ladderPlayerY + 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                if (shieldTimer > 0.0f && !isDashing) {
+                                    shieldTimer = 0.0f; // Removed on first hit!
+                                    spawnFloatingText("SHIELD BROKE! [TRAP DEFLECTED]", glm::vec2(ladderPlayerX, ladderPlayerY + 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                    showCornerNotification("SHIELD", "SHIELD BROKEN!", "Absorbed trap hit!", glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
+                                } else {
+                                    spawnFloatingText("DASH DEFLECTED TRAP!", glm::vec2(ladderPlayerX, ladderPlayerY + 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                }
                             } else {
                                 isLadderHit = true;
                                 ladderHitVelY = -6.0f;
@@ -1140,7 +1152,13 @@ int main()
                             if (shieldTimer > 0.0f || isDashing) {
                                 bird.active = false;
                                 audioMgr.play(SFX_SLIDE);
-                                spawnFloatingText("SHIELD DEFLECTED BIRD!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                if (shieldTimer > 0.0f && !isDashing) {
+                                    shieldTimer = 0.0f; // Removed on first hit!
+                                    spawnFloatingText("SHIELD BROKE! [BIRD DEFLECTED]", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                    showCornerNotification("SHIELD", "SHIELD BROKEN!", "Absorbed aerial collision!", glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
+                                } else {
+                                    spawnFloatingText("DASH DEFLECTED BIRD!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                }
                             } else {
                                 isSkyFallHit = true;
                                 skyFallHitTimer = 0.0f;
@@ -1163,7 +1181,13 @@ int main()
                                 if (shieldTimer > 0.0f || isDashing) {
                                     trap.active = false;
                                     audioMgr.play(SFX_SLIDE);
-                                    spawnFloatingText("SHIELD DEFLECTED MINE!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                    if (shieldTimer > 0.0f && !isDashing) {
+                                        shieldTimer = 0.0f; // Removed on first hit!
+                                        spawnFloatingText("SHIELD BROKE! [MINE DEFLECTED]", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                        showCornerNotification("SHIELD", "SHIELD BROKEN!", "Absorbed spike mine hit!", glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
+                                    } else {
+                                        spawnFloatingText("DASH DEFLECTED MINE!", skyFallPos + glm::vec2(0.0f, 1.0f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                    }
                                 } else {
                                     isSkyFallHit = true;
                                     skyFallHitTimer = 0.0f;
@@ -1245,7 +1269,7 @@ int main()
                 LadderTunnel* activeTunnel = nullptr;
 
                 for (auto& tunnel : gameWorld.tunnels) {
-                    bool inVerticalRange = (playerPos.y >= (tunnel.minY - 0.4f) && playerPos.y <= (tunnel.maxY + 0.6f));
+                    bool inVerticalRange = (playerPos.y >= (tunnel.minY - 0.4f) && playerPos.y <= (tunnel.maxY + 1.4f));
                     bool inHorizontalRange = (std::abs(playerPos.x - tunnel.x) <= 1.25f);
 
                     if (inVerticalRange && inHorizontalRange) {
@@ -1340,7 +1364,19 @@ int main()
                         if (isOnLadder && activeTunnel) {
                             playerPos.x = glm::mix(playerPos.x, activeTunnel->x, deltaTime * 16.0f);
                             playerVel.x = 0.0f;
-                            playerVel.y = CLIMB_SPEED;
+                            if (freeExplorationMode) {
+                                bool climbUp = (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS);
+                                bool climbDn = (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
+                                if (climbUp && !climbDn) {
+                                    playerVel.y = CLIMB_SPEED;
+                                } else if (climbDn && !climbUp) {
+                                    playerVel.y = -CLIMB_SPEED;
+                                } else {
+                                    playerVel.y = 0.0f;
+                                }
+                            } else {
+                                playerVel.y = CLIMB_SPEED;
+                            }
 
                             if (playerPos.y >= activeTunnel->maxY - 0.15f) {
                                 playerPos.y = activeTunnel->maxY + (playerHitbox.y * 0.5f) + 0.15f;
@@ -1358,7 +1394,19 @@ int main()
                         if (isOnLadder && activeTunnel) {
                             playerPos.x = glm::mix(playerPos.x, activeTunnel->x, deltaTime * 16.0f);
                             playerVel.x = 0.0f;
-                            playerVel.y = -CLIMB_SPEED;
+                            if (freeExplorationMode) {
+                                bool climbUp = (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS);
+                                bool climbDn = (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
+                                if (climbUp && !climbDn) {
+                                    playerVel.y = CLIMB_SPEED;
+                                } else if (climbDn && !climbUp) {
+                                    playerVel.y = -CLIMB_SPEED;
+                                } else {
+                                    playerVel.y = 0.0f;
+                                }
+                            } else {
+                                playerVel.y = -CLIMB_SPEED;
+                            }
 
                             if (playerPos.y <= activeTunnel->minY + 0.2f) {
                                 playerPos.y = activeTunnel->minY + (playerHitbox.y * 0.5f);
@@ -1393,7 +1441,18 @@ int main()
                     {
                         if (tile.isLadder) continue;
 
-                        if (tile.isOneWay && (currentDirection == DIR_DOWN || glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)) {
+                        // When actively climbing or descending inside a ladder tunnel, do not let shaft interior tiles block movement
+                        if (isOnLadder && activeTunnel) {
+                            if (std::abs(tile.pos.x - activeTunnel->x) < 1.15f &&
+                                tile.pos.y >= activeTunnel->minY - 0.5f && tile.pos.y <= activeTunnel->maxY + 0.8f)
+                            {
+                                continue;
+                            }
+                        }
+
+                        if (tile.isOneWay && (currentDirection == DIR_DOWN ||
+                                              glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS ||
+                                              glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)) {
                             continue;
                         }
 
@@ -1441,13 +1500,18 @@ int main()
                 }
 
                 // 5. Spiky Trap Collisions (Phased through safely during DASH or TEMPORARY SHIELD!)
-                if (!isDashing) {
+                if (!isDashing && postHitInvulnTimer <= 0.0f) {
                     for (const auto& spike : gameWorld.spikes) {
                         if (gameWorld.checkCollision(playerPos, playerHitbox, spike.pos, spike.size)) {
                             if (shieldTimer > 0.0f) {
+                                shieldTimer = 0.0f; // Shield is consumed on first hit!
+                                postHitInvulnTimer = 0.75f; // Grace window to safely clear current spike
                                 audioMgr.play(SFX_SLIDE);
-                                spawnFloatingText("SHIELD DEFLECTED TRAP!", playerPos + glm::vec2(0.0f, 1.2f),
-                                                  glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
+                                spawnFloatingText("SHIELD BROKE! [TRAP DEFLECTED]", playerPos + glm::vec2(0.0f, 1.2f),
+                                                  glm::vec4(0.3f, 1.0f, 0.95f, 1.0f), 0.28f, 0.40f, 2.2f, 1.4f);
+                                showCornerNotification("SHIELD", "SHIELD BROKEN!", "Absorbed spike hit and broke!",
+                                                       glm::vec4(0.3f, 0.9f, 1.0f, 1.0f), 1, 0);
+                                break;
                             } else {
                                 currentGameState = STATE_GAME_OVER;
                                 gameOverReason = "IMPALED BY SPIKY TRAP";
@@ -1740,8 +1804,17 @@ int main()
 
                 glm::mat4 modelHero = glm::mat4(1.0f);
                 modelHero = glm::translate(modelHero, glm::vec3(ladderPlayerX, ladderPlayerY - 0.10f, 0.0f));
-                modelHero = glm::scale(modelHero, glm::vec3(playerRenderSize.x, playerRenderSize.y, 1.0f));
                 gameRenderer.drawQuad(modelHero, view, projection, glm::vec4(1.0f), (activeTex != 0), uvRect, activeTex);
+
+                // Render Circular Shield Bubble wrapped around hero if active
+                if (shieldTimer > 0.0f) {
+                    float shieldPulse = 1.0f + std::sin(animTimer * 8.0f) * 0.06f;
+                    glm::mat4 modelShield = glm::mat4(1.0f);
+                    modelShield = glm::translate(modelShield, glm::vec3(ladderPlayerX, ladderPlayerY, 0.0f));
+                    modelShield = glm::scale(modelShield, glm::vec3(2.35f * shieldPulse, 2.35f * shieldPulse, 1.0f));
+                    float sAlpha = std::min(0.70f, 0.35f + (shieldTimer / 10.0f) * 0.35f);
+                    gameRenderer.drawCircle(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), 2.2f);
+                }
 
                 if (ladderDarkAlpha > 0.01f) {
                     glm::mat4 modelDark = glm::mat4(1.0f);
@@ -1883,12 +1956,12 @@ int main()
                 gameRenderer.drawQuad(modelHero, view, projection, glm::vec4(1.0f), (activeTex != 0), uvRect, activeTex);
 
                 if (shieldTimer > 0.0f) {
-                    float shieldPulse = 1.0f + std::sin(animTimer * 8.0f) * 0.08f;
+                    float shieldPulse = 1.0f + std::sin(animTimer * 8.0f) * 0.06f;
                     glm::mat4 modelShield = glm::mat4(1.0f);
                     modelShield = glm::translate(modelShield, glm::vec3(skyFallPos.x, skyFallPos.y, 0.0f));
-                    modelShield = glm::scale(modelShield, glm::vec3(2.4f * shieldPulse, 2.4f * shieldPulse, 1.0f));
-                    float sAlpha = std::min(0.50f, 0.20f + (shieldTimer / 10.0f) * 0.30f);
-                    gameRenderer.drawQuad(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), false, glm::vec4(0), 0);
+                    modelShield = glm::scale(modelShield, glm::vec3(2.35f * shieldPulse, 2.35f * shieldPulse, 1.0f));
+                    float sAlpha = std::min(0.70f, 0.35f + (shieldTimer / 10.0f) * 0.35f);
+                    gameRenderer.drawCircle(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), 2.2f);
                 }
             }
         }
@@ -2170,19 +2243,14 @@ int main()
 
             gameRenderer.drawQuad(modelPlayer, view, projection, playerTint, (activeTexture != 0), uvRect, activeTexture);
 
-            // Render Glowing Shield Bubble if active
+            // Render Circular Glowing Shield Bubble if active
             if (shieldTimer > 0.0f) {
-                float shieldPulse = 1.0f + std::sin(animTimer * 8.0f) * 0.08f;
+                float shieldPulse = 1.0f + std::sin(animTimer * 8.0f) * 0.06f;
                 glm::mat4 modelShield = glm::mat4(1.0f);
                 modelShield = glm::translate(modelShield, glm::vec3(playerPos.x, playerPos.y, 0.0f));
-                modelShield = glm::scale(modelShield, glm::vec3(2.4f * shieldPulse, 2.4f * shieldPulse, 1.0f));
-                float sAlpha = std::min(0.50f, 0.20f + (shieldTimer / 10.0f) * 0.30f);
-                gameRenderer.drawQuad(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), false, glm::vec4(0), 0);
-
-                glm::mat4 modelRing = glm::mat4(1.0f);
-                modelRing = glm::translate(modelRing, glm::vec3(playerPos.x, playerPos.y, 0.0f));
-                modelRing = glm::scale(modelRing, glm::vec3(2.6f * shieldPulse, 2.6f * shieldPulse, 1.0f));
-                gameRenderer.drawQuad(modelRing, view, projection, glm::vec4(0.4f, 0.95f, 1.0f, sAlpha * 0.7f), false, glm::vec4(0), 0);
+                modelShield = glm::scale(modelShield, glm::vec3(2.35f * shieldPulse, 2.35f * shieldPulse, 1.0f));
+                float sAlpha = std::min(0.70f, 0.35f + (shieldTimer / 10.0f) * 0.35f);
+                gameRenderer.drawCircle(modelShield, view, projection, glm::vec4(0.2f, 0.85f, 1.0f, sAlpha), 2.2f);
             }
         }
 
@@ -2631,11 +2699,9 @@ void processInput(GLFWwindow* window, float deltaTime)
         if (!isLadderHit && !isLadderResurrecting) {
             static bool ladderLeftLast = false;
             static bool ladderRightLast = false;
-            static bool ladderDownLast = false;
 
             bool leftPressed  = (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
             bool rightPressed = (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
-            bool downPressed  = (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
 
             if (leftPressed && !ladderLeftLast && !isLadderLeaping) {
                 if (ladderCurrentLane > 0) {
@@ -2644,16 +2710,6 @@ void processInput(GLFWwindow* window, float deltaTime)
                     ladderLeapProgress = 0.0f;
                     audioMgr.play(SFX_JUMP);
                     spawnFloatingText("LEAP LEFT <<<", glm::vec2(ladderPlayerX - 1.0f, ladderPlayerY + 0.8f), glm::vec4(0.3f, 1.0f, 0.8f, 1.0f));
-                } else {
-                    // Outer Left edge exit -> requires 15s trial completion
-                    if (scenePlayTime < SCENE_DIRECTION_COOLDOWN) {
-                        int leftSec = static_cast<int>(std::ceil(SCENE_DIRECTION_COOLDOWN - scenePlayTime));
-                        spawnFloatingText("SURVIVE 15s FIRST! (" + std::to_string(leftSec) + "s left)", glm::vec2(ladderPlayerX, ladderPlayerY + 0.8f), glm::vec4(1.0f, 0.8f, 0.3f, 1.0f));
-                    } else {
-                        platformerSavedDir = DIR_LEFT;
-                        returnToPlatformerScene(true);
-                        return;
-                    }
                 }
             }
             if (rightPressed && !ladderRightLast && !isLadderLeaping) {
@@ -2663,32 +2719,11 @@ void processInput(GLFWwindow* window, float deltaTime)
                     ladderLeapProgress = 0.0f;
                     audioMgr.play(SFX_JUMP);
                     spawnFloatingText(">>> LEAP RIGHT", glm::vec2(ladderPlayerX + 1.0f, ladderPlayerY + 0.8f), glm::vec4(0.3f, 1.0f, 0.8f, 1.0f));
-                } else {
-                    // Outer Right edge exit -> requires 15s trial completion
-                    if (scenePlayTime < SCENE_DIRECTION_COOLDOWN) {
-                        int leftSec = static_cast<int>(std::ceil(SCENE_DIRECTION_COOLDOWN - scenePlayTime));
-                        spawnFloatingText("SURVIVE 15s FIRST! (" + std::to_string(leftSec) + "s left)", glm::vec2(ladderPlayerX, ladderPlayerY + 0.8f), glm::vec4(1.0f, 0.8f, 0.3f, 1.0f));
-                    } else {
-                        platformerSavedDir = DIR_RIGHT;
-                        returnToPlatformerScene(true);
-                        return;
-                    }
-                }
-            }
-            if (downPressed && !ladderDownLast) {
-                // Down direction triggers transition to Sky-Fall Scene (requires 15s trial)
-                if (scenePlayTime < SCENE_DIRECTION_COOLDOWN) {
-                    int leftSec = static_cast<int>(std::ceil(SCENE_DIRECTION_COOLDOWN - scenePlayTime));
-                    spawnFloatingText("LADDER TRIAL ACTIVE! (" + std::to_string(leftSec) + "s left)", glm::vec2(ladderPlayerX, ladderPlayerY + 0.8f), glm::vec4(1.0f, 0.8f, 0.3f, 1.0f));
-                } else {
-                    enterSkyFallScene();
-                    return;
                 }
             }
 
             ladderLeftLast  = leftPressed;
             ladderRightLast = rightPressed;
-            ladderDownLast  = downPressed;
         }
         return;
     }
@@ -2700,26 +2735,6 @@ void processInput(GLFWwindow* window, float deltaTime)
             }
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
                 skyFallVelX += 40.0f * deltaTime;
-            }
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-                // Up direction triggers transition to 3-Ladder Climbing Scene (requires 15s trial)
-                if (scenePlayTime < SCENE_DIRECTION_COOLDOWN) {
-                    int leftSec = static_cast<int>(std::ceil(SCENE_DIRECTION_COOLDOWN - scenePlayTime));
-                    spawnFloatingText("SKY TRIAL ACTIVE! (" + std::to_string(leftSec) + "s left)", skyFallPos + glm::vec2(0.0f, 0.8f), glm::vec4(1.0f, 0.8f, 0.3f, 1.0f));
-                } else {
-                    enterLadderScene();
-                    return;
-                }
-            }
-            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-                // Space recovery to regular platform runner (requires 15s trial)
-                if (scenePlayTime < SCENE_DIRECTION_COOLDOWN) {
-                    int leftSec = static_cast<int>(std::ceil(SCENE_DIRECTION_COOLDOWN - scenePlayTime));
-                    spawnFloatingText("SKY TRIAL ACTIVE! (" + std::to_string(leftSec) + "s left)", skyFallPos + glm::vec2(0.0f, 0.8f), glm::vec4(1.0f, 0.8f, 0.3f, 1.0f));
-                } else {
-                    returnToPlatformerScene(true);
-                    return;
-                }
             }
         }
         return;
@@ -2780,13 +2795,14 @@ void processInput(GLFWwindow* window, float deltaTime)
     {
         for (auto& tunnel : gameWorld.tunnels) {
             if (std::abs(playerPos.x - tunnel.x) <= 1.25f &&
-                playerPos.y >= (tunnel.maxY - 1.0f) && playerPos.y <= (tunnel.maxY + 1.2f))
+                playerPos.y >= (tunnel.maxY - 1.0f) && playerPos.y <= (tunnel.maxY + 1.4f))
             {
                 currentDirection = DIR_DOWN;
                 isOnLadder = true;
                 playerPos.x = tunnel.x;
                 playerVel.x = 0.0f;
                 playerVel.y = -CLIMB_SPEED;
+                playerPos.y -= 0.35f;
                 isGrounded = false;
                 showCornerNotification("TUNNEL", "DESCENDING SHAFT",
                                        "Climbing down into underground!",

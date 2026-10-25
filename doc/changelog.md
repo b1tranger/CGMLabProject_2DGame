@@ -12,6 +12,8 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
 | :--- | :--- | :--- | :--- |
+| **v0.5.14** | [v4.16](#v416---circular-energy-shield-bubble-and-single-hit-trap-absorption) | 2026-10-25 | Circular Energy Shield Bubble Rendering via Fragment Discard & Single-Hit Trap Absorption with Grace Invulnerability |
+| **v0.5.13** | [v4.13](#v413---mini-game-scene-exit-restrictions-and-underground-ladder-descent-fix) | 2026-10-25 | Mini-Game Scene Exit Restrictions (Relics/Hit Only) & Underground Ladder Descent Pass-Through Fix |
 | **v0.5.12** | [v4.12](#v412---free-exploration-mode-and-manual-movement-toggle) | 2026-10-25 | Free Exploration Mode (`F` Key) — Manual A/D Movement, Dynamic Idle Stance, Zero Auto-Run Drift & Ladder Hold |
 | **v0.5.11** | [v4.11](#v411---fix-standalone-missing-dll-and-video-rendering-alpha-discard) | 2026-10-25 | Fixed Standalone `msys-stdc++-6.dll` Dependency via Static Runtime Linkage & Restored Intro Video Visuals (Alpha Discard Fix) |
 | **v0.5.10** | [v4.10](#v410---standalone-single-file-game-packaging-analysis) | 2026-10-25 | Standalone Single-File Packaging Architecture, In-Binary Resource Embedding vs. Virtual Container SFX & Automated `package` Target |
@@ -39,6 +41,40 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ## Detailed Version Logs
+
+### [v0.5.14] - 2026-10-25
+#### Session Archive: [`v4.16 - Circular Energy Shield Bubble and Single-Hit Trap Absorption.md`](/doc/prompts/v4.16%20-%20Circular%20Energy%20Shield%20Bubble%20and%20Single-Hit%20Trap%20Absorption.md)
+* **Mechanics & Combat State**:
+  - **Single-Hit Shield Trap Absorption**:
+    - *Root Cause of Deflection Loop*: The fruit shield timer (`shieldTimer`) was never reduced or cleared upon colliding with hazards, allowing players to overlap spikes, mines, or raptors for up to 10 seconds while spamming "DEFLECTED" sound and visual notifications on every single frame.
+    - *Immediate Shield Break*: A trap impact now immediately destroys the shield (`shieldTimer = 0.0f`), triggering a single distinct announcement: `"SHIELD BROKE! [TRAP DEFLECTED]"`.
+  - **Post-Hit Grace Invulnerability Window**:
+    - *Immediate Re-Hit Prevention*: When the shield breaks, a brief $0.75\,\text{s}$ grace window (`postHitInvulnTimer = 0.75f`) is applied so the player can safely clear the hazard's physical bounding box without suffering an instantaneous fatal hit on frame 2.
+    - Applied universally across all three game scenes: Platformer Spiky Traps, Ladder Climb Traps, and Sky-Fall Diving Raptors/Mines.
+* **Rendering & Visual Fidelity**:
+  - **Analytical Circular Force-Field Shader**:
+    - *Eliminated Box Quad*: Replaced the previous flat square quad with a true analytical circular shield rendered via `gameRenderer.drawCircle()`.
+    - *Fragment Discard & Edge Smoothing*: The shader computes normalized distance from quad center $\vec{p} = \text{TexCoord} - (0.5, 0.5)$ and discards fragments where $\|\vec{p}\| > 0.5$. Outer edge pixels are anti-aliased via `smoothstep(0.482, 0.50, dist)`.
+    - *Glowing Electric Rim*: Applies a power-curve rim glow formula $\text{rim} = \text{pow}(\text{dist} \times 2.0, \text{uRimPower})$, yielding a translucent protective core and an intense, shimmering electric perimeter wrapped snugly around the hero.
+
+### [v0.5.13] - 2026-10-25
+#### Session Archive: [`v4.13 - Mini-Game Scene Exit Restrictions and Underground Ladder Descent Fix.md`](/doc/prompts/v4.13%20-%20Mini-Game%20Scene%20Exit%20Restrictions%20and%20Underground%20Ladder%20Descent%20Fix.md)
+* **Mechanics & Level Interactivity**:
+  - **Mini-Game Scene Exit Restrictions**:
+    - *Disallowed Key Switching*: Removed arbitrary manual key transitions that switched between `SCENE_LADDER_CLIMB` and `SCENE_SKY_FALL` via Up/Down keys, and disabled leaping off outer edge lanes to exit.
+    - *Strict Exit Rule*: Players can now strictly only exit mini-game scenes by either:
+      1. Collecting Direction Arrow Relics (which unlock and spawn across lanes after the 15-second survival trial completes).
+      2. Suffering an obstacle or trap hit (which plays the death/hit sequence, triggers screen darkening, and cleanly resurrects the player back in the main platformer runner).
+  - **Underground Ladder Descent Deadlock Fix**:
+    - *Root Cause*: Standing on the surface ground over an underground ladder and pressing `S` or `Down Arrow` caused the player to freeze without descending. This occurred due to two issues:
+      1. Solid ground and dirt tiles (`sTop` and `sDirt` with `isOneWay = false`) were generated directly across the top of underground shafts, snapping downward vertical velocity to zero on collision.
+      2. The proactive ladder vertical threshold checked `playerPos.y <= tunnel.maxY + 0.6f`, which evaluated to `false` for a player standing on top of surface ground (`playerPos.y = 0.6f > tunnel.maxY + 0.6f = 0.1f`).
+    - *Resolution*:
+      1. Pre-planned underground ladder shaft X coordinates in [`src/World.cpp`](/src/World.cpp). Surface ground tiles directly over shafts are configured as one-way hatches (`isOneWay = true`) and solid dirt blocks inside the shaft are omitted.
+      2. Expanded ladder detection vertical threshold to `tunnel.maxY + 1.4f` in [`src/main.cpp`](/src/main.cpp).
+      3. Bypassed collision resolution for tiles inside the active ladder shaft when the player is climbing/descending on a ladder.
+      4. Downward ladder entry in `processInput` now nudges `playerPos.y -= 0.35f` to cleanly latch the character onto the rungs.
+      5. Added support for `GLFW_KEY_DOWN` alongside `GLFW_KEY_S` for dropping through one-way tiles and descending ladders.
 
 ### [v0.5.12] - 2026-10-25
 #### Session Archive: [`v4.12 - Free Exploration Mode and Manual Movement Toggle.md`](/doc/prompts/v4.12%20-%20Free%20Exploration%20Mode%20and%20Manual%20Movement%20Toggle.md)

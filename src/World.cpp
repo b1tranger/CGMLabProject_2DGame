@@ -62,6 +62,27 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
         return false;
     };
 
+    // Pre-plan underground ladder shafts so surface ground has one-way entrance and no blocking dirt
+    std::vector<float> undergroundShaftXs;
+    if (isInitial) {
+        undergroundShaftXs = { -12.0f, 11.0f };
+    } else {
+        float curX = startX + 2.0f;
+        while (curX < endX - 4.0f) {
+            if (!isInsideChasm(curX) && std::rand() % 2 == 0) {
+                undergroundShaftXs.push_back(curX + 1.5f);
+            }
+            curX += 8.0f;
+        }
+    }
+
+    auto isUndergroundShaft = [&](float x) {
+        for (float sx : undergroundShaftXs) {
+            if (std::abs(x - sx) < 0.85f) return true;
+        }
+        return false;
+    };
+
     // 1. Bedrock Safety Foundation (Zero out-of-bounds fall deaths!)
     for (float x = startX; x < endX; x += TILE_SIZE) {
         bool hasSpike = (!isInitial && (std::rand() % 16 == 0));
@@ -83,23 +104,31 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
     // 2. Surface Ground Level (Y = SURFACE_GROUND_Y = -0.5f)
     // NOTE: Surface ground tiles are explicitly OMITTED over any chasm/slope span so the underground path is NEVER blocked!
     for (float x = startX; x < endX; x += TILE_SIZE) {
-        if (isInsideChasm(x + TILE_SIZE * 0.5f)) {
+        float midTileX = x + TILE_SIZE * 0.5f;
+        if (isInsideChasm(midTileX)) {
             continue; // Completely open chasm for downward slope / cavern entry!
         }
 
+        bool isShaft = isUndergroundShaft(midTileX);
+
         PlatformTile sTop;
-        sTop.pos = glm::vec2(x + TILE_SIZE * 0.5f, SURFACE_GROUND_Y);
+        sTop.pos = glm::vec2(midTileX, SURFACE_GROUND_Y);
         sTop.size = glm::vec2(TILE_SIZE, TILE_SIZE);
         sTop.tileX = 1; sTop.tileY = 0; // Surface grass
-        sTop.isLadder = false; sTop.isOneWay = false; sTop.theme = theme;
+        sTop.isLadder = false;
+        sTop.isOneWay = isShaft; // One-way hatch at top of ladder shaft so player can press DOWN to descend!
+        sTop.theme = theme;
         tiles.push_back(sTop);
 
-        PlatformTile sDirt;
-        sDirt.pos = glm::vec2(x + TILE_SIZE * 0.5f, SURFACE_GROUND_Y - TILE_SIZE);
-        sDirt.size = glm::vec2(TILE_SIZE, TILE_SIZE);
-        sDirt.tileX = 1; sDirt.tileY = 1;
-        sDirt.isLadder = false; sDirt.isOneWay = false; sDirt.theme = theme;
-        tiles.push_back(sDirt);
+        // Omit solid dirt block if there is a vertical ladder shaft passing through!
+        if (!isShaft) {
+            PlatformTile sDirt;
+            sDirt.pos = glm::vec2(midTileX, SURFACE_GROUND_Y - TILE_SIZE);
+            sDirt.size = glm::vec2(TILE_SIZE, TILE_SIZE);
+            sDirt.tileX = 1; sDirt.tileY = 1;
+            sDirt.isLadder = false; sDirt.isOneWay = false; sDirt.theme = theme;
+            tiles.push_back(sDirt);
+        }
     }
 
     // 3. Underground Cavern Floor (Y = CAVERN_FLOOR_Y = -4.5f)
@@ -245,51 +274,50 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
     }
 
     // 4. Multiple Upward Ladders inside Underground Cavern leading to surface / ledges
+    for (float shaftX : undergroundShaftXs) {
+        float shaftBottom = CAVERN_FLOOR_Y + 0.5f;
+        float shaftTop = SURFACE_GROUND_Y;
+
+        LadderTunnel tunnel;
+        tunnel.x = shaftX;
+        tunnel.minY = shaftBottom;
+        tunnel.maxY = shaftTop;
+        tunnel.width = 2.4f;
+        tunnel.playerInside = false;
+        tunnels.push_back(tunnel);
+
+        // Left Wall Column
+        for (float ly = shaftBottom; ly <= shaftTop; ly += TILE_SIZE) {
+            PlatformTile wallL;
+            wallL.pos = glm::vec2(shaftX - 0.85f, ly);
+            wallL.size = glm::vec2(0.6f, TILE_SIZE);
+            wallL.tileX = 0; wallL.tileY = 1;
+            wallL.isLadder = false; wallL.isOneWay = false; wallL.theme = theme;
+            tiles.push_back(wallL);
+        }
+        // Right Wall Column
+        for (float ly = shaftBottom; ly <= shaftTop; ly += TILE_SIZE) {
+            PlatformTile wallR;
+            wallR.pos = glm::vec2(shaftX + 0.85f, ly);
+            wallR.size = glm::vec2(0.6f, TILE_SIZE);
+            wallR.tileX = 2; wallR.tileY = 1;
+            wallR.isLadder = false; wallR.isOneWay = false; wallR.theme = theme;
+            tiles.push_back(wallR);
+        }
+        // Center Ladder Rungs
+        for (float ly = shaftBottom; ly <= shaftTop; ly += TILE_SIZE) {
+            PlatformTile lad;
+            lad.pos = glm::vec2(shaftX, ly);
+            lad.size = glm::vec2(TILE_SIZE, TILE_SIZE);
+            lad.tileX = 9; lad.tileY = (ly >= shaftTop - 0.1f) ? 3 : 4;
+            lad.isLadder = true; lad.isOneWay = false; lad.theme = theme;
+            tiles.push_back(lad);
+        }
+    }
+
+    // 5. Elevated Platforms & Sky Canopy Tiers (Y = 1.5, 2.6, Sky Canopy 5.5)
     float curX = startX + 2.0f;
     while (curX < endX - 4.0f) {
-        if (!isInsideChasm(curX) && std::rand() % 2 == 0) {
-            float shaftX = curX + 1.5f;
-            float shaftBottom = CAVERN_FLOOR_Y + 0.5f;
-            float shaftTop = SURFACE_GROUND_Y;
-
-            LadderTunnel tunnel;
-            tunnel.x = shaftX;
-            tunnel.minY = shaftBottom;
-            tunnel.maxY = shaftTop;
-            tunnel.width = 2.4f;
-            tunnel.playerInside = false;
-            tunnels.push_back(tunnel);
-
-            // Left Wall Column
-            for (float ly = shaftBottom; ly <= shaftTop; ly += TILE_SIZE) {
-                PlatformTile wallL;
-                wallL.pos = glm::vec2(shaftX - 0.85f, ly);
-                wallL.size = glm::vec2(0.6f, TILE_SIZE);
-                wallL.tileX = 0; wallL.tileY = 1;
-                wallL.isLadder = false; wallL.isOneWay = false; wallL.theme = theme;
-                tiles.push_back(wallL);
-            }
-            // Right Wall Column
-            for (float ly = shaftBottom; ly <= shaftTop; ly += TILE_SIZE) {
-                PlatformTile wallR;
-                wallR.pos = glm::vec2(shaftX + 0.85f, ly);
-                wallR.size = glm::vec2(0.6f, TILE_SIZE);
-                wallR.tileX = 2; wallR.tileY = 1;
-                wallR.isLadder = false; wallR.isOneWay = false; wallR.theme = theme;
-                tiles.push_back(wallR);
-            }
-            // Center Ladder Rungs
-            for (float ly = shaftBottom; ly <= shaftTop; ly += TILE_SIZE) {
-                PlatformTile lad;
-                lad.pos = glm::vec2(shaftX, ly);
-                lad.size = glm::vec2(TILE_SIZE, TILE_SIZE);
-                lad.tileX = 9; lad.tileY = (ly >= shaftTop - 0.1f) ? 3 : 4;
-                lad.isLadder = true; lad.isOneWay = false; lad.theme = theme;
-                tiles.push_back(lad);
-            }
-        }
-
-        // 5. Elevated Platforms & Sky Canopy Tiers (Y = 1.5, 2.6, Sky Canopy 5.5)
         float platY = (std::rand() % 3 == 0) ? 5.5f : ((std::rand() % 2 == 0) ? 2.6f : 1.5f);
         int platLen = 4 + (std::rand() % 5);
 

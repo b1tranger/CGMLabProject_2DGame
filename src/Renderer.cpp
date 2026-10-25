@@ -38,10 +38,31 @@ uniform sampler2D uTexture;
 uniform vec4 uColor;
 uniform bool uUseTexture;
 uniform bool uDiscardAlpha;
+uniform bool uIsCircle;
+uniform float uRimPower;
 
 void main()
 {
-    if (uUseTexture) {
+    if (uIsCircle) {
+        vec2 p = TexCoord - vec2(0.5);
+        float dist = length(p);
+        if (dist > 0.5) discard;
+
+        // Anti-aliased outer boundary edge
+        float edge = 1.0 - smoothstep(0.482, 0.50, dist);
+
+        // Glowing force-field outer rim
+        float rim = smoothstep(0.32, 0.49, dist);
+        rim = pow(rim, max(0.2, uRimPower * 0.5));
+
+        // Translucent inner energy core
+        float core = smoothstep(0.50, 0.0, dist) * 0.22;
+
+        float alpha = (core + rim * 0.85) * edge * uColor.a;
+        // Brighter electric cyan/white highlight on the energy rim
+        vec3 col = mix(uColor.rgb, vec3(0.85, 0.96, 1.0), rim * 0.75);
+        FragColor = vec4(col, alpha);
+    } else if (uUseTexture) {
         vec4 texColor = texture(uTexture, TexCoord);
         if (uDiscardAlpha && texColor.a < 0.12) discard;
         FragColor = texColor * uColor;
@@ -54,7 +75,8 @@ void main()
 
 Renderer::Renderer()
     : quadVAO(0), quadVBO(0), shaderProgram(0), fontTextureID(0),
-      uMVPLoc(-1), uUVRectLoc(-1), uColorLoc(-1), uUseTextureLoc(-1), uDiscardAlphaLoc(-1) {}
+      uMVPLoc(-1), uUVRectLoc(-1), uColorLoc(-1), uUseTextureLoc(-1), uDiscardAlphaLoc(-1),
+      uIsCircleLoc(-1), uRimPowerLoc(-1) {}
 
 bool Renderer::init() {
     shaderProgram = compileShaders(vertexShaderSource, fragmentShaderSource);
@@ -65,6 +87,8 @@ bool Renderer::init() {
     uColorLoc        = glGetUniformLocation(shaderProgram, "uColor");
     uUseTextureLoc   = glGetUniformLocation(shaderProgram, "uUseTexture");
     uDiscardAlphaLoc = glGetUniformLocation(shaderProgram, "uDiscardAlpha");
+    uIsCircleLoc     = glGetUniformLocation(shaderProgram, "uIsCircle");
+    uRimPowerLoc     = glGetUniformLocation(shaderProgram, "uRimPower");
 
     setupQuadGeometry();
 
@@ -166,11 +190,13 @@ unsigned int Renderer::loadTexture(const char* filepath) {
 
 void Renderer::drawQuad(const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection,
                         const glm::vec4& color, bool useTexture, const glm::vec4& uvRect, unsigned int textureID, bool discardAlpha) {
+    glUseProgram(shaderProgram);
     glm::mat4 mvp = projection * view * model;
     glUniformMatrix4fv(uMVPLoc, 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform4fv(uColorLoc, 1, glm::value_ptr(color));
     glUniform1i(uUseTextureLoc, useTexture ? 1 : 0);
     glUniform1i(uDiscardAlphaLoc, discardAlpha ? 1 : 0);
+    if (uIsCircleLoc != -1) glUniform1i(uIsCircleLoc, 0);
     glUniform4fv(uUVRectLoc, 1, glm::value_ptr(uvRect));
 
     if (useTexture && textureID != 0) {
@@ -180,6 +206,25 @@ void Renderer::drawQuad(const glm::mat4& model, const glm::mat4& view, const glm
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+void Renderer::drawCircle(const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection,
+                          const glm::vec4& color, float rimPower) {
+    glUseProgram(shaderProgram);
+    glm::mat4 mvp = projection * view * model;
+    glUniformMatrix4fv(uMVPLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+    glUniform4fv(uColorLoc, 1, glm::value_ptr(color));
+    glUniform1i(uUseTextureLoc, 0);
+    glUniform1i(uDiscardAlphaLoc, 0);
+    if (uIsCircleLoc != -1) glUniform1i(uIsCircleLoc, 1);
+    if (uRimPowerLoc != -1) glUniform1f(uRimPowerLoc, rimPower);
+    glUniform4f(uUVRectLoc, 0.0f, 0.0f, 1.0f, 1.0f);
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    if (uIsCircleLoc != -1) glUniform1i(uIsCircleLoc, 0);
 }
 
 unsigned int Renderer::compileShaders(const char* vSource, const char* fSource) {

@@ -39,16 +39,18 @@ mingw32-make package
 - **`F`**: **Toggle Free Exploration Mode** — Disables continuous autonomous running! Walk and sprint with precision using `A` and `D`, rest in idle breathing stance when stationary, and hold position on ladders unless pressing `W`/`S`. Press `F` again to re-engage auto-runner mode.
 - **`Space` / `Esc` / `Enter` (During Intro)**: **Skip Intro Video** — Immediately interrupt the opening cinematic and advance to game spawn.
 - **`Left Shift`**: **Dash Movement** — High-speed burst with ghost trail afterimages and spike hazard invulnerability!
-- **`Space` / `W` / `Up Arrow`**: Jump across gaps and over spiky traps (or latch on and climb upward inside ladder shafts; in Sky-Fall, transitions to Ladder Climb)
-- **`S` / `Down Arrow`**: Drop down through one-way platforms or descend ladder tunnels (in Ladder Climb, transitions to Sky-Fall)
-- **`A` / `Left Arrow`**: Run left (in Ladder Climb: leap to left ladder or exit scene; in Sky-Fall: aerial steer left)
-- **`D` / `Right Arrow`**: Run right (in Ladder Climb: leap to right ladder or exit scene; in Sky-Fall: aerial steer right)
+- **`Space` / `W` / `Up Arrow`**: Jump across gaps and over spiky traps, or latch on and climb upward inside ladder shafts
+- **`S` / `Down Arrow`**: Drop down through one-way platforms or descend into underground ladder shafts
+- **`A` / `Left Arrow`**: Run left (in Ladder Climb: leap to left ladder track; in Sky-Fall: aerial steer left)
+- **`D` / `Right Arrow`**: Run right (in Ladder Climb: leap to right ladder track; in Sky-Fall: aerial steer right)
 - **`Esc`**: Open / Close **Pause Menu** (pause physics simulation, inspect stats, restart, or quit)
 - **`B`**: **Cycle Background Scenery** (Silvergrass Field <-> Autumn Foliage <-> Green Forest Foliage <-> Urban Area)
 - **`N`**: **Fast-Forward Day / Night Cycle** (Instantly advance 90-second half-cycle between Day and Night)
 - **`T`**: Toggle autonomous direction shifts (`ENABLED` timer shifts every 6.5s <-> `DISABLED` direction relics only)
 - **`R`**: Quick restart run (when paused or after Game Over)
 - **`Q`**: Quit game to desktop (from Pause Menu or Game Over screen)
+- **Mini-Game Scene Exits**: Mini-game scenes (3-Ladder Climbing and Sky-Fall Diving) can strictly **only** be exited by collecting Direction Arrow Relics (which unlock and spawn after the 15-second survival trial) or by taking an obstacle hit (resurrecting back on the main platformer). Manual scene switching via key presses is disabled.
+- **Underground Ladder Shafts**: Approach any underground ladder shaft from the surface and press `S` or `Down Arrow` to smoothly latch on and climb down into the subterranean caverns.
 - **Idle Stance at Start**: The Samurai starts in a grounded idle breathing stance upon game launch and restart until directional movement keys (`A`, `D`) or `Space` are pressed.
 - **Direction Arrow Relics**: Distinct glowing neon arrowheads (Left, Right, Up, Down) explicitly indicate which direction change or scene transition they trigger when touched.
 - **Fruit Pickups (10s Energy Shield)**: Collecting tasty fruit grants a 10-second glowing energy shield bubble that deflects spikes, floating mines, and raptor birds!
@@ -71,6 +73,20 @@ mingw32-make package
 ---
 
 ## 📜 Version History (Changelog)
+
+### [v0.5.14] - 2026-10-25 (Circular Energy Shield Bubble & Single-Hit Trap Absorption)
+- **Single-Hit Trap Absorption & Removal**: Collecting fruits equips a protective energy shield that now absorbs exactly one trap/hazard hit and immediately breaks (`shieldTimer = 0.0f`).
+- **Post-Hit Grace Invulnerability Window**: Added a $0.75\,\text{s}$ grace period (`postHitInvulnTimer`) upon shield shatter, preventing instant death on the subsequent frame while the player clears the hazard bounding box.
+- **Immediate Deflection Feedback**: Replaced repetitive spam of the "DEFLECTED" notification with a single, clear floating announcement: `"SHIELD BROKE! [TRAP DEFLECTED]"` accompanied by sound effects.
+- **Anti-Aliased Circular Energy Shield Rendering**: Implemented `drawCircle()` with analytical distance testing (`length(TexCoord - 0.5) > 0.5 discard;`) and smooth-step edge filtering in the fragment shader. Replaced the flat box quad with a pulsing, glowing circular force-field bubble wrapped closely around the hero across all scenes.
+
+### [v0.5.13] - 2026-10-25 (Mini-Game Scene Exit Restrictions & Underground Ladder Descent Fix)
+- **Scene Exit Restrictions**: Removed arbitrary manual key triggers between Ladder Climbing and Sky-Fall scenes (and outer-lane leaps). Mini-game scenes can strictly only be exited by collecting Direction Arrow Relics (which spawn post-15s) or by suffering an obstacle hit (triggering cinematic hit/resurrection and returning to the runner).
+- **Underground Ladder Descent Fix**: Resolved collision deadlock where players would freeze on top of underground ladders when pressing `S`/`Down Arrow`.
+  - Added pre-planned underground ladder shaft registration in procedural generation.
+  - Configured surface ground tiles directly over ladder shafts as one-way traversable tiles (`isOneWay = true`) and eliminated solid underground dirt blocks (`sDirt`) plugging the shaft interior.
+  - Expanded ladder detection vertical threshold to `tunnel.maxY + 1.4f` and bypassed interior shaft collisions during active ladder climbing.
+  - Added support for `GLFW_KEY_DOWN` alongside `GLFW_KEY_S` for dropping through one-way tiles and entering shafts.
 
 ### [v0.5.12] - 2026-10-25 (Free Exploration Mode & Manual Movement Toggle)
 - **Free Exploration Mode (`F` Key)**: Allows the player to switch between autonomous endless-runner sprinting and traditional, precision platformer exploration at will.

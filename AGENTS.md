@@ -38,8 +38,8 @@ Each archive file in `doc/prompts/` must adhere to the following Markdown format
 ### User Input
 [Exact user prompt or request verbatim]
 
-### AI Thinking & Planning Summary
-> [Comprehensive summary of the agent's analytical thought process, requirement breakdown, architectural rationale, formulas, technical trade-offs, and step-by-step implementation strategy leading directly to the solution.]
+### AI Technical Analysis & Implementation Strategy
+> [Detailed, step-by-step breakdown of the agent's engineering analysis, requirement decomposition, edge-case handling, physics and mathematical models, architectural trade-offs, and direct problem-solving methodology leading to the solution.]
 
 ### Actions & Tools Executed
 - [Tool action summary, e.g., Inspected files, compiled binaries, created components]
@@ -52,11 +52,11 @@ Each archive file in `doc/prompts/` must adhere to the following Markdown format
 ```
 
 #### Guidelines for Archiving Thought Process:
-The **AI Thinking & Planning Summary** must record the core analytical thought process and reasoning of the agent:
-- Decomposition of user requirements and edge-case identification.
-- Mathematical models, coordinate transformations, and physics formulas applied.
-- Structural decisions, component interfaces, and API integrations.
-- Direct problem-solving steps and rationale leading to the final delivered changes.
+The **AI Technical Analysis & Implementation Strategy** section must capture the exhaustive technical rationale and analytical strategy behind every change:
+- **Requirement & Constraint Analysis**: Granular breakdown of user specifications, latent bug vectors, and system constraints.
+- **Mathematical & Physical Modeling**: Explicit formulas, coordinate conversions, velocity vectors, and geometric collision equations.
+- **Architectural & Subsystem Strategy**: Analysis of data structures, cross-module couplings, OpenGL state transitions, and memory lifecycle considerations.
+- **Step-by-Step Problem Solving**: Detailed chronological walkthrough of the direct engineering steps, diagnostics, and code modifications implemented.
 
 
 ---

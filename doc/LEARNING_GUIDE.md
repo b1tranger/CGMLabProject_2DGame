@@ -624,6 +624,48 @@ Instead of flat, plain-color geometric rectangles, the world is constructed from
       - When $v_x = 0$ on solid ground, the player state smoothly switches to `ANIM_IDLE` breathing rather than running in place.
       - On vertical ladder shafts, vertical velocity $v_y$ is halted when neither `W` nor `S` is pressed, allowing players to pause mid-shaft and inspect obstacles.
 
+14. **Vertical Shaft Pass-Through & Mini-Game Scene Enclosure (`v0.5.13`)**:
+    - **Underground Ladder Collision Deadlock**:
+      - In tile-based platformers, a vertical ladder descending from the surface into subterranean caverns presents a geometric dilemma: the surface ground must support the player during horizontal walking, yet allow the player to pass downward when pressing `S` or `Down Arrow`.
+      - If surface ground tiles have `isOneWay = false`, downward velocity $v_y < 0$ triggers ground collision, arresting vertical velocity to zero and locking the player in place.
+      - *Resolution*:
+        1. Underground ladder shafts are pre-registered during procedural chunk generation. Surface ground tiles covering a shaft are marked with `isOneWay = true` (acting as a passable hatch/grate), and subterranean dirt blocks (`sDirt`) directly inside the shaft are omitted.
+        2. In the physics loop, any tile positioned inside the active ladder shaft (`isOnLadder && activeTunnel`) is excluded from collision checks.
+        3. Proactive detection range is extended to `tunnel.maxY + 1.4f` so a player standing flush on top of the surface is within range to latch on.
+    - **Deterministic Mini-Game Scene Exits**:
+      - Mini-game scenes (`SCENE_LADDER_CLIMB` and `SCENE_SKY_FALL`) represent enclosed survival trials with explicit win/lose exit conditions.
+      - Arbitrary manual scene switching via keys (`Up`/`Down`/`Space`) or jumping off outer boundaries breaks ludonarrative pacing.
+      - Exits are strictly constrained to:
+        1. **Collectibles**: Direction Arrow Relics (which unlock and spawn post-15s).
+        2. **Hazard Penalties**: Collision with traps or birds, initiating cinematic hit/death reactions followed by safe resurrection on the primary running platform.
+
+15. **Analytical Circular Shader Rendering & Single-Hit Shield Absorption (`v0.5.14`)**:
+    - **Shader-Based Mathematical Circle vs Polygonal Disks**:
+      - Traditionally, drawing a circle in OpenGL requires tessellating a triangle fan with 32 to 64 vertices. At close camera distances, the polygonal edges become visibly segmented.
+      - In **The Wenderer**, circular force fields are rendered analytically directly in the fragment shader using a single reusable quad:
+        ```glsl
+        if (uIsCircle) {
+            vec2 centeredCoord = TexCoord - vec2(0.5);
+            float dist = length(centeredCoord);
+            if (dist > 0.5) discard; // Discard all fragments outside unit radius
+
+            float edgeAlpha = 1.0 - smoothstep(0.482, 0.50, dist); // C1 smooth anti-aliased edge
+            float rim = pow(dist * 2.0, uRimPower); // Intense glowing outer rim
+            float alpha = uColor.a * edgeAlpha * (0.35 + 0.65 * rim);
+            vec3 glowColor = mix(uColor.rgb, vec3(1.0), rim * 0.7);
+            FragColor = vec4(glowColor, alpha);
+        }
+        ```
+      - *Key Benefits*: Zero additional vertex memory, scale-independent sub-pixel sharpness, and dynamic parameterized rim glow.
+    - **Single-Hit Hazard Absorption & Post-Hit Grace Window**:
+      - In a $60\,\text{FPS}$ physics loop, colliding with a hazard occurs over multiple consecutive frames as the player's bounding box traverses the hazard.
+      - If an equipped shield does not decrement or break upon impact, the game enters a continuous deflection loop, spamming sound effects and floating HUD messages for up to 10 seconds.
+      - Conversely, simply setting `shieldTimer = 0.0f` on frame 1 causes instant player death on frame 2 (16ms later), because the player is still intersecting the spike tile.
+      - *Resolution*:
+        1. On first contact with any hazard (platform spikes, ladder traps, diving mines, raptor birds), zero `shieldTimer = 0.0f`.
+        2. Immediately activate a post-hit grace invulnerability window (`postHitInvulnTimer = 0.75f`).
+        3. Emit a single definitive notification: `"SHIELD BROKE! [TRAP DEFLECTED]"` with a single shield shatter audio cue.
+
 ---
 
 ## 6. Quick Reference & Math Cheatsheet
