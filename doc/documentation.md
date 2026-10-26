@@ -191,10 +191,15 @@ Implements Modern OpenGL 3.3 Core Profile graphics:
 
 The project compiles with GCC/MinGW-w64 targeting C++17:
 ```bash
-# Build binary via Makefile
-mingw32-make
+# Build binary via Makefile (make or mingw32-make)
+make
+# (or mingw32-make)
+
+# Or compile and run directly:
+make win
 
 # Or compile directly with g++:
+powershell -Command "if (!(Test-Path 'build')) { New-Item -ItemType Directory -Path 'build' | Out-Null }; Copy-Item lib/*.dll build/ -Force"
 g++.exe -std=c++17 -Wall -Wextra -O2 -static-libgcc -static-libstdc++ \
     -I./include ./src/main.cpp ./src/VideoPlayer.cpp ./src/Audio.cpp \
     ./src/Renderer.cpp ./src/World.cpp ./src/UIManager.cpp \
@@ -203,7 +208,8 @@ g++.exe -std=c++17 -Wall -Wextra -O2 -static-libgcc -static-libstdc++ \
     -lmfplat -lmfreadwrite -lmfuuid -lole32
 
 # Package standalone portable distribution zip:
-mingw32-make package
+make package
+# (or mingw32-make package)
 ```
 Linked libraries:
 - `glfw3`: Window creation, input handling, and OpenGL context management.

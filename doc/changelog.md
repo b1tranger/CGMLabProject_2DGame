@@ -12,6 +12,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
 |---|---|---|---|
+| **v0.6.16** | [v6.0](#v60---fix-build--run-commands-makefile-pipeline-and-cmake-specification) | 2026-10-26 | Build System & Quick Start Fix: Decoupled Build/Run Targets in Makefile, Restored CMakeLists.txt Modern Subsystems, Bundled msys-2.0.dll & Provided Robust Shell-Agnostic Commands |
 | **v0.6.15** | [v5.15](#v515---boss-demon-slime-death-animation-calibration-to-match-updated-dying-roar-audio) | 2026-10-26 | Boss Demon Slime Death Animation Calibration: Slowed `05_d_death.gif` to 6.0 FPS (3.67s) & Extended Despawn Timer to 4.0s Synchronized with 3.96s `dyingRoar.mp3` |
 | **v0.6.14** | [v5.14](#v514---slime-ground-placement--ai-unfreezing-and-boss-demon-slime-dying-roar-audio-integration) | 2026-10-26 | Slime Ground Placement & AI Unfreezing, and Boss Demon Slime Dying Roar Audio Integration (`dyingRoar.mp3` for `05_d_death.gif`) |
 | **v0.6.13** | [v5.13](#v513---scale-down-player-defend-animation-to-match-idle-spritesheet-proportions) | 2026-10-25 | Player Defend Animation Proportional Rescaling: Downscaled `Defend_nobg.png` by $0.338\times$, Aligned $Y=121$ Footing & $X=94$ Centering to Match `Idle.png` Pixel-for-Pixel |
@@ -58,6 +59,16 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ## Detailed Version Logs
+
+### [v0.6.16] - 2026-10-26
+#### Session Archive: [`v6.0 - Fix Build & Run Commands, Makefile Pipeline, and CMake Specification.md`](/doc/prompts/v6.0%20-%20Fix%20Build%20%26%20Run%20Commands,%20Makefile%20Pipeline,%20and%20CMake%20Specification.md)
+* **Build System & Quick Start Command Diagnosis**:
+  - Diagnosed command failure in [`README.md`](/README.md) where `mingw32-make` is not recognized on standard MSYS2/Windows environments where GNU make is named `make` (`make.exe`).
+  - Resolved implicit execution side-effect where `make win` directly executed `./build/main.exe`, preventing pure compilation steps. Decoupled Makefile targets into dedicated `.PHONY: all build run win linux package clean`.
+  - Added automatic directory validation and runtime DLL synchronization (`if (!(Test-Path 'build')) ...; Copy-Item lib/*.dll build/ -Force`) to the build recipe.
+  - Synchronized [`CMakeLists.txt`](/CMakeLists.txt) by registering modern decoupled modules (`VideoPlayer.cpp`, `Audio.cpp`, `Renderer.cpp`, `World.cpp`, `UIManager.cpp`, `LadderScene.cpp`, `SkyFallScene.cpp`) and required media foundation linking flags (`-lwinmm -lmfplat -lmfreadwrite -lmfuuid -lole32`).
+  - Bundled [`lib/msys-2.0.dll`](/lib/msys-2.0.dll) into the repository so stand-alone execution outside MSYS environment does not fail on missing POSIX runtime.
+  - Documented explicit commands for PowerShell, Windows Command Prompt (`cmd.exe`), and Git Bash across [`README.md`](/README.md) and [`doc/documentation.md`](/doc/documentation.md).
 
 ### [v0.6.15] - 2026-10-26
 #### Session Archive: [`v5.15 - Boss Demon Slime Death Animation Calibration to Match Updated Dying Roar Audio.md`](/doc/prompts/v5.15%20-%20Boss%20Demon%20Slime%20Death%20Animation%20Calibration%20to%20Match%20Updated%20Dying%20Roar%20Audio.md)

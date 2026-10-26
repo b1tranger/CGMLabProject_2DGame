@@ -20,19 +20,47 @@ Unlike traditional static runners, **The Wenderer** features autonomous dynamic 
 - MinGW-w64 (`g++` supporting C++17) or CMake
 - All OpenGL and imaging libraries (`GLFW`, `GLAD`, `GLM`, `stb_image`) are bundled in the repo!
 
-### Building with Makefile (Recommended)
+### Building with Make (Recommended)
+
+Depending on your environment (MSYS2, Git Bash, or standalone MinGW), the GNU make executable is named `make` or `mingw32-make`:
+
 ```bash
-# Build the project
-mingw32-make
+# Build the project (creates ./build/ and compiles main.exe)
+make
+# (or: mingw32-make)
 
-# Or compile directly with g++:
-g++.exe -std=c++17 -Wall -Wextra -O2 -static-libgcc -static-libstdc++ -I./include ./src/main.cpp ./src/VideoPlayer.cpp ./src/Audio.cpp ./src/Renderer.cpp ./src/World.cpp ./src/UIManager.cpp ./src/LadderScene.cpp ./src/SkyFallScene.cpp ./src/glad.c -o ./build/main.exe -L./lib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lmfplat -lmfreadwrite -lmfuuid -lole32
-
-# Run the game
+# Run the game:
+# In PowerShell / Bash:
 ./build/main.exe
+# In Windows Command Prompt (cmd.exe):
+build\main.exe
 
-# Package standalone portable game distribution zip (~5.8 MB):
-mingw32-make package
+# Or compile and launch immediately in one step:
+make win
+# (or: mingw32-make win)
+
+# Package standalone portable game distribution zip:
+make package
+# (or: mingw32-make package)
+```
+
+### Direct Compilation with g++ (No Make required)
+
+If `make` is not available, you can compile directly. Note that `./build/` must exist and include the runtime DLLs:
+
+**In PowerShell:**
+```powershell
+if (!(Test-Path "build")) { New-Item -ItemType Directory -Path "build" | Out-Null }; Copy-Item lib/*.dll build/ -Force
+g++.exe -std=c++17 -Wall -Wextra -O2 -static-libgcc -static-libstdc++ -I./include ./src/main.cpp ./src/VideoPlayer.cpp ./src/Audio.cpp ./src/Renderer.cpp ./src/World.cpp ./src/UIManager.cpp ./src/LadderScene.cpp ./src/SkyFallScene.cpp ./src/glad.c -o ./build/main.exe -L./lib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lmfplat -lmfreadwrite -lmfuuid -lole32
+./build/main.exe
+```
+
+**In Windows Command Prompt (cmd.exe):**
+```cmd
+if not exist build mkdir build
+copy /y lib\*.dll build\
+g++.exe -std=c++17 -Wall -Wextra -O2 -static-libgcc -static-libstdc++ -I./include ./src/main.cpp ./src/VideoPlayer.cpp ./src/Audio.cpp ./src/Renderer.cpp ./src/World.cpp ./src/UIManager.cpp ./src/LadderScene.cpp ./src/SkyFallScene.cpp ./src/glad.c -o ./build/main.exe -L./lib -lglfw3 -lopengl32 -lgdi32 -lwinmm -lmfplat -lmfreadwrite -lmfuuid -lole32
+build\main.exe
 ```
 
 ### Controls
