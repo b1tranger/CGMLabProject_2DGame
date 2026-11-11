@@ -100,7 +100,7 @@ constexpr float DAY_NIGHT_CYCLE_DURATION =
 constexpr float SCENE_DIRECTION_COOLDOWN =
     15.0f; // 15 seconds trial before following direction changes
 constexpr float ENEMY_PHASE_DURATION =
-    120.0f; // 2 minutes per enemy spawn phase (3 phases total)
+    60.0f; // 1 minute per Phase 1 and Phase 2 (3 phases total)
 constexpr float HORDE_SPAWN_COOLDOWN =
     180.0f; // 3 minutes cooldown between Phase 3 Horde spawns
 

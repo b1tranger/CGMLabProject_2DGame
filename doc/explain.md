@@ -95,12 +95,12 @@ void Renderer::drawQuad(const glm::mat4& model, const glm::mat4& view, const glm
   - **Bedrock Safety Floor**:  
     A continuous bedrock foundation at $Y = -7.5\text{m}$ guarantees zero out-of-bounds pit deaths. The only lethal hazards are spiky traps and enemy attacks!
   - **3-Phase Dynamic Enemy Spawning & Separation**:  
-    Escalates enemy spawn rate across 3 phases changing every 2 minutes (`ENEMY_PHASE_DURATION = 120.0f` in [`/src/World.cpp`](/src/World.cpp)): Phase 1 spawns rarely (max 2 active enemies at once), Phase 2 increases density (up to 6 active), and Phase 3 enables peak spawns plus **Horde Spawn** (3 Slimes + 3 Bringers of Death at random with a 3-minute cooldown), while enforcing spatial separation buffers.
+    Escalates enemy spawn rate across 3 phases (`ENEMY_PHASE_DURATION = 60.0f`, with Phase 1 & Phase 2 lasting 1 minute each in [`/src/World.cpp`](/src/World.cpp)): Phase 1 spawns rarely (max 2 active enemies at once), Phase 2 increases density (up to 6 active), and Phase 3 enables peak spawns (**max 5 per enemy type per chunk**, up to 14 active) plus **Horde Spawn** (3 Slimes + 3 Bringers of Death at random with a 3-minute cooldown), while enforcing spatial separation buffers.
 
 ```cpp
 // Time-Scaled Enemy Spawn Phases & Horde Cooldown (/src/World.cpp)
-// Phase 1 (0-2m): rare spawns, max 2 active | Phase 2 (2-4m): max 6 active
-// Phase 3 (4m+):  max 12 active + Horde Spawn (3 Slimes + 3 BOD, 180s cooldown)
+// Phase 1 (0-1m): rare spawns, max 2 active | Phase 2 (1-2m): max 6 active
+// Phase 3 (2m+):  max 5 per type/chunk (cap 14) + Horde Spawn (3 Slimes + 3 BOD, 180s cooldown)
 ```
 
 ---

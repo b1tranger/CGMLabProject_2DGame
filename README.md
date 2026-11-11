@@ -85,8 +85,8 @@ build\main.exe
 ### Controls
 - **`A` / `D` (or Left / Right Arrow)**: **Walk & Run (Free Exploration - DEFAULT)** — Explore the world at your own pace! Samurai Mack stands still in idle stance when keys are released.
 - **`F`**: **Toggle Auto-Runner Mode** — Switches between default manual Free Exploration and continuous autonomous sprinting platformer mode.
-- **`M`**: **Mute / Unmute Background Music** — Toggles looping background music (`Quarter_in_the_Slot.mp3`, default 30% volume) with real-time HUD notification.
-- **Music Volume Slider (`ESC` Pause Menu / `-` & `=`)**: Drag the interactive Pause Menu volume slider (or press `Left`/`Right`, `-`/`=`, or click `[-]`/`[+]`) to adjust BGM volume in **10% increments** (0%–100%, default **30%**).
+- **`M`**: **Mute / Unmute Background Music** — Toggles looping background music (`Quarter_in_the_Slot.mp3`, default 40% volume) with real-time HUD notification.
+- **Music Volume Slider (`ESC` Pause Menu / `-` & `=`)**: Drag the interactive Pause Menu volume slider (or press `Left`/`Right`, `-`/`=`, or click `[-]`/`[+]`) to adjust BGM volume in **10% increments** (0%–100%, default **40%**).
 - **`J` / `X` / `Left Mouse Click`**: **Sword Slash Attack** — Swing katana to defeat Bringer of Death (1 hit), Initial Slime (2 hits), and Demon Slime Boss (5 hits)!
 - **`Right Mouse Click` / `K`**: **Defend / Parry Stance** — Raise katana in defensive guard for up to 1.0s using `Defend_nobg.png`! Absorbs all enemy attacks (Slime, Bringer of Death scythe, Thunder cloud spell, Demon Boss cleave/smash) with a resonant metallic parry clang (`SFX_BLOCK`), floating `[PARRY]` text, and 0.6s grace invulnerability (2.0s cooldown on deflection).
 - **`Space` / `Esc` / `Enter` (During Intro Splash & Video)**: **Skip Intro Screen & Video** — Instantly advance from the academic course/group intro splash screen or skip the cinematic video directly into gameplay.
@@ -103,10 +103,10 @@ build\main.exe
 - **`Q`**: Quit game to desktop (from Pause Menu or Game Over screen)
 - **3-Lives Health System & Heart Relics**: The player possesses 3 life pips displayed on the HUD. Collect ruby heart relics (spawned alongside shields) to restore lost lives, or gain +150 bonus overheal points.
 - **Roaming Enemies, Time-Escalating Spawn Phases & Boss Fight**:
-  - **3-Phase Dynamic Enemy Spawning**: Enemy spawn rate escalates automatically every **2 minutes** (`ENEMY_PHASE_DURATION = 120s`):
-    - **Phase 1 (0–2m)**: Rare enemy spawns, capped at a **maximum of 2 active enemies** at once.
-    - **Phase 2 (2–4m)**: Increased spawn rate (up to 6 active enemies across chunks and periodic patrols).
-    - **Phase 3 (4m+)**: Peak spawn density (up to 12 active enemies) plus **Horde Spawn** — randomly spawns **3 Slimes** and **3 Bringers of Death** around the player on a **3-minute cooldown** (`180s`).
+  - **3-Phase Dynamic Enemy Spawning**: Enemy spawn rate escalates automatically every **1 minute** (`ENEMY_PHASE_DURATION = 60s`):
+    - **Phase 1 (0–1m)**: Rare enemy spawns, capped at a **maximum of 2 active enemies** at once.
+    - **Phase 2 (1–2m)**: Increased spawn rate (up to 6 active enemies across chunks and periodic patrols).
+    - **Phase 3 (2m+)**: Peak spawn density (**up to 5 Bringers of Death & 5 Slimes** per chunk, up to 14 active enemies) plus **Horde Spawn** — randomly spawns **3 Slimes** and **3 Bringers of Death** around the player on a **3-minute cooldown** (`180s`).
   - **Bringer of Death**: Roaming scythe-wielding wraith. Accurately pixel-centered on platforms. Casts ranged thunder spells targeting the player across multi-layer elevations (underground cavern to overground surface/sky canopy) with a 1.0s telegraphed gathering cloud window before lightning strikes (`thunder-after-crackle.mp3`). Cleave in **1 hit**.
   - **Enemy Separation**: Bringer of Death and Slime spawns maintain a 9.0m horizontal distance buffer on the same elevation tier, preventing cluttered spawn clumping.
   - **Initial Slime & Boss Demon Slime**: Defeating the green slime in **2 hits** triggers a sequenced 3-phase audio metamorphosis ($5.5\text{s}$) with wet splat impact, acid bubbling, and demon roar. The Boss Demon Slime leaps between platforms with ground smash attacks. Slay the boss in **5 hits** or dash away to despawn!
@@ -127,6 +127,7 @@ build\main.exe
 - **[Complete Project Changelog](/doc/changelog.md)**: Detailed chronological history of all releases mapped to session prompt archives.
 - **[Technical Progress Documentation](/doc/documentation.md)**: Comprehensive architectural, mathematical, and subsystem specification.
 - **[Academic Code Guide & Explanations](/doc/explain.md)**: Beginner-friendly academic guide explaining components in simple terms for lab presentations & vivas.
+- **[Presentation Guide & Video Narration Script](/doc/PRESENTATION_GUIDE.md)**: Pre-gameplay spoken script, visual B-roll storyboard, live demo playbook, and rapid viva Q&A cheat sheet.
 - **[Learning & Implementation Guide](/doc/LEARNING_GUIDE.md)**: Beginner-friendly step-by-step breakdown of OpenGL concepts, mathematics, and guided milestones.
 - **[Project Proposal](/doc/research/CSE55_088_063_093_CGMLab_Project_Proposal.docx.pdf)**: Formal proposal for the CGM Lab course.
 - **[Research Analysis](/doc/research/Platformer%20Game%20Research%20Analysis.pdf)**: Architectural, ludonarrative, and market research.

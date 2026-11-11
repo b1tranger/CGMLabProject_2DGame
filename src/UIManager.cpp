@@ -702,7 +702,8 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
 }
 
 void UIManager::renderTutorialModal(float halfW, float halfH,
-                                    bool openedFromPause) {
+                                    bool openedFromPause, float animTimer,
+                                    const TutorialPreviewTextures &enemyTex) {
   glm::mat4 identityView = glm::mat4(1.0f);
   glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
 
@@ -713,8 +714,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
                         glm::vec4(0.02f, 0.03f, 0.06f, 0.88f), false,
                         glm::vec4(0), 0);
 
-  float tutW = 15.6f;
-  float tutH = 10.4f;
+  float tutW = 18.0f;
+  float tutH = 12.6f;
   glm::mat4 modelTut = glm::mat4(1.0f);
   modelTut = glm::scale(modelTut, glm::vec3(tutW, tutH, 1.0f));
   gameRenderer.drawQuad(modelTut, identityView, orthoUI,
@@ -723,48 +724,499 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
 
   glm::mat4 modelHeaderStripe = glm::mat4(1.0f);
   modelHeaderStripe = glm::translate(
-      modelHeaderStripe, glm::vec3(0.0f, tutH * 0.5f - 0.10f, 0.0f));
+      modelHeaderStripe, glm::vec3(0.0f, tutH * 0.5f - 0.09f, 0.0f));
   modelHeaderStripe =
-      glm::scale(modelHeaderStripe, glm::vec3(tutW, 0.20f, 1.0f));
+      glm::scale(modelHeaderStripe, glm::vec3(tutW, 0.18f, 1.0f));
   gameRenderer.drawQuad(modelHeaderStripe, identityView, orthoUI,
                         glm::vec4(0.25f, 0.85f, 1.0f, 1.0f), false,
                         glm::vec4(0), 0);
 
-  float textX = -tutW * 0.5f + 0.85f;
-  float maxTextW = tutW - 1.70f;
-  float curY = tutH * 0.5f - 0.78f;
+  auto drawPanel = [&](float x1, float y1, float x2, float y2,
+                       const glm::vec4 &bgCol, const glm::vec4 &borderCol) {
+    float cx = (x1 + x2) * 0.5f;
+    float cy = (y1 + y2) * 0.5f;
+    float w = x2 - x1;
+    float h = y2 - y1;
+    glm::mat4 mBorder = glm::mat4(1.0f);
+    mBorder = glm::translate(mBorder, glm::vec3(cx, cy, 0.0f));
+    mBorder = glm::scale(mBorder, glm::vec3(w + 0.05f, h + 0.05f, 1.0f));
+    gameRenderer.drawQuad(mBorder, identityView, orthoUI, borderCol, false,
+                          glm::vec4(0), 0);
 
-  gameRenderer.drawText("=== WELCOME TO THE WENDERER ===", textX + 1.8f, curY,
-                        0.32f, 0.46f, glm::vec4(1.0f, 0.88f, 0.25f, 1.0f),
-                        orthoUI);
-  curY -= 0.50f;
+    glm::mat4 mBg = glm::mat4(1.0f);
+    mBg = glm::translate(mBg, glm::vec3(cx, cy, 0.0f));
+    mBg = glm::scale(mBg, glm::vec3(w, h, 1.0f));
+    gameRenderer.drawQuad(mBg, identityView, orthoUI, bgCol, false,
+                          glm::vec4(0), 0);
+  };
 
-  gameRenderer.drawText("--- THE ESSENCE OF WANDERING ---", textX + 2.4f, curY,
-                        0.22f, 0.32f, glm::vec4(0.40f, 0.85f, 1.0f, 1.0f),
-                        orthoUI);
-  curY -= 0.46f;
+  auto beginCellScissor = [&](float x1, float y1, float x2, float y2,
+                              GLboolean &wasEnabled, GLint prevScissor[4]) {
+    wasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+    glGetIntegerv(GL_SCISSOR_BOX, prevScissor);
+    GLint curVp[4] = {0, 0, 0, 0};
+    glGetIntegerv(GL_VIEWPORT, curVp);
 
-  int lines = drawWrappedText(
-      "Endless runner with traps to avoid, shields to pickup, and bosses to slay.",
-      textX, curY, 0.185f, 0.27f, maxTextW, glm::vec4(0.95f, 0.95f, 1.0f, 1.0f),
-      orthoUI, 0.31f);
-  curY -= 0.35f + (lines - 1) * 0.31f;
+    auto toFbX = [&](float ux) -> int {
+      float norm = (ux + halfW) / (2.0f * halfW);
+      return curVp[0] + static_cast<int>(std::floor(norm * curVp[2]));
+    };
+    auto toFbY = [&](float uy) -> int {
+      float norm = (uy + halfH) / (2.0f * halfH);
+      return curVp[1] + static_cast<int>(std::floor(norm * curVp[3]));
+    };
+    int sx0 = toFbX(x1);
+    int sx1 = toFbX(x2);
+    int sy0 = toFbY(y1);
+    int sy1 = toFbY(y2);
+    if (wasEnabled) {
+      sx0 = std::max(sx0, prevScissor[0]);
+      sy0 = std::max(sy0, prevScissor[1]);
+      sx1 = std::min(sx1, prevScissor[0] + prevScissor[2]);
+      sy1 = std::min(sy1, prevScissor[1] + prevScissor[3]);
+    }
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(sx0, sy0, std::max(0, sx1 - sx0), std::max(0, sy1 - sy0));
+  };
+
+  auto endCellScissor = [&](GLboolean wasEnabled, const GLint prevScissor[4]) {
+    if (wasEnabled) {
+      glScissor(prevScissor[0], prevScissor[1], prevScissor[2], prevScissor[3]);
+    } else {
+      glDisable(GL_SCISSOR_TEST);
+    }
+  };
+
+  const float innerLeft = -tutW * 0.5f + 0.65f;
+  const float innerRight = tutW * 0.5f - 0.65f;
+  const float innerW = innerRight - innerLeft;
+
+  // Title & Intro
+  std::string mainHeading = "=== WELCOME TO THE WENDERER ===";
+  float mhW = static_cast<float>(mainHeading.length()) * 0.27f;
+  gameRenderer.drawText(mainHeading, -mhW * 0.5f, tutH * 0.5f - 0.62f, 0.27f,
+                        0.38f, glm::vec4(1.0f, 0.88f, 0.25f, 1.0f), orthoUI);
+
+  std::string subHeading =
+      "Endless runner with traps to avoid, shields to pickup, and bosses to slay.";
+  float shW = static_cast<float>(subHeading.length()) * 0.16f;
+  gameRenderer.drawText(subHeading, -shW * 0.5f, tutH * 0.5f - 0.96f, 0.16f,
+                        0.23f, glm::vec4(0.68f, 0.88f, 1.0f, 1.0f), orthoUI);
+
+  // =========================================================================
+  // 1. PLAYER CONTROLS (6-Cell Animation Grid with Controls Below)
+  // =========================================================================
+  float pcHeaderY = tutH * 0.5f - 1.32f;
+  gameRenderer.drawText("PLAYER CONTROLS", innerLeft, pcHeaderY, 0.19f, 0.26f,
+                        glm::vec4(0.35f, 1.0f, 0.65f, 1.0f), orthoUI);
+
+  const int numPlayerCells = 6;
+  const float cellGap = 0.22f;
+  const float cellW = (innerW - cellGap * (numPlayerCells - 1)) / numPlayerCells;
+  const float pcTop = pcHeaderY - 0.10f;
+  const float pcBottom = pcTop - 1.98f;
+  const float animBoxBottom = pcBottom + 0.58f;
+
+  struct PlayerPreviewDef {
+    const char *actionTitle;
+    const char *controlLine1;
+    const char *controlLine2;
+    glm::vec4 accent;
+  };
+  const PlayerPreviewDef playerPreviews[numPlayerCells] = {
+      {"RUN", "[A / D]", "MOVE", glm::vec4(0.35f, 1.0f, 0.65f, 1.0f)},
+      {"JUMP/CLIMB", "[W / SPACE]", "ASCEND", glm::vec4(0.35f, 0.90f, 1.0f, 1.0f)},
+      {"SLIDE/DROP", "[S / DOWN]", "DESCEND", glm::vec4(1.0f, 0.80f, 0.30f, 1.0f)},
+      {"SHADOW DASH", "[SHIFT]", "INVULN BURST", glm::vec4(0.30f, 0.95f, 1.0f, 1.0f)},
+      {"KATANA ATK", "[L-CLICK]", "OR [J] / [X]", glm::vec4(1.0f, 0.45f, 0.45f, 1.0f)},
+      {"DEFEND/PARRY", "[R-CLICK]", "OR [K] (1s)", glm::vec4(0.45f, 0.92f, 1.0f, 1.0f)},
+  };
+
+  for (int i = 0; i < numPlayerCells; ++i) {
+    float cx1 = innerLeft + i * (cellW + cellGap);
+    float cx2 = cx1 + cellW;
+    float cx = (cx1 + cx2) * 0.5f;
+    const auto &def = playerPreviews[i];
+
+    drawPanel(cx1, pcBottom, cx2, pcTop, glm::vec4(0.06f, 0.10f, 0.17f, 0.96f),
+              glm::vec4(def.accent.r, def.accent.g, def.accent.b, 0.50f));
+
+    // Subtle divider between animation box and control label footer
+    glm::mat4 mSubDiv = glm::mat4(1.0f);
+    mSubDiv = glm::translate(mSubDiv, glm::vec3(cx, animBoxBottom, 0.0f));
+    mSubDiv = glm::scale(mSubDiv, glm::vec3(cellW - 0.10f, 0.025f, 1.0f));
+    gameRenderer.drawQuad(mSubDiv, identityView, orthoUI,
+                          glm::vec4(0.25f, 0.38f, 0.55f, 0.65f), false,
+                          glm::vec4(0), 0);
+
+    // Clip animated Samurai sprite strictly inside the upper animation area
+    GLboolean wasScissor = GL_FALSE;
+    GLint prevScissor[4] = {0, 0, 0, 0};
+    beginCellScissor(cx1 + 0.04f, animBoxBottom + 0.03f, cx2 - 0.04f,
+                     pcTop - 0.04f, wasScissor, prevScissor);
+
+    unsigned int pTex = samuraiAnim.texIdle;
+    int pFrames = samuraiAnim.idleFrames;
+    int pFrame = 0;
+    float pAngle = 0.0f;
+    float pOffsetY = 0.0f;
+    glm::vec4 pTint(1.0f);
+    bool drawDashGhosts = false;
+
+    if (i == 0) {
+      pTex = samuraiAnim.texRun;
+      pFrames = samuraiAnim.runFrames;
+      pFrame = static_cast<int>(animTimer * 9.0f) % std::max(1, pFrames);
+    } else if (i == 1) {
+      float cycle = std::fmod(animTimer, 1.3f);
+      pOffsetY = std::sin((cycle / 1.3f) * 3.14159f) * 0.24f - 0.06f;
+      if (cycle < 0.65f) {
+        pTex = samuraiAnim.texJump;
+        pFrames = samuraiAnim.jumpFrames;
+        pFrame = static_cast<int>(cycle * 3.0f) % std::max(1, pFrames);
+      } else {
+        pTex = samuraiAnim.texFall;
+        pFrames = samuraiAnim.fallFrames;
+        pFrame = static_cast<int>((cycle - 0.65f) * 3.0f) % std::max(1, pFrames);
+      }
+    } else if (i == 2) {
+      pTex = samuraiAnim.texAttack;
+      pFrames = samuraiAnim.attackFrames;
+      pFrame = std::min(1, std::max(0, pFrames - 1));
+      pAngle = -0.45f;
+    } else if (i == 3) {
+      pTex = samuraiAnim.texRun;
+      pFrames = samuraiAnim.runFrames;
+      pFrame = static_cast<int>(animTimer * 14.0f) % std::max(1, pFrames);
+      pTint = glm::vec4(0.45f, 0.92f, 1.0f, 1.0f);
+      drawDashGhosts = true;
+    } else if (i == 4) {
+      pTex = samuraiAnim.texAttack;
+      pFrames = samuraiAnim.attackFrames;
+      pFrame = static_cast<int>(animTimer * 10.0f) % std::max(1, pFrames);
+    } else if (i == 5) {
+      pTex = samuraiAnim.texDefend;
+      pFrames = samuraiAnim.defendFrames;
+      pFrame = static_cast<int>(animTimer * 8.0f) % std::max(1, pFrames);
+    }
+
+    float pu = static_cast<float>(pFrame) / static_cast<float>(std::max(1, pFrames));
+    float pdu = 1.0f / static_cast<float>(std::max(1, pFrames));
+    glm::vec4 pUV(pu, 0.0f, pdu, 1.0f);
+    float animCenterY = (animBoxBottom + pcTop) * 0.5f + pOffsetY - 0.06f;
+    float spriteQuadSize = 3.85f;
+
+    if (drawDashGhosts && pTex != 0) {
+      for (int g = 1; g <= 2; ++g) {
+        glm::mat4 mGhost = glm::mat4(1.0f);
+        mGhost = glm::translate(
+            mGhost, glm::vec3(cx - 0.24f * g, animCenterY, 0.0f));
+        mGhost = glm::scale(
+            mGhost, glm::vec3(spriteQuadSize, spriteQuadSize, 1.0f));
+        gameRenderer.drawQuad(mGhost, identityView, orthoUI,
+                              glm::vec4(0.2f, 0.85f, 1.0f, 0.55f - 0.20f * g),
+                              true, pUV, pTex);
+      }
+    }
+
+    if (pTex != 0) {
+      glm::mat4 mSprite = glm::mat4(1.0f);
+      mSprite = glm::translate(mSprite, glm::vec3(cx, animCenterY, 0.0f));
+      if (std::abs(pAngle) > 0.01f) {
+        mSprite = glm::rotate(mSprite, pAngle, glm::vec3(0.0f, 0.0f, 1.0f));
+      }
+      mSprite = glm::scale(
+          mSprite, glm::vec3(spriteQuadSize, spriteQuadSize, 1.0f));
+      gameRenderer.drawQuad(mSprite, identityView, orthoUI, pTint, true, pUV,
+                            pTex);
+    }
+    endCellScissor(wasScissor, prevScissor);
+
+    // Top tiny action badge inside cell
+    float actW = static_cast<float>(std::string(def.actionTitle).length()) * 0.115f;
+    gameRenderer.drawText(def.actionTitle, cx - actW * 0.5f, pcTop - 0.22f,
+                          0.115f, 0.16f, def.accent, orthoUI);
+
+    // Player controls shown directly below the corresponding animation
+    float c1W = static_cast<float>(std::string(def.controlLine1).length()) * 0.135f;
+    gameRenderer.drawText(def.controlLine1, cx - c1W * 0.5f,
+                          animBoxBottom - 0.24f, 0.135f, 0.19f,
+                          glm::vec4(1.0f, 0.92f, 0.45f, 1.0f), orthoUI);
+    float c2W = static_cast<float>(std::string(def.controlLine2).length()) * 0.115f;
+    gameRenderer.drawText(def.controlLine2, cx - c2W * 0.5f,
+                          animBoxBottom - 0.47f, 0.115f, 0.16f,
+                          glm::vec4(0.84f, 0.92f, 1.0f, 0.95f), orthoUI);
+  }
+
+  // =========================================================================
+  // 2. ENEMIES (2 Grid Cells Looping ALL Animations of the 2 Enemy Types)
+  // =========================================================================
+  float enHeaderY = pcBottom - 0.40f;
+  gameRenderer.drawText("ENEMIES", innerLeft, enHeaderY, 0.19f, 0.26f,
+                        glm::vec4(1.0f, 0.72f, 0.30f, 1.0f), orthoUI);
+
+  const float enGap = 0.30f;
+  const float enCellW = (innerW - enGap) * 0.5f;
+  const float enTop = enHeaderY - 0.10f;
+  const float enBottom = enTop - 2.25f;
+
+  // --- Enemy Grid Cell 1: Bringer of Death (Loops ALL 6 Animations + Thunder Spell) ---
+  {
+    float ex1 = innerLeft;
+    float ex2 = ex1 + enCellW;
+    drawPanel(ex1, enBottom, ex2, enTop, glm::vec4(0.06f, 0.08f, 0.15f, 0.96f),
+              glm::vec4(0.82f, 0.42f, 0.98f, 0.55f));
+
+    float previewX1 = ex1 + 0.10f;
+    float previewX2 = ex1 + 3.45f;
+    float previewY1 = enBottom + 0.10f;
+    float previewY2 = enTop - 0.10f;
+    drawPanel(previewX1, previewY1, previewX2, previewY2,
+              glm::vec4(0.03f, 0.04f, 0.09f, 0.95f),
+              glm::vec4(0.55f, 0.35f, 0.80f, 0.45f));
+
+    float bodT = std::fmod(animTimer, 7.2f);
+    unsigned int bTex = enemyTex.bodIdle;
+    int bFrames = 8;
+    int bFrame = 0;
+    const char *bPhase = "IDLE";
+    bool showSpell = false;
+    int spellFrame = 0;
+    glm::vec4 bTint(1.0f);
+
+    if (bodT < 1.2f) {
+      bTex = enemyTex.bodIdle;
+      bFrames = 8;
+      bFrame = static_cast<int>(bodT * 6.0f) % bFrames;
+      bPhase = "IDLE";
+    } else if (bodT < 2.2f) {
+      bTex = enemyTex.bodWalk;
+      bFrames = 8;
+      bFrame = static_cast<int>((bodT - 1.2f) * 8.0f) % bFrames;
+      bPhase = "WALK";
+    } else if (bodT < 3.45f) {
+      bTex = enemyTex.bodAttack;
+      bFrames = 10;
+      bFrame = std::min(bFrames - 1, static_cast<int>((bodT - 2.2f) * 8.0f));
+      bPhase = "SCYTHE ATTACK";
+    } else if (bodT < 5.05f) {
+      bTex = enemyTex.bodCast;
+      bFrames = 9;
+      float dt = bodT - 3.45f;
+      bFrame = std::min(bFrames - 1, static_cast<int>(dt * 7.5f));
+      bPhase = "CAST + THUNDER SPELL";
+      showSpell = true;
+      spellFrame = std::min(15, static_cast<int>(dt * 10.0f));
+    } else if (bodT < 5.80f) {
+      bTex = enemyTex.bodHurt;
+      bFrames = 3;
+      bFrame = static_cast<int>((bodT - 5.05f) * 6.0f) % bFrames;
+      bPhase = "HURT";
+      bTint = glm::vec4(1.0f, 0.45f, 0.45f, 1.0f);
+    } else {
+      bTex = enemyTex.bodDeath;
+      bFrames = 10;
+      bFrame = std::min(bFrames - 1, static_cast<int>((bodT - 5.80f) * 7.5f));
+      bPhase = "DEATH";
+    }
+
+    GLboolean wasScissor = GL_FALSE;
+    GLint prevScissor[4] = {0, 0, 0, 0};
+    beginCellScissor(previewX1 + 0.03f, previewY1 + 0.03f, previewX2 - 0.03f,
+                     previewY2 - 0.03f, wasScissor, prevScissor);
+    if (bTex != 0) {
+      float eu = static_cast<float>(bFrame) / static_cast<float>(bFrames);
+      float edu = 1.0f / static_cast<float>(bFrames);
+      // Flip horizontally so BOD faces right inside preview box
+      glm::vec4 eUV(eu + edu, 0.0f, -edu, 1.0f);
+      float bodCenterX = showSpell ? ((previewX1 + previewX2) * 0.5f - 0.25f)
+                                   : ((previewX1 + previewX2) * 0.5f + 0.65f);
+      float bodCenterY = (previewY1 + previewY2) * 0.5f - 0.12f;
+      glm::mat4 mBod = glm::mat4(1.0f);
+      mBod = glm::translate(mBod, glm::vec3(bodCenterX, bodCenterY, 0.0f));
+      mBod = glm::scale(mBod, glm::vec3(2.85f, 1.90f, 1.0f));
+      gameRenderer.drawQuad(mBod, identityView, orthoUI, bTint, true, eUV, bTex);
+    }
+    if (showSpell && enemyTex.bodSpell != 0) {
+      float su = static_cast<float>(spellFrame) / 16.0f;
+      glm::vec4 sUV(su, 0.0f, 1.0f / 16.0f, 1.0f);
+      glm::mat4 mSpell = glm::mat4(1.0f);
+      mSpell = glm::translate(
+          mSpell,
+          glm::vec3(previewX2 - 0.72f, (previewY1 + previewY2) * 0.5f, 0.0f));
+      mSpell = glm::scale(mSpell, glm::vec3(1.35f, 1.75f, 1.0f));
+      gameRenderer.drawQuad(mSpell, identityView, orthoUI,
+                            glm::vec4(1.0f, 1.0f, 1.0f, 0.95f), true, sUV,
+                            enemyTex.bodSpell);
+    }
+    endCellScissor(wasScissor, prevScissor);
+
+    float infoX = previewX2 + 0.25f;
+    float infoW = ex2 - infoX - 0.20f;
+    drawWrappedText("BRINGER OF DEATH  [1 HIT]", infoX, enTop - 0.34f,
+                    0.155f, 0.22f, infoW,
+                    glm::vec4(0.88f, 0.55f, 1.0f, 1.0f), orthoUI, 0.25f);
+    gameRenderer.drawText(std::string("LOOP: ") + bPhase, infoX, enTop - 0.66f,
+                          0.135f, 0.19f, glm::vec4(1.0f, 0.88f, 0.35f, 1.0f),
+                          orthoUI);
+    drawWrappedText(
+        "Patrols platforms & caverns, telegraphs scythe cleaves, and casts multi-layer Thunder Spells.",
+        infoX, enTop - 0.98f, 0.13f, 0.185f, infoW,
+        glm::vec4(0.86f, 0.92f, 0.98f, 0.95f), orthoUI, 0.24f);
+    drawWrappedText(
+        "Anim: Idle > Walk > Attack > Cast+Spell > Hurt > Death",
+        infoX, enBottom + 0.38f, 0.105f, 0.15f, infoW,
+        glm::vec4(0.62f, 0.75f, 0.90f, 0.90f), orthoUI, 0.19f);
+  }
+
+  // --- Enemy Grid Cell 2: Slime -> Boss Demon Slime (Loops ALL 10 Animations) ---
+  {
+    float ex1 = innerLeft + enCellW + enGap;
+    float ex2 = ex1 + enCellW;
+    drawPanel(ex1, enBottom, ex2, enTop, glm::vec4(0.06f, 0.08f, 0.15f, 0.96f),
+              glm::vec4(0.95f, 0.38f, 0.32f, 0.55f));
+
+    float previewX1 = ex1 + 0.10f;
+    float previewX2 = ex1 + 3.45f;
+    float previewY1 = enBottom + 0.10f;
+    float previewY2 = enTop - 0.10f;
+    drawPanel(previewX1, previewY1, previewX2, previewY2,
+              glm::vec4(0.03f, 0.04f, 0.09f, 0.95f),
+              glm::vec4(0.85f, 0.32f, 0.32f, 0.45f));
+
+    float slT = std::fmod(animTimer, 14.5f);
+    unsigned int sTex = enemyTex.slimeIdle;
+    int sFrames = 6;
+    int sFrame = 0;
+    glm::vec2 sRender(1.55f, 1.55f);
+    const char *sPhase = "SLIME IDLE";
+    glm::vec4 sTint(1.0f);
+
+    if (slT < 1.0f) {
+      sTex = enemyTex.slimeIdle;
+      sFrames = 6;
+      sFrame = static_cast<int>(slT * 6.0f) % sFrames;
+      sRender = glm::vec2(1.55f, 1.55f);
+      sPhase = "SLIME IDLE";
+    } else if (slT < 2.0f) {
+      sTex = enemyTex.slimeMove;
+      sFrames = 8;
+      sFrame = static_cast<int>((slT - 1.0f) * 8.0f) % sFrames;
+      sRender = glm::vec2(1.55f, 1.55f);
+      sPhase = "SLIME MOVE";
+    } else if (slT < 2.8f) {
+      sTex = enemyTex.slimeTakeHit;
+      sFrames = 6;
+      sFrame = static_cast<int>((slT - 2.0f) * 8.0f) % sFrames;
+      sRender = glm::vec2(1.55f, 1.55f);
+      sPhase = "SLIME HIT";
+      sTint = glm::vec4(1.0f, 0.45f, 0.45f, 1.0f);
+    } else if (slT < 6.0f) {
+      sTex = enemyTex.slimeTransform;
+      sFrames = 33;
+      sFrame = std::min(sFrames - 1, static_cast<int>((slT - 2.8f) * 10.3f));
+      sRender = glm::vec2(2.30f, 2.30f);
+      sPhase = "TRANSFORMING -> BOSS";
+    } else if (slT < 7.0f) {
+      sTex = enemyTex.demonIdle;
+      sFrames = 6;
+      sFrame = static_cast<int>((slT - 6.0f) * 6.0f) % sFrames;
+      sRender = glm::vec2(3.15f, 1.75f);
+      sPhase = "DEMON BOSS IDLE";
+    } else if (slT < 8.4f) {
+      sTex = enemyTex.demonWalk;
+      sFrames = 12;
+      sFrame = static_cast<int>((slT - 7.0f) * 8.5f) % sFrames;
+      sRender = glm::vec2(3.15f, 1.75f);
+      sPhase = "DEMON BOSS WALK";
+    } else if (slT < 10.0f) {
+      sTex = enemyTex.demonAttack;
+      sFrames = 15;
+      sFrame = std::min(sFrames - 1, static_cast<int>((slT - 8.4f) * 9.5f));
+      sRender = glm::vec2(3.15f, 1.75f);
+      sPhase = "DEMON BOSS CLEAVE";
+    } else if (slT < 11.7f) {
+      sTex = enemyTex.demonSmash;
+      sFrames = 18;
+      sFrame = std::min(sFrames - 1, static_cast<int>((slT - 10.0f) * 10.5f));
+      sRender = glm::vec2(3.15f, 1.75f);
+      sPhase = "DEMON BOSS JUMP SMASH";
+    } else if (slT < 12.4f) {
+      sTex = enemyTex.demonTakeHit;
+      sFrames = 5;
+      sFrame = static_cast<int>((slT - 11.7f) * 8.0f) % sFrames;
+      sRender = glm::vec2(3.15f, 1.75f);
+      sPhase = "DEMON BOSS HIT";
+      sTint = glm::vec4(1.0f, 0.45f, 0.45f, 1.0f);
+    } else {
+      sTex = enemyTex.demonDeath;
+      sFrames = 22;
+      sFrame = std::min(sFrames - 1, static_cast<int>((slT - 12.4f) * 10.5f));
+      sRender = glm::vec2(3.15f, 1.75f);
+      sPhase = "DEMON BOSS DEATH";
+    }
+
+    GLboolean wasScissor = GL_FALSE;
+    GLint prevScissor[4] = {0, 0, 0, 0};
+    beginCellScissor(previewX1 + 0.03f, previewY1 + 0.03f, previewX2 - 0.03f,
+                     previewY2 - 0.03f, wasScissor, prevScissor);
+    if (sTex != 0) {
+      float su = static_cast<float>(sFrame) / static_cast<float>(sFrames);
+      float sdu = 1.0f / static_cast<float>(sFrames);
+      glm::vec4 sUV(su, 0.0f, sdu, 1.0f);
+      glm::mat4 mSlime = glm::mat4(1.0f);
+      mSlime = glm::translate(
+          mSlime, glm::vec3((previewX1 + previewX2) * 0.5f,
+                            (previewY1 + previewY2) * 0.5f - 0.05f, 0.0f));
+      mSlime = glm::scale(mSlime, glm::vec3(sRender.x, sRender.y, 1.0f));
+      gameRenderer.drawQuad(mSlime, identityView, orthoUI, sTint, true, sUV,
+                            sTex);
+    }
+    endCellScissor(wasScissor, prevScissor);
+
+    float infoX = previewX2 + 0.25f;
+    float infoW = ex2 - infoX - 0.20f;
+    drawWrappedText("SLIME [2 HP] -> DEMON BOSS [5 HP]", infoX,
+                    enTop - 0.34f, 0.125f, 0.19f, infoW,
+                    glm::vec4(0.35f, 0.95f, 0.55f, 1.0f), orthoUI, 0.23f);
+    gameRenderer.drawText(std::string("LOOP: ") + sPhase, infoX, enTop - 0.66f,
+                          0.135f, 0.19f, glm::vec4(1.0f, 0.88f, 0.35f, 1.0f),
+                          orthoUI);
+    drawWrappedText(
+        "Defeating a Slime (2 hits) awakens the Demon Boss (5 hits). Leap-smashes platforms; dash or flee to despawn.",
+        infoX, enTop - 0.98f, 0.13f, 0.185f, infoW,
+        glm::vec4(0.86f, 0.92f, 0.98f, 0.95f), orthoUI, 0.24f);
+    drawWrappedText(
+        "Anim: Slime(Idle/Move/Hit) > Transform > Boss(Idle/Walk/Atk/Smash/Hit/Death)",
+        infoX, enBottom + 0.38f, 0.105f, 0.15f, infoW,
+        glm::vec4(0.62f, 0.75f, 0.90f, 0.90f), orthoUI, 0.19f);
+  }
+
+  // =========================================================================
+  // 3. GAME MECHANICS (Left Column) & 4. OTHERS (Right Column)
+  // =========================================================================
+  const float secTop = enBottom - 0.48f;
+  const float secBottom = -tutH * 0.5f + 0.88f;
+  const float colGap = 0.32f;
+  const float gmLeft = innerLeft;
+  const float gmRight = innerLeft + 9.65f;
+  const float otLeft = gmRight + colGap;
+  const float otRight = innerRight;
+
+  // --- Section 3: GAME MECHANICS ---
+  gameRenderer.drawText("GAME MECHANICS", gmLeft, secTop + 0.13f, 0.19f, 0.26f,
+                        glm::vec4(0.35f, 0.95f, 1.0f, 1.0f), orthoUI);
+  drawPanel(gmLeft, secBottom, gmRight, secTop,
+            glm::vec4(0.05f, 0.09f, 0.15f, 0.94f),
+            glm::vec4(0.25f, 0.75f, 0.95f, 0.45f));
 
   struct TutRow {
     std::string text;
     glm::vec4 color;
   };
-  const TutRow rows[] = {
+  const TutRow gmRows[] = {
       {"MODES  : Free Exploration is DEFAULT ([A/D] move). Press [F] to toggle Auto-Run!",
        glm::vec4(0.35f, 1.0f, 0.65f, 1.0f)},
-      {"MUSIC  : BGM defaults to 30% volume. Slider in [ESC] Pause (10% steps), [M] Mute.",
-       glm::vec4(0.40f, 0.85f, 1.0f, 1.0f)},
-      {"COMBAT : Press [Left Click] / [J] / [X] to attack with katana.",
-       glm::vec4(1.0f, 0.45f, 0.45f, 1.0f)},
-      {"DEFEND : Press [Right Click] or [K] to block attacks for 1s (2s cooldown on hit).",
-       glm::vec4(0.35f, 1.0f, 0.95f, 1.0f)},
-      {"ENEMIES: 1-hit Roamers (Multi-layer Thunder Spells!), 2-hit Slimes, 5-hit Demon Boss!",
-       glm::vec4(1.0f, 0.75f, 0.35f, 1.0f)},
       {"LIVES  : 3 Hits absorbed before death. Pick up Hearts to restore lives.",
        glm::vec4(1.0f, 0.35f, 0.65f, 1.0f)},
       {"SHIELDS: Pick up glowing Shield icons to absorb 1 hazard/enemy hit.",
@@ -775,40 +1227,47 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
        glm::vec4(1.0f, 0.68f, 0.28f, 1.0f)},
   };
 
-  for (const auto &row : rows) {
-    lines = drawWrappedText(row.text, textX, curY, 0.18f, 0.26f, maxTextW,
-                            row.color, orthoUI, 0.30f, 9.0f * 0.18f);
-    curY -= 0.34f + (lines - 1) * 0.30f;
+  float gmTextX = gmLeft + 0.28f;
+  float gmMaxW = (gmRight - gmLeft) - 0.56f;
+  float gmY = secTop - 0.46f;
+  for (const auto &row : gmRows) {
+    int lines = drawWrappedText(row.text, gmTextX, gmY, 0.16f, 0.23f, gmMaxW,
+                                row.color, orthoUI, 0.29f, 9.0f * 0.16f);
+    gmY -= 0.42f + (lines - 1) * 0.29f;
   }
-  curY -= 0.12f;
 
-  lines = drawWrappedText(
-      "Check the pause menu for controls, or press 'T' at any time to view this tutorial window again without losing your progress.",
-      textX, curY, 0.185f, 0.27f, maxTextW, glm::vec4(0.35f, 1.0f, 0.70f, 1.0f),
-      orthoUI, 0.31f);
-  curY -= 0.40f + (lines - 1) * 0.31f;
+  // --- Section 4: OTHERS ---
+  gameRenderer.drawText("OTHERS", otLeft, secTop + 0.13f, 0.19f, 0.26f,
+                        glm::vec4(0.80f, 0.72f, 1.0f, 1.0f), orthoUI);
+  drawPanel(otLeft, secBottom, otRight, secTop,
+            glm::vec4(0.05f, 0.09f, 0.15f, 0.94f),
+            glm::vec4(0.65f, 0.55f, 0.95f, 0.45f));
 
-  glm::mat4 modelDiv = glm::mat4(1.0f);
-  modelDiv = glm::translate(modelDiv, glm::vec3(0.0f, curY + 0.08f, 0.0f));
-  modelDiv = glm::scale(modelDiv, glm::vec3(tutW - 1.7f, 0.04f, 1.0f));
-  gameRenderer.drawQuad(modelDiv, identityView, orthoUI,
-                        glm::vec4(0.3f, 0.45f, 0.6f, 0.6f), false, glm::vec4(0),
-                        0);
-  curY -= 0.32f;
+  const TutRow otRows[] = {
+      {"MUSIC   : BGM defaults to 30% volume. Slider in [ESC] Pause (10% steps), [M] Mute.",
+       glm::vec4(0.40f, 0.85f, 1.0f, 1.0f)},
+      {"TUTORIAL: Check the pause menu for controls, or press 'T' at any time to view this tutorial window again without losing your progress.",
+       glm::vec4(0.35f, 1.0f, 0.70f, 1.0f)},
+      {"EXTRAS  : [ESC] Pause  [B] Scenery  [N] Day/Night  [F11] Fullscreen  [R] Restart",
+       glm::vec4(0.85f, 0.90f, 1.0f, 0.92f)},
+  };
 
-  lines = drawWrappedText(
-      "CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  "
-      "[L-CLICK] ATK  [R-CLICK] BLOCK  [F] AUTO-RUN  [M] MUTE",
-      textX, curY, 0.15f, 0.21f, maxTextW, glm::vec4(0.7f, 0.8f, 0.95f, 0.9f),
-      orthoUI, 0.26f);
-  curY -= 0.42f + (lines - 1) * 0.26f;
+  float otTextX = otLeft + 0.28f;
+  float otMaxW = (otRight - otLeft) - 0.56f;
+  float otY = secTop - 0.46f;
+  for (const auto &row : otRows) {
+    int lines = drawWrappedText(row.text, otTextX, otY, 0.15f, 0.22f, otMaxW,
+                                row.color, orthoUI, 0.28f, 10.0f * 0.15f);
+    otY -= 0.42f + (lines - 1) * 0.28f;
+  }
 
+  // Footer Resume / Begin Prompt
   std::string promptStr = openedFromPause
                               ? "PRESS [SPACE / ENTER / ESC / T] TO RESUME"
                               : "PRESS [SPACE / ENTER / ESC] TO BEGIN VENTURE";
-  float prW = static_cast<float>(promptStr.length()) * 0.23f;
-  gameRenderer.drawText(promptStr, -prW * 0.5f, curY, 0.23f, 0.34f,
-                        glm::vec4(0.35f, 1.0f, 0.55f, 1.0f), orthoUI);
+  float prW = static_cast<float>(promptStr.length()) * 0.22f;
+  gameRenderer.drawText(promptStr, -prW * 0.5f, -tutH * 0.5f + 0.34f, 0.22f,
+                        0.32f, glm::vec4(0.35f, 1.0f, 0.55f, 1.0f), orthoUI);
 }
 
 void UIManager::renderGameOver(float halfW, float halfH,

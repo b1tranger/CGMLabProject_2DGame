@@ -12,7 +12,8 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
 |---|---|---|---|
-| **v0.8.0** | [Session 9](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md) | 2026-11-11 | Up/Down-Only Run Relics, Open Exit Gate Icon (`exit_gate.png`), 3-Phase Dynamic Enemy Spawning with Phase 3 Horde Spawn, 10%-Step BGM Volume Slider (30% Default), 2-Line Modal Text Wrapping, Letterboxed Fullscreen (`F11`), and Background-Free Floating Icons |
+| **v0.8.1** | [Session 10](/doc/prompts/10.%20Presentation%20Guide%20%26%20Video%20Narration%20Script/summary.md) | 2026-11-11 | Presentation Guide, Pre-Gameplay Video Narration Script, Gameplay B-Roll Storyboard, Live Demo Playbook & Viva Cheat Sheet |
+| **v0.8.0** | [Session 9](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md) | 2026-11-11 | Up/Down-Only Run Relics, Open Exit Gate Icon (`exit_gate.png`), 3-Phase Dynamic Enemy Spawning (1m Phase 1/2, Max 5/Type in Phase 3) with Horde Spawn, 10%-Step BGM Volume Slider (40% Default), 2-Line Modal Text Wrapping, Letterboxed Fullscreen (`F11`), Background-Free Floating Icons, and Tutorial Screen Animation Grids |
 | **v0.7.4** | [v8.3](#v83---comprehensive-code-contexts-and-documentation-synchronization) | 2026-11-05 | Documentation & Code Context Synchronization: Embedded Root-Relative Code Contexts, Viva Q&A Expansion & Modern Subsystem Mapping Across explain.md, LEARNING_GUIDE.md, and documentation.md |
 | **v0.7.3** | [v8.1](#v81---synchronize-academic-group-details-at-readme-top) | 2026-11-05 | Academic Metadata Synchronization: Added Course, Faculty, and Student Group Details Table Prominently to the Top of README.md |
 | **v0.7.2** | [v7.2](#v72---render-academic-splash-screen-graphically-in-opengl-and-purge-bitmap-texture) | 2026-11-02 | Procedural Graphical Splash Screen: 100% Vector/Text Rendering in Modern OpenGL, Tables & Borders, Zero Disk Image Dependency |
@@ -66,6 +67,13 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 ## Detailed Version Logs
 
+### [v0.8.1] - 2026-11-11
+#### Session Archive: [`10. Presentation Guide & Video Narration Script`](/doc/prompts/10.%20Presentation%20Guide%20%26%20Video%20Narration%20Script/summary.md)
+* **Presentation Guide & Screen Recording Narration Script ([`/doc/PRESENTATION_GUIDE.md`](/doc/PRESENTATION_GUIDE.md))**:
+  - Authored a ~75-second pre-gameplay spoken narration script covering genre/tech stack, the core philosophy of *wending* (adaptability vs. static runners), and core mechanics.
+  - Added a line-by-line **Visual B-Roll Storyboard** and **Quick Shot-List Checklist** specifying exact gameplay clips and keystrokes to pair with the voiceover.
+  - Added a **5–7 Minute Live Demo Playbook**, **4-Pillar Architecture Talking Points**, **Controls Cheat Sheet**, and **Rapid Viva Q&A Summary**, and linked the guide from [`/README.md`](/README.md).
+
 ### [v0.8.0] - 2026-11-11
 #### Session Archive: [`9. Relics, Dynamic Enemy Spawning, and Music Volume Slider`](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md)
 * **Open Exit Gate Relics & Regular-Run Relic Cleanup**:
@@ -73,12 +81,12 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Created a 4-frame animated glowing **Open Exit Gate** spritesheet ([`/assets/exit_gate.png`](/assets/exit_gate.png), $256\times 64$) via [`/scratch/gen_exit_gate.cpp`](/scratch/gen_exit_gate.cpp) and UV helper `getExitGateUV` in [`/include/Common.h`](/include/Common.h).
   - Updated [`/src/LadderScene.cpp`](/src/LadderScene.cpp), [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp), and [`/src/UIManager.cpp`](/src/UIManager.cpp) so post-15s exit triggers spawn and render animated Open Exit Gates instead of Left/Right arrowheads.
 * **3-Phase Dynamic Enemy Spawning & Phase 3 Horde Spawn**:
-  - Replaced static per-chunk enemy counts with time-escalating 3-phase spawning (`ENEMY_PHASE_DURATION = 120.0f` seconds per phase, changing every 2 minutes) via `World::updateEnemySpawning` in [`/src/World.cpp`](/src/World.cpp):
-    - **Phase 1 (0–2 min)**: Rare enemy spawns with a strict maximum of **2 active enemies** at once.
-    - **Phase 2 (2–4 min)**: Increased spawn frequency across chunks and periodic patrols (up to 6 active enemies).
-    - **Phase 3 (4+ min)**: Peak spawn rate (up to 12 active enemies) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`), randomly spawning **3 Slimes** and **3 Bringers of Death** around the player with a 3-minute cooldown, accompanied by roar SFX and HUD alerts.
-* **Interactive 10%-Step BGM Volume Slider (Default 30%)**:
-  - Updated `AudioManager` in [`/include/Audio.h`](/include/Audio.h) and [`/src/Audio.cpp`](/src/Audio.cpp) to default looping background music to **30%** (`bgmVolumePercent = 30`, MCI volume `300`) with `setBgmVolumePercent` and `adjustBgmVolume` snapping to 10% increments (`0%`–`100%`).
+  - Replaced static per-chunk enemy counts with time-escalating 3-phase spawning (`ENEMY_PHASE_DURATION = 60.0f` seconds per phase, advancing Phase 1 & Phase 2 every 1 minute) via `World::updateEnemySpawning` in [`/src/World.cpp`](/src/World.cpp):
+    - **Phase 1 (0–1 min)**: Rare enemy spawns with a strict maximum of **2 active enemies** at once.
+    - **Phase 2 (1–2 min)**: Increased spawn frequency across chunks and periodic patrols (up to 6 active enemies).
+    - **Phase 3 (2+ min)**: Peak spawn rate (**2–5 Bringers of Death & 2–5 Slimes** per chunk, up to 14 active enemies) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`), randomly spawning **3 Slimes** and **3 Bringers of Death** around the player with a 3-minute cooldown, accompanied by roar SFX and HUD alerts.
+* **Interactive 10%-Step BGM Volume Slider (Default 40%)**:
+  - Updated `AudioManager` in [`/include/Audio.h`](/include/Audio.h) and [`/src/Audio.cpp`](/src/Audio.cpp) to default looping background music to **40%** (`bgmVolumePercent = 40`, MCI volume `400`, with unmute-from-zero fallback `40%`) and snap `setBgmVolumePercent` / `adjustBgmVolume` to 10% increments (`0%`–`100%`).
   - Added an interactive Pause Menu volume slider in [`/src/UIManager.cpp`](/src/UIManager.cpp) and [`/src/main.cpp`](/src/main.cpp) supporting mouse click/drag, `[-]`/`[+]` buttons, `Left`/`Right` keys in Pause, `-`/`=` quick steps, and `[M]` mute toggle.
 * **UI Text Wrapping, Letterboxed Fullscreen & Background-Free Floating Icons**:
   - Added word-boundary wrapping (`drawWrappedText`) in [`/src/UIManager.cpp`](/src/UIManager.cpp) so long lines in both the Pause Menu (`renderPauseMenu`) and Tutorial Modal (`renderTutorialModal`) wrap cleanly onto 2 lines inside the window borders instead of overflowing.
@@ -87,6 +95,9 @@ All entries in this changelog map directly to session archives recorded in [`/do
 * **Windows Build & `make package` Fix**:
   - Updated [`/Makefile`](/Makefile) to route `build` and `package` through [`/build/win_tasks.ps1`](/build/win_tasks.ps1), automatically selecting the native MinGW-w64 compiler (`x86_64-w64-mingw32-g++.exe`) instead of MSYS2 POSIX `g++.exe`, cleaning stale `dist/` folders, and suppressing non-interactive archive progress errors.
   - Guarded `#define NOMINMAX` with `#ifndef NOMINMAX` in [`/src/VideoPlayer.cpp`](/src/VideoPlayer.cpp) and [`/src/Audio.cpp`](/src/Audio.cpp) to eliminate compiler redefinition warnings.
+* **Tutorial Screen Animation Grids & Categorized Layout**:
+  - Added [`TutorialPreviewTextures`](/include/UIManager.h#L16-L35) in [`/include/UIManager.h`](/include/UIManager.h) and expanded [`UIManager::renderTutorialModal`](/src/UIManager.cpp) to organize tutorials into four sections: **Player Controls** (6-cell scissor-clipped animation grid for `RUN`, `JUMP/CLIMB`, `SLIDE/DROP`, `SHADOW DASH`, `KATANA ATK`, and `DEFEND/PARRY` with controls shown beneath each cell), **Enemies** (2-cell grid looping every Bringer of Death state and the full Slime-to-Demon-Boss transformation and combat animation cycle), **Game Mechanics** (`MODES`, `LIVES`, `SHIELDS`, `WARPS`, `SHIFTS`), and **Others** (`MUSIC`, `TUTORIAL`, `EXTRAS`).
+  - Passed all 17 loaded enemy sprite sheet handles and continuous real-time `glfwGetTime()` animation playback from [`/src/main.cpp`](/src/main.cpp) so tutorial previews animate smoothly while gameplay is paused.
 
 ### [v0.7.4] - 2026-11-05
 #### Session Archive: [`8. Code Snippets, Academic Metadata & Documentation Sync/conversation.md (v8.3)`](/doc/prompts/8.%20Code%20Snippets,%20Academic%20Metadata%20&%20Documentation%20Sync/conversation.md)

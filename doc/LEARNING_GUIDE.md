@@ -752,17 +752,18 @@ In academic capstone and lab submissions, displaying course context, university 
     - **Responsive Letterboxed Fullscreen & Modal Word-Wrapping**:
       - `computeGameViewport` and `beginViewportFrame` in [`/src/main.cpp`](/src/main.cpp) (`[F11]` or Maximize) expand horizontal visibility (`halfW = halfH * (vpW / vpH)`) while adding clean top/bottom vertical black borders (`glScissor`) so the game is never stretched.
       - `drawWrappedText` in [`/src/UIManager.cpp`](/src/UIManager.cpp) wraps long Pause Menu and Tutorial Modal lines onto 2 lines inside the dialog borders.
+      - `UIManager::renderTutorialModal` in [`/src/UIManager.cpp`](/src/UIManager.cpp) (`TutorialPreviewTextures` in [`/include/UIManager.h`](/include/UIManager.h), driven by `glfwGetTime()` in [`/src/main.cpp`](/src/main.cpp)) displays four categorized sections: **Player Controls** (6 scissor-clipped live animation cells with keybindings below each preview), **Enemies** (2 cells looping every Bringer of Death state and the full Slime-to-Demon-Boss transformation & combat cycle), **Game Mechanics** (`MODES`, `LIVES`, `SHIELDS`, `WARPS`, `SHIFTS`), and **Others** (`MUSIC`, `TUTORIAL`, `EXTRAS`).
     - **Minigame Open Exit Gate Mechanism**:
       - Inside mini-games ([`/src/LadderScene.cpp`](/src/LadderScene.cpp) and [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp)), entering an animated **Open Exit Gate** ([`/assets/exit_gate.png`](/assets/exit_gate.png)) after the 15-second survival window exits the minigame and returns the player safely to the platformer world.
-    - **10%-Step BGM Volume Slider (Default 30%)**:
-      - [`/src/Audio.cpp`](/src/Audio.cpp) defaults `bgmVolumePercent = 30` (MCI volume `300`) and snaps slider/hotkey adjustments (`setBgmVolumePercent`, `adjustBgmVolume`) to 10% increments from `0%` to `100%`. [`/src/UIManager.cpp`](/src/UIManager.cpp) renders the interactive Pause Menu slider with 11 notch ticks, `[-]`/`[+]` step buttons, and drag/keyboard support.
+    - **10%-Step BGM Volume Slider (Default 40%)**:
+      - [`/include/Audio.h`](/include/Audio.h) and [`/src/Audio.cpp`](/src/Audio.cpp) default `bgmVolumePercent = 40` (MCI volume `400`) and snap slider/hotkey adjustments (`setBgmVolumePercent`, `adjustBgmVolume`) to 10% increments from `0%` to `100%`. [`/src/UIManager.cpp`](/src/UIManager.cpp) renders the interactive Pause Menu slider with 11 notch ticks, `[-]`/`[+]` step buttons, and drag/keyboard support.
 
 21. **Dynamic 3-Phase Enemy Spawning, Horde Wave & Spatial Buffering (`v0.6.12`, `v0.6.14`, `v0.8.0`)**:
     - **Time-Escalating 3-Phase Spawn Schedule**:
-      - Managed by `World::updateEnemySpawning` and `World::generateChunk` in [`/src/World.cpp`](/src/World.cpp) (`ENEMY_PHASE_DURATION = 120.0f`, changing every 2 minutes):
-        - **Phase 1 ($0\text{–}2\,\text{min}$)**: Rare spawns with a hard cap of **2 active enemies** at once.
-        - **Phase 2 ($2\text{–}4\,\text{min}$)**: Moderate spawn rate (1–2 per type per chunk + 10s periodic spawns, cap 6).
-        - **Phase 3 ($4+\,\text{min}$)**: High spawn rate (1–3 Bringer of Death, 2–4 Slimes per chunk + 6s periodic spawns, cap 12) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`, 3-minute cooldown) spawning **3 Slimes** and **3 Bringers of Death** at random around the player.
+      - Managed by `World::updateEnemySpawning` and `World::generateChunk` in [`/src/World.cpp`](/src/World.cpp) (`ENEMY_PHASE_DURATION = 60.0f`, Phase 1 and Phase 2 each lasting 1 minute):
+        - **Phase 1 ($0\text{–}1\,\text{min}$)**: Rare spawns with a hard cap of **2 active enemies** at once.
+        - **Phase 2 ($1\text{–}2\,\text{min}$)**: Moderate spawn rate (1–2 per type per chunk + 10s periodic spawns, cap 6).
+        - **Phase 3 ($2+\,\text{min}$)**: High spawn rate (2–5 Bringers of Death, 2–5 Slimes per chunk + 6s periodic spawns, cap 14) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`, 3-minute cooldown) spawning **3 Slimes** and **3 Bringers of Death** at random around the player.
     - **Vertical Strata Distribution**:
       - `bool inCavern = (std::rand() % 3 == 0);`: 33% chance to spawn in subterranean caverns ($Y = -4.5\text{m}$), 67% chance on surface ground ($Y = -0.5\text{m}$).
     - **Distance Clearance Buffering**:

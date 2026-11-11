@@ -1,15 +1,23 @@
-Fixed the `make package` build pipeline and built both the executable and standalone package cleanly:
+Updated the startup default BGM volume alignment to **40%** and tuned the 3-phase enemy spawning schedule to **1-minute** Phase 1 & Phase 2 durations with a **max spawn count of 5 for both enemy types**, rebuilt the game and standalone archive, and updated documentation.
 
-### Root Causes Fixed
-1. **MSYS2 POSIX `g++.exe` Shadowing**: On this machine, `C:\msys64\usr\bin\g++.exe` (MSYS POSIX target) appears ahead of the WinLibs MinGW-w64 toolchain (`x86_64-w64-mingw32-g++.exe`) on `PATH`, so bare `g++.exe` in [Makefile](file:///d:/GitHub/UITS/CGMLabProject_2DGame/Makefile) invoked the wrong compiler.
-2. **Packaging Robustness & Progress Buffer Error**: `Copy-Item assets -Recurse dist/TheWenderer/` lacked `-Force` (failing if a prior `dist/` directory existed), and `Compress-Archive` emitted a `Write-Progress` console buffer error in non-interactive hosts unless `$ProgressPreference = 'SilentlyContinue'` is set.
-3. **`NOMINMAX` Redefinition Warnings**: Guarded `#define NOMINMAX` with `#ifndef NOMINMAX` in [VideoPlayer.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/VideoPlayer.cpp#L3-L5) and [Audio.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/Audio.cpp#L3-L5).
+### Changes Implemented
+1. **Default Music Volume (`40%`) Alignment**
+   - Your edit at [`src/Audio.cpp`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/Audio.cpp#L115-L121) updated the unmute-from-zero fallback inside [`AudioManager::toggleBgmMute`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/Audio.cpp#L115-L121).
+   - Updated [`AudioManager::bgmVolumePercent`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/Audio.h#L42-L44) in [Audio.h](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/Audio.h#L42-L44) from `30` to `40` so the game actually launches at **40%** BGM volume, and updated [`UIManager::renderPauseMenu`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/UIManager.h#L93-L97) default parameter to `40`.
 
-### Changes & Build Output
-- Created [build/win_tasks.ps1](file:///d:/GitHub/UITS/CGMLabProject_2DGame/build/win_tasks.ps1) and updated [Makefile](file:///d:/GitHub/UITS/CGMLabProject_2DGame/Makefile#L5-L18) so `make build` and `make package` automatically prefer `x86_64-w64-mingw32-g++.exe` (or any non-MSYS MinGW-w64 `g++.exe`), clean stale `dist/` folders, and generate `TheWenderer_Standalone.zip` reliably.
-- Ran both `build` and `package` tasks (`exit code 0`, zero C++ warnings):
-  - Built [build/main.exe](file:///d:/GitHub/UITS/CGMLabProject_2DGame/build/main.exe) (`3,629,434` bytes)
-  - Packaged [TheWenderer_Standalone.zip](file:///d:/GitHub/UITS/CGMLabProject_2DGame/TheWenderer_Standalone.zip) (`13,705,647` bytes)
-- Updated [changelog.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/changelog.md) and synced the Session 9 archive (`doc/prompts/9. Relics, Dynamic Enemy Spawning, and Music Volume Slider/`).
+2. **1-Minute Phase 1 & Phase 2 + Max 5 Spawns for Both Enemy Types**
+   - Updated [`ENEMY_PHASE_DURATION`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/Common.h#L102-L103) in [Common.h](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/Common.h#L102-L105) from `120.0f` to `60.0f`:
+     - **Phase 1 (`0–1 min`)**: rare spawns, maximum **2** active enemies at once.
+     - **Phase 2 (`1–2 min`)**: moderate spawns (`1–2` per chunk of each type, cap **6** active).
+     - **Phase 3 (`2+ min`)**: increased chunk spawn range in [`World::generateChunk`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/World.cpp#L635-L660) to **`2–5` Bringers of Death** and **`2–5` Slimes** per chunk (active cap **14** in both [`World::generateChunk`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/World.cpp#L649) and [`World::updateEnemySpawning`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/World.cpp#L742)), with relaxed-separation fallback if strict spacing fills up, plus **Horde Spawn** (3 Slimes + 3 Bringers of Death, `180s` cooldown).
+   - Updated the phase comment in [main.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L1018-L1019).
 
-You can now run `make package` (or `make`) in your regular terminal, or launch `./build/main.exe` directly.
+3. **Documentation & Archive Updates**
+   - Updated [README.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/README.md), [changelog.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/changelog.md), [LEARNING_GUIDE.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/LEARNING_GUIDE.md), [documentation.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/documentation.md), [explain.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/explain.md), [PRESENTATION_GUIDE.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/PRESENTATION_GUIDE.md), and the Session 9 prompt archive ([summary.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md)).
+
+### Build & Verification
+- **Logic Verification ([verify_logic.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/scratch/verify_logic.cpp))**: Compiled and ran `scratch/verify_logic.exe` (`exit code 0`):
+  - Verified default `40%` startup volume, 10% snapping, and unmute-from-zero `40%` restore.
+  - Verified Phase 1 (`0–60s`, max 2 active), Phase 2 (`60–120s`), Phase 3 transition at `120s`, `Phase 3 chunk max spawned: slimes=5, bods=5`, `Horde #1 spawned: slimes=3, bods=3`, and `Horde #2 spawned: slimes=3, bods=3` after `180s` cooldown (`ALL VERIFICATION ASSERTIONS PASSED!`).
+- **Full Game Build & Standalone Package (`win_tasks.ps1`)**:
+  - Compiled cleanly (`exit code 0`) into [main.exe](file:///d:/GitHub/UITS/CGMLabProject_2DGame/build/main.exe) (`3,644,864` bytes) and packaged [TheWenderer_Standalone.zip](file:///d:/GitHub/UITS/CGMLabProject_2DGame/TheWenderer_Standalone.zip) (`13,711,842` bytes).

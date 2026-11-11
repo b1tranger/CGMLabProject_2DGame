@@ -26,6 +26,11 @@
    - Reorganized all legacy flat archives (`v1.0`–`v8.3`, `b1tranger.txt`, `lima.txt`) inside [`/doc/prompts/`](/doc/prompts/) into serial session folders `1.`–`8.` matching [`/AGENTS.md`](/AGENTS.md) and Session 9's structure.
 6. **Build & `make package` Pipeline Fix (Turn 4)**:
    - Fixed `Makefile` toolchain shadowing (`C:\msys64\usr\bin\g++.exe` vs `x86_64-w64-mingw32-g++.exe`) and `package` target cleanup/progress issues, and built `build/main.exe` + `TheWenderer_Standalone.zip`.
+7. **Tutorial Screen Animation Grids & Categorized Layout (Turn 5)**:
+   - Added live scissor-clipped animation grids to the Tutorial Screen for **Player Controls** (6 cells with controls below each animation) and **Enemies** (2 cells looping all animations of Bringer of Death and Slime/Demon Boss), and categorized the remaining tutorials under **Game Mechanics** (`MODES`, `LIVES`, `SHIELDS`, `WARPS`, `SHIFTS`) and **Others** (`MUSIC`, `TUTORIAL`, `EXTRAS`).
+8. **Audio Default Alignment & Enemy Phase/Rate Tuning (Turn 7)**:
+   - Synced the startup default music volume in [`/include/Audio.h`](/include/Audio.h) (`40%`) and [`/include/UIManager.h`](/include/UIManager.h) (`40%`) to match [`/src/Audio.cpp`](/src/Audio.cpp).
+   - Updated [`/include/Common.h`](/include/Common.h) (`ENEMY_PHASE_DURATION = 60.0f`) and [`/src/World.cpp`](/src/World.cpp) so Phase 1 and Phase 2 last **1 minute** each and Phase 3 increases max per-chunk spawn rate to **5** for both Bringer of Death and Slimes (`2–5` per chunk each, cap `14` active + Horde Spawn).
 
 ---
 
@@ -56,6 +61,20 @@
 - Updated all session archive links in [`/doc/changelog.md`](/doc/changelog.md) to point to the new serial folder `conversation.md` paths (verified zero remaining `/doc/prompts/v` references).
 - Note: Raw `transcript_full.jsonl` files for prior sessions `1`–`8` are not available inside the sandbox (prior brain conversation directories returned `Access is denied`), so `conversation.md` and `summary.md` clearly document that they were migrated verbatim from the legacy Markdown archives.
 
+### F. Tutorial Screen Animation Grids & Categorized Modal Layout
+- Added [`TutorialPreviewTextures`](/include/UIManager.h) to [`/include/UIManager.h`](/include/UIManager.h) and extended `UIManager::renderTutorialModal` to accept `float animTimer` and all 17 enemy animation texture handles.
+- Redesigned `UIManager::renderTutorialModal` in [`/src/UIManager.cpp`](/src/UIManager.cpp) (`18.0m x 12.6m`) with nested framebuffer scissor clipping (`glIsEnabled(GL_SCISSOR_TEST)` / `GL_SCISSOR_BOX` preservation):
+  - **PLAYER CONTROLS**: 6-cell grid previewing `RUN`, `JUMP / CLIMB`, `SLIDE / DROP`, `SHADOW DASH`, `KATANA ATK`, and `DEFEND / PARRY` with wrapped control bindings printed directly below each animation box.
+  - **ENEMIES**: 2-cell grid looping every Bringer of Death animation (`Idle -> Walk -> Attack -> Cast + Spell -> Hurt -> Death`, UV-flipped to face right) and the full Slime -> Demon Boss lifecycle (`Slime Idle/Move/Hit -> Transform -> Boss Idle/Walk/Attack/Smash/Hit/Death`).
+  - **GAME MECHANICS**: Kept `MODES`, `LIVES`, `SHIELDS`, `WARPS`, and `SHIFTS` intact inside a dedicated bottom-left card.
+  - **OTHERS**: Kept `MUSIC`, `TUTORIAL`, and `EXTRAS` quick keys inside a dedicated bottom-right card.
+- Updated [`/src/main.cpp`](/src/main.cpp) to populate `TutorialPreviewTextures` from all loaded enemy sheets and pass `static_cast<float>(glfwGetTime())` so preview animations loop smoothly while gameplay is paused.
+
+### G. 40% Default BGM Volume & 1-Minute Phase / Max-5 Enemy Spawn Tuning
+- Aligned initial startup `bgmVolumePercent = 40` in [`/include/Audio.h`](/include/Audio.h#L43) and `renderPauseMenu` default argument in [`/include/UIManager.h`](/include/UIManager.h#L96) with the `40%` unmute fallback at [`/src/Audio.cpp#L118`](/src/Audio.cpp#L118).
+- Changed `ENEMY_PHASE_DURATION` in [`/include/Common.h`](/include/Common.h#L102-L103) from `120.0f` to `60.0f` so Phase 1 (`0–1 min`) and Phase 2 (`1–2 min`) each last 1 minute before Phase 3 begins at `2+ min`.
+- Updated `World::generateChunk` and `World::updateEnemySpawning` in [`/src/World.cpp`](/src/World.cpp) so Phase 3 increases the max per-chunk spawn rate to **5** for both enemy types (`2–5` Bringers of Death and `2–5` Slimes per chunk, active cap `14`), while preserving Phase 1's max-2 active cap and Phase 3's 3-minute Horde Spawn.
+
 ---
 
 ## 3. Files Created / Modified
@@ -82,15 +101,16 @@
   - [`/doc/LEARNING_GUIDE.md`](/doc/LEARNING_GUIDE.md)
   - [`/doc/documentation.md`](/doc/documentation.md)
   - [`/doc/explain.md`](/doc/explain.md)
+  - [`/doc/PRESENTATION_GUIDE.md`](/doc/PRESENTATION_GUIDE.md)
 
 ---
 
 ## 4. Verification & Outcomes
 - **Automated Logic & Unit Verification** ([`/scratch/verify_logic.cpp`](/scratch/verify_logic.cpp)):
   - Compiled and executed `scratch/verify_logic.exe`; all assertions passed:
-    - Verified default BGM volume `30%`, 10%-step snapping/adjustments, and mute/unmute state restoration.
+    - Verified default BGM volume `40%`, 10%-step snapping/adjustments, and mute/unmute (`0% -> 40%`) state restoration.
     - Verified zero `DIR_LEFT` or `DIR_RIGHT` relics across initial and 25 streamed platformer chunks.
-    - Verified 2-minute phase transitions (`Phase 1` -> `Phase 2` at 120s -> `Phase 3` at 240s), Phase 1 strict max-2 cap, and Phase 3 Horde Spawns (`Horde #1 spawned: slimes=3, bods=3`, `Horde #2 spawned: slimes=3, bods=3` after 180s cooldown).
+    - Verified 1-minute Phase 1 & Phase 2 transitions (`Phase 1` -> `Phase 2` at 60s -> `Phase 3` at 120s), Phase 1 strict max-2 cap, Phase 3 chunk spawning (`Phase 3 chunk max spawned: slimes=5, bods=5`), and Phase 3 Horde Spawns (`Horde #1 spawned: slimes=3, bods=3`, `Horde #2 spawned: slimes=3, bods=3` after 180s cooldown).
 - **Full Game Compilation & Standalone Packaging**:
-  - Compiled all 9 translation units cleanly (`exit code 0`, zero C++ warnings) via [`/build/win_tasks.ps1`](/build/win_tasks.ps1) using `x86_64-w64-mingw32-g++.exe`, producing [`/build/main.exe`](/build/main.exe) (`3,629,434` bytes) and [`/TheWenderer_Standalone.zip`](/TheWenderer_Standalone.zip) (`13,705,647` bytes).
+  - Compiled all 9 translation units cleanly (`exit code 0`, zero C++ errors/warnings) via [`/build/win_tasks.ps1`](/build/win_tasks.ps1) using `x86_64-w64-mingw32-g++.exe`, producing [`/build/main.exe`](/build/main.exe) (`3,644,864` bytes) and [`/TheWenderer_Standalone.zip`](/TheWenderer_Standalone.zip) (`13,711,842` bytes).
 

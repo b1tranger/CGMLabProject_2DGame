@@ -26,6 +26,28 @@ struct VolumeSliderLayout {
   float btnSize;
 };
 
+struct TutorialPreviewTextures {
+  unsigned int bodIdle = 0;
+  unsigned int bodWalk = 0;
+  unsigned int bodAttack = 0;
+  unsigned int bodCast = 0;
+  unsigned int bodSpell = 0;
+  unsigned int bodHurt = 0;
+  unsigned int bodDeath = 0;
+
+  unsigned int slimeIdle = 0;
+  unsigned int slimeMove = 0;
+  unsigned int slimeTakeHit = 0;
+  unsigned int slimeTransform = 0;
+
+  unsigned int demonIdle = 0;
+  unsigned int demonWalk = 0;
+  unsigned int demonAttack = 0;
+  unsigned int demonTakeHit = 0;
+  unsigned int demonSmash = 0;
+  unsigned int demonDeath = 0;
+};
+
 class UIManager {
 public:
   static UIManager &instance();
@@ -71,9 +93,11 @@ public:
   void renderPauseMenu(float halfW, float halfH, int totalScore, int coins,
                        int relics, float distance, bool freeExploration,
                        int activeScenery, bool isNight, float timeLeftInPhase,
-                       bool autoShiftEnabled = true, int bgmVolumePercent = 30,
+                       bool autoShiftEnabled = true, int bgmVolumePercent = 40,
                        bool bgmMuted = false);
-  void renderTutorialModal(float halfW, float halfH, bool openedFromPause);
+  void renderTutorialModal(
+      float halfW, float halfH, bool openedFromPause, float animTimer = 0.0f,
+      const TutorialPreviewTextures &enemyTex = TutorialPreviewTextures{});
   void renderGameOver(float halfW, float halfH, const std::string &reason,
                       int totalScore, int coins, float distance);
 

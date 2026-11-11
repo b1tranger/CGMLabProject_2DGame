@@ -633,9 +633,10 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
     }
 
     // 6. Spawn Roaming Enemies in non-initial chunks scaled by the 3 Time Phases:
-    //    Phase 1 (0-2m): Rare spawns, maximum 2 active enemies at once
-    //    Phase 2 (2-4m): Moderate spawn rate, maximum 6 active enemies at once
-    //    Phase 3 (4m+):  High spawn rate, maximum 12 active enemies + Horde Spawn
+    //    Phase 1 (0-1m): Rare spawns, maximum 2 active enemies at once
+    //    Phase 2 (1-2m): Moderate spawn rate, maximum 6 active enemies at once
+    //    Phase 3 (2m+):  Peak spawn rate (up to 5 Bringers of Death & 5 Slimes per chunk),
+    //                    maximum 14 active enemies + Horde Spawn
     if (!isInitial) {
         int activeCount = countActiveEnemies();
         if (currentEnemyPhase == 1) {
@@ -644,15 +645,19 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
                 trySpawnEnemyInRange(pick, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false);
             }
         } else {
-            int maxActive = (currentEnemyPhase == 2) ? 6 : 12;
-            int numBod    = (currentEnemyPhase == 2) ? (1 + (std::rand() % 2)) : (1 + (std::rand() % 3));
-            int numSlimes = (currentEnemyPhase == 2) ? (1 + (std::rand() % 2)) : (2 + (std::rand() % 3));
+            int maxActive = (currentEnemyPhase == 2) ? 6 : 14;
+            int numBod    = (currentEnemyPhase == 2) ? (1 + (std::rand() % 2)) : (2 + (std::rand() % 4)); // Phase 3: 2-5
+            int numSlimes = (currentEnemyPhase == 2) ? (1 + (std::rand() % 2)) : (2 + (std::rand() % 4)); // Phase 3: 2-5
 
             for (int b = 0; b < numBod && countActiveEnemies() < maxActive; ++b) {
-                trySpawnEnemyInRange(ENEMY_BRINGER_OF_DEATH, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false);
+                if (!trySpawnEnemyInRange(ENEMY_BRINGER_OF_DEATH, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false)) {
+                    trySpawnEnemyInRange(ENEMY_BRINGER_OF_DEATH, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, true);
+                }
             }
             for (int s = 0; s < numSlimes && countActiveEnemies() < maxActive; ++s) {
-                trySpawnEnemyInRange(ENEMY_SLIME_INITIAL, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false);
+                if (!trySpawnEnemyInRange(ENEMY_SLIME_INITIAL, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false)) {
+                    trySpawnEnemyInRange(ENEMY_SLIME_INITIAL, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, true);
+                }
             }
         }
     }
@@ -735,7 +740,7 @@ SpawnEventResult World::updateEnemySpawning(float deltaTime, float playerX,
         } else {
             periodicSpawnTimer = 6.0f;
             int toSpawn = 1 + (std::rand() % 2);
-            for (int i = 0; i < toSpawn && countActiveEnemies() < 12; ++i) {
+            for (int i = 0; i < toSpawn && countActiveEnemies() < 14; ++i) {
                 EnemyType pick = (std::rand() % 2 == 0) ? ENEMY_SLIME_INITIAL : ENEMY_BRINGER_OF_DEATH;
                 trySpawnEnemyInRange(pick, playerX - 24.0f, playerX + 24.0f, playerX, 6.5f, false);
             }

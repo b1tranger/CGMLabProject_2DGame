@@ -115,7 +115,7 @@ void AudioManager::adjustBgmVolume(int deltaPercent) {
 void AudioManager::toggleBgmMute() {
   isBgmMuted = !isBgmMuted;
   if (!isBgmMuted && bgmVolumePercent <= 0) {
-    bgmVolumePercent = 30;
+    bgmVolumePercent = 40;
   }
   applyBgmVolume();
 }

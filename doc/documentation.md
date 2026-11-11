@@ -167,10 +167,10 @@ Implements Modern OpenGL 3.3 Core Profile graphics:
   - Automatically prunes chunks farther than $85\,\text{m}$ behind the player, keeping memory usage constant and sustaining 60+ FPS indefinitely.
 - **3-Phase Dynamic Enemy Spawning & Horde Waves**:
   - **Guaranteed Starter Slimes**: Spawns 2 initial slimes at $X = +17.5\,\text{m}$ and $X = -18.0\,\text{m}$ on the initial spawn chunk.
-  - **Time-Escalating Phases (2-Minute Intervals)**: `World::updateEnemySpawning` advances through 3 phases every $120\,\text{s}$:
-    - **Phase 1 ($0\text{–}2\,\text{min}$)**: Rare spawns, capped at a maximum of **2 active enemies** at once.
-    - **Phase 2 ($2\text{–}4\,\text{min}$)**: Increased spawn rate across chunks and periodic patrols (up to 6 active enemies).
-    - **Phase 3 ($4+\,\text{min}$)**: Peak spawn density (up to 12 active enemies) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`), randomly spawning **3 Slimes** and **3 Bringers of Death** around the player on a 3-minute cooldown.
+  - **Time-Escalating Phases (1-Minute Phase 1 & Phase 2)**: `World::updateEnemySpawning` advances through Phase 1 ($0\text{–}1\,\text{min}$) and Phase 2 ($1\text{–}2\,\text{min}$) at $60\,\text{s}$ intervals (`ENEMY_PHASE_DURATION = 60.0f`):
+    - **Phase 1 ($0\text{–}1\,\text{min}$)**: Rare spawns, capped at a maximum of **2 active enemies** at once.
+    - **Phase 2 ($1\text{–}2\,\text{min}$)**: Increased spawn rate across chunks and periodic patrols (up to 6 active enemies).
+    - **Phase 3 ($2+\,\text{min}$)**: Peak spawn density (**up to 5 Bringers of Death & 5 Slimes** per chunk, up to 14 active enemies) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`), randomly spawning **3 Slimes** and **3 Bringers of Death** around the player on a 3-minute cooldown.
   - **Multi-Elevation Cavern Spawning**: 33% probability to spawn enemies in subterranean caverns (`CAVERN_FLOOR_Y + 0.5\,\text{m}`), 67% on surface ground.
 - **Grouped Spike Clusters & Vertical-Aware Enemy Separation**:
   - Spawns platform spikes in grouped clusters of 2 to 4 spikes (`SpikeTrap`).
@@ -183,6 +183,7 @@ Implements Modern OpenGL 3.3 Core Profile graphics:
 ### 3.7 UI & Mini-Game Subsystems
 - **`UIManager` ([`/src/UIManager.cpp`](/src/UIManager.cpp) & [`/include/UIManager.h`](/include/UIManager.h))**:
   - Thread-safe singleton managing the score counter, coin meter, distance tracking, 3 animated heart life pips, Guard status badge, overhead segmented enemy health bars, floating combat text, and glassmorphic modals with `drawWrappedText` 2-line word-boundary wrapping (preventing Pause/Tutorial text overflow).
+  - **Categorized Tutorial Animation Grids ([`TutorialPreviewTextures`](/include/UIManager.h) & `UIManager::renderTutorialModal`)**: Organizes onboarding tutorials into **Player Controls** (6 scissor-clipped animation cells with controls printed below each cell), **Enemies** (2 cells looping all Bringer of Death and Slime/Demon Boss animations), **Game Mechanics** (`MODES`, `LIVES`, `SHIELDS`, `WARPS`, `SHIFTS`), and **Others** (`MUSIC`, `TUTORIAL`, `EXTRAS`), driven smoothly during pause via `glfwGetTime()`.
   - **Letterboxed Fullscreen Viewport ([`/src/main.cpp`](/src/main.cpp))**: `computeGameViewport` and `beginViewportFrame` (`[F11]` or Maximize) expand horizontal camera coverage across the full window width while rendering clean vertical black borders (top/bottom `glScissor` clearing) with exact 1:1 pixel aspect scaling (zero stretching).
   - **Procedural Academic Splash Screen ([`/src/UIManager.cpp#L68-L230`](/src/UIManager.cpp#L68-L230))**:
     - Pre-video formal academic proposal presentation card ($15.6\,\text{m} \times 8.6\,\text{m}$) rendered 100% through Modern OpenGL primitives and embedded 8x8 font ([`/include/font8x8_basic.h`](/include/font8x8_basic.h)).

@@ -219,10 +219,11 @@ static GameViewport computeGameViewport(GLFWwindow *window) {
 
   const float baseAspect =
       static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT);
-  bool isExpanded = (glfwGetWindowMonitor(window) != nullptr) ||
-                    (glfwGetWindowAttrib(window, GLFW_MAXIMIZED) == GLFW_TRUE) ||
-                    (fbW > static_cast<int>(WINDOW_WIDTH) + 40) ||
-                    (fbH > static_cast<int>(WINDOW_HEIGHT) + 40);
+  bool isExpanded =
+      (glfwGetWindowMonitor(window) != nullptr) ||
+      (glfwGetWindowAttrib(window, GLFW_MAXIMIZED) == GLFW_TRUE) ||
+      (fbW > static_cast<int>(WINDOW_WIDTH) + 40) ||
+      (fbH > static_cast<int>(WINDOW_HEIGHT) + 40);
 
   int vpW = fbW;
   int vpH = fbH;
@@ -230,7 +231,8 @@ static GameViewport computeGameViewport(GLFWwindow *window) {
   if (isExpanded) {
     // Allow players to see further horizontally across the full width while
     // adding clean black borders vertically (top & bottom), never stretching.
-    vpH = std::max(1, static_cast<int>(std::round(static_cast<float>(fbH) * 0.82f)));
+    vpH = std::max(
+        1, static_cast<int>(std::round(static_cast<float>(fbH) * 0.82f)));
   }
 
   // Prevent horizontal view from narrowing below default aspect on tall windows
@@ -1013,7 +1015,7 @@ int main() {
       UIManager::instance().updateCornerNotification(rawDeltaTime);
       UIManager::instance().updateFloatingTexts(rawDeltaTime);
 
-      // Dynamic 3-Phase Enemy Spawn Escalation (changes every 2m; Phase 3 adds
+      // Dynamic 3-Phase Enemy Spawn Escalation (changes every 1m; Phase 3 adds
       // Horde Spawn on 3m CD)
       SpawnEventResult spawnEvt =
           gameWorld.updateEnemySpawning(deltaTime, playerPos.x, activeTheme,
@@ -2423,7 +2425,8 @@ int main() {
       activeClearCol = glm::vec4(dynamicSky.r * 0.65f, dynamicSky.g * 0.65f,
                                  dynamicSky.b * 0.75f, 1.0f);
     } else if (currentScene == SCENE_SKY_FALL) {
-      activeClearCol = glm::vec4(dynamicSky.r, dynamicSky.g, dynamicSky.b, 1.0f);
+      activeClearCol =
+          glm::vec4(dynamicSky.r, dynamicSky.g, dynamicSky.b, 1.0f);
     } else if (playerPos.y < -2.0f) {
       activeClearCol = glm::vec4(dynamicSky.r * 0.35f, dynamicSky.g * 0.35f,
                                  dynamicSky.b * 0.42f, 1.0f);
@@ -3047,8 +3050,27 @@ int main() {
     // 14. Tutorial Window Modal Dialog (Shown once after Intro & via [T] in
     // Pause Menu)
     if (showTutorialModal) {
-      UIManager::instance().renderTutorialModal(halfW, halfH,
-                                                tutorialOpenedFromPause);
+      TutorialPreviewTextures tutPreview;
+      tutPreview.bodIdle = texBodIdle;
+      tutPreview.bodWalk = texBodWalk;
+      tutPreview.bodAttack = texBodAttack;
+      tutPreview.bodCast = texBodCast;
+      tutPreview.bodSpell = texBodSpell;
+      tutPreview.bodHurt = texBodHurt;
+      tutPreview.bodDeath = texBodDeath;
+      tutPreview.slimeIdle = texSlimeIdle;
+      tutPreview.slimeMove = texSlimeMove;
+      tutPreview.slimeTakeHit = texSlimeTakeHit;
+      tutPreview.slimeTransform = texSlimeTransform;
+      tutPreview.demonIdle = texDemonIdle;
+      tutPreview.demonWalk = texDemonWalk;
+      tutPreview.demonAttack = texDemonAttack;
+      tutPreview.demonTakeHit = texDemonTakeHit;
+      tutPreview.demonSmash = texDemonSmash;
+      tutPreview.demonDeath = texDemonDeath;
+      UIManager::instance().renderTutorialModal(
+          halfW, halfH, tutorialOpenedFromPause,
+          static_cast<float>(glfwGetTime()), tutPreview);
     }
 
     glfwSwapBuffers(window);
@@ -3331,7 +3353,8 @@ void processInput(GLFWwindow *window, float deltaTime) {
   }
   fKeyLast = fKeyPressed;
 
-  // Fullscreen Toggle (F11 key) - Expands horizontally with vertical black borders
+  // Fullscreen Toggle (F11 key) - Expands horizontally with vertical black
+  // borders
   static bool f11KeyLast = false;
   bool f11Pressed = (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS);
   if (f11Pressed && !f11KeyLast) {
@@ -3429,9 +3452,10 @@ void processInput(GLFWwindow *window, float deltaTime) {
           static_cast<float>(vp.fbH) -
           static_cast<float>(my) *
               (static_cast<float>(vp.fbH) / static_cast<float>(winH));
-      float normX = (fbX - static_cast<float>(vp.vpX)) / static_cast<float>(vp.vpW);
-      float normY =
-          (fbYFromBottom - static_cast<float>(vp.vpY)) / static_cast<float>(vp.vpH);
+      float normX =
+          (fbX - static_cast<float>(vp.vpX)) / static_cast<float>(vp.vpW);
+      float normY = (fbYFromBottom - static_cast<float>(vp.vpY)) /
+                    static_cast<float>(vp.vpH);
       float uiX = normX * (2.0f * vp.halfW) - vp.halfW;
       float uiY = normY * (2.0f * vp.halfH) - vp.halfH;
 
