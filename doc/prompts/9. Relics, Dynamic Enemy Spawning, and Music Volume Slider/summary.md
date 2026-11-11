@@ -31,6 +31,9 @@
 8. **Audio Default Alignment & Enemy Phase/Rate Tuning (Turn 7)**:
    - Synced the startup default music volume in [`/include/Audio.h`](/include/Audio.h) (`40%`) and [`/include/UIManager.h`](/include/UIManager.h) (`40%`) to match [`/src/Audio.cpp`](/src/Audio.cpp).
    - Updated [`/include/Common.h`](/include/Common.h) (`ENEMY_PHASE_DURATION = 60.0f`) and [`/src/World.cpp`](/src/World.cpp) so Phase 1 and Phase 2 last **1 minute** each and Phase 3 increases max per-chunk spawn rate to **5** for both Bringer of Death and Slimes (`2–5` per chunk each, cap `14` active + Horde Spawn).
+9. **Center Phase Banners, Previous Run Score HUD & Game Over Highest Score (Turn 8)**:
+   - Added centered screen-space banners (`CenterAnnouncement`) for Day/Night and Enemy Threat Phase changes.
+   - Added `PREV SCORE` directly beneath `SCORE` inside the HUD card and `HIGHEST SCORE` inside the Game Over window with persistent local score tracking (`score_record.txt`).
 
 ---
 
@@ -75,6 +78,11 @@
 - Changed `ENEMY_PHASE_DURATION` in [`/include/Common.h`](/include/Common.h#L102-L103) from `120.0f` to `60.0f` so Phase 1 (`0–1 min`) and Phase 2 (`1–2 min`) each last 1 minute before Phase 3 begins at `2+ min`.
 - Updated `World::generateChunk` and `World::updateEnemySpawning` in [`/src/World.cpp`](/src/World.cpp) so Phase 3 increases the max per-chunk spawn rate to **5** for both enemy types (`2–5` Bringers of Death and `2–5` Slimes per chunk, active cap `14`), while preserving Phase 1's max-2 active cap and Phase 3's 3-minute Horde Spawn.
 
+### H. Center Phase Announcements, Previous Score HUD & Game Over Highest Score
+- Added `CenterAnnouncement` in [`/include/Common.h`](/include/Common.h#L248-L254) and `showCenterAnnouncement`, `updateCenterAnnouncement`, and `renderCenterAnnouncement` in [`/include/UIManager.h`](/include/UIManager.h) and [`/src/UIManager.cpp`](/src/UIManager.cpp) so Day/Night phase switches, Threat Phase 2/3 escalations, and Horde Spawns render at screen center (`(0, 0)`) with fade-in/fade-out transitions.
+- Expanded `UIManager::renderScoreHUD` ([`/src/UIManager.cpp`](/src/UIManager.cpp)) to show `PREV SCORE` directly beneath `SCORE`, and updated `UIManager::renderGameOver` to show `HIGHEST SCORE` (plus `[NEW RECORD!]` badge when beaten).
+- Added `getCurrentScore`, `loadScoreHistory`, `saveScoreHistory`, and `triggerGameOver` in [`/src/main.cpp`](/src/main.cpp) to persist `highestScore` and `previousRunScore` in `score_record.txt` (added to [`/.gitignore`](/.gitignore)).
+
 ---
 
 ## 3. Files Created / Modified
@@ -88,6 +96,7 @@
   - [`/scratch/sync_archive.ps1`](/scratch/sync_archive.ps1)
 - **Modified**:
   - [`/Makefile`](/Makefile)
+  - [`/.gitignore`](/.gitignore)
   - [`/include/Common.h`](/include/Common.h)
   - [`/include/Audio.h`](/include/Audio.h) & [`/src/Audio.cpp`](/src/Audio.cpp)
   - [`/src/VideoPlayer.cpp`](/src/VideoPlayer.cpp)
@@ -112,5 +121,5 @@
     - Verified zero `DIR_LEFT` or `DIR_RIGHT` relics across initial and 25 streamed platformer chunks.
     - Verified 1-minute Phase 1 & Phase 2 transitions (`Phase 1` -> `Phase 2` at 60s -> `Phase 3` at 120s), Phase 1 strict max-2 cap, Phase 3 chunk spawning (`Phase 3 chunk max spawned: slimes=5, bods=5`), and Phase 3 Horde Spawns (`Horde #1 spawned: slimes=3, bods=3`, `Horde #2 spawned: slimes=3, bods=3` after 180s cooldown).
 - **Full Game Compilation & Standalone Packaging**:
-  - Compiled all 9 translation units cleanly (`exit code 0`, zero C++ errors/warnings) via [`/build/win_tasks.ps1`](/build/win_tasks.ps1) using `x86_64-w64-mingw32-g++.exe`, producing [`/build/main.exe`](/build/main.exe) (`3,644,864` bytes) and [`/TheWenderer_Standalone.zip`](/TheWenderer_Standalone.zip) (`13,711,842` bytes).
+  - Compiled all 9 translation units cleanly (`exit code 0`, zero C++ errors/warnings) via [`/build/win_tasks.ps1`](/build/win_tasks.ps1) using `x86_64-w64-mingw32-g++.exe`, producing [`/build/main.exe`](/build/main.exe) (`3,648,380` bytes) and [`/TheWenderer_Standalone.zip`](/TheWenderer_Standalone.zip) (`13,712,992` bytes).
 

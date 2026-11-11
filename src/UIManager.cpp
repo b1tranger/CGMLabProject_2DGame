@@ -4,7 +4,8 @@
 #include <cmath>
 #include <cstdio>
 
-// Helper: Draws text wrapped at word boundaries within maxWidth (returns line count).
+// Helper: Draws text wrapped at word boundaries within maxWidth (returns line
+// count).
 static int drawWrappedText(const std::string &text, float startX, float startY,
                            float charW, float charH, float maxWidth,
                            const glm::vec4 &color, const glm::mat4 &orthoUI,
@@ -30,9 +31,10 @@ static int drawWrappedText(const std::string &text, float startX, float startY,
 
   std::vector<std::string> lines;
   std::string curLine;
-  int maxCharsFirst = std::max(1, static_cast<int>(std::floor(maxWidth / charW)));
-  int maxCharsCont =
-      std::max(1, static_cast<int>(std::floor((maxWidth - hangIndent) / charW)));
+  int maxCharsFirst =
+      std::max(1, static_cast<int>(std::floor(maxWidth / charW)));
+  int maxCharsCont = std::max(
+      1, static_cast<int>(std::floor((maxWidth - hangIndent) / charW)));
 
   for (const std::string &w : words) {
     int limit = lines.empty() ? maxCharsFirst : maxCharsCont;
@@ -68,6 +70,8 @@ UIManager::UIManager() {
   activeNotice.maxTime = 2.0f;
   activeNotice.iconType = 0;
   activeNotice.fruitType = 0;
+  centerNotice.timer = 0.0f;
+  centerNotice.maxTime = 3.0f;
   pauseSliderLayout.trackLeft = -2.20f;
   pauseSliderLayout.trackRight = 4.60f;
   pauseSliderLayout.trackY = 1.00f;
@@ -80,6 +84,7 @@ UIManager::UIManager() {
 void UIManager::clear() {
   floatingTexts.clear();
   activeNotice.timer = 0.0f;
+  centerNotice.timer = 0.0f;
 }
 
 void UIManager::spawnFloatingText(const std::string &text, const glm::vec2 &pos,
@@ -233,16 +238,124 @@ void UIManager::renderCornerNotification(float halfW, float halfH,
                         orthoUI);
 }
 
+void UIManager::showCenterAnnouncement(const std::string &title,
+                                       const std::string &subtitle,
+                                       const glm::vec4 &accentColor,
+                                       float duration) {
+  centerNotice.title = title;
+  centerNotice.subtitle = subtitle;
+  centerNotice.accentColor = accentColor;
+  centerNotice.maxTime = (duration > 0.1f) ? duration : 3.0f;
+  centerNotice.timer = centerNotice.maxTime;
+}
+
+void UIManager::updateCenterAnnouncement(float dt) {
+  if (centerNotice.timer > 0.0f) {
+    centerNotice.timer -= dt;
+    if (centerNotice.timer < 0.0f) {
+      centerNotice.timer = 0.0f;
+    }
+  }
+}
+
+void UIManager::renderCenterAnnouncement(float halfW, float halfH) {
+  if (centerNotice.timer <= 0.0f) {
+    return;
+  }
+
+  float elapsed = centerNotice.maxTime - centerNotice.timer;
+  float fadeIn = std::min(1.0f, elapsed / 0.22f);
+  float fadeOut = std::min(1.0f, centerNotice.timer / 0.45f);
+  float alpha = std::min(fadeIn, fadeOut);
+  if (alpha <= 0.01f) {
+    return;
+  }
+
+  glm::mat4 identityView = glm::mat4(1.0f);
+  glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
+
+  float cardW = std::min(halfW * 1.65f, 12.6f);
+  float cardH = 1.75f;
+  float cardX = 0.0f;
+  float cardY = 0.0f;
+
+  // Center backdrop panel
+  glm::mat4 modelBg = glm::mat4(1.0f);
+  modelBg = glm::translate(modelBg, glm::vec3(cardX, cardY, 0.0f));
+  modelBg = glm::scale(modelBg, glm::vec3(cardW, cardH, 1.0f));
+  gameRenderer.drawQuad(modelBg, identityView, orthoUI,
+                        glm::vec4(0.03f, 0.05f, 0.09f, 0.88f * alpha), false,
+                        glm::vec4(0), 0);
+
+  // Top and bottom accent stripes
+  glm::mat4 modelTop = glm::mat4(1.0f);
+  modelTop = glm::translate(
+      modelTop, glm::vec3(cardX, cardY + (cardH * 0.5f) - 0.05f, 0.0f));
+  modelTop = glm::scale(modelTop, glm::vec3(cardW, 0.10f, 1.0f));
+  gameRenderer.drawQuad(modelTop, identityView, orthoUI,
+                        glm::vec4(centerNotice.accentColor.r,
+                                  centerNotice.accentColor.g,
+                                  centerNotice.accentColor.b, alpha),
+                        false, glm::vec4(0), 0);
+
+  glm::mat4 modelBot = glm::mat4(1.0f);
+  modelBot = glm::translate(
+      modelBot, glm::vec3(cardX, cardY - (cardH * 0.5f) + 0.04f, 0.0f));
+  modelBot = glm::scale(modelBot, glm::vec3(cardW, 0.08f, 1.0f));
+  gameRenderer.drawQuad(modelBot, identityView, orthoUI,
+                        glm::vec4(centerNotice.accentColor.r,
+                                  centerNotice.accentColor.g,
+                                  centerNotice.accentColor.b, 0.80f * alpha),
+                        false, glm::vec4(0), 0);
+
+  float maxTextW = cardW - 0.9f;
+  float titleCharW = 0.28f;
+  float titleCharH = 0.42f;
+  if (!centerNotice.title.empty()) {
+    float naturalW =
+        static_cast<float>(centerNotice.title.length()) * titleCharW;
+    if (naturalW > maxTextW) {
+      float scale = maxTextW / naturalW;
+      titleCharW *= scale;
+      titleCharH *= scale;
+    }
+    float titleW = static_cast<float>(centerNotice.title.length()) * titleCharW;
+    gameRenderer.drawText(centerNotice.title, -titleW * 0.5f, cardY + 0.18f,
+                          titleCharW, titleCharH,
+                          glm::vec4(centerNotice.accentColor.r,
+                                    centerNotice.accentColor.g,
+                                    centerNotice.accentColor.b, alpha),
+                          orthoUI);
+  }
+
+  if (!centerNotice.subtitle.empty()) {
+    float subCharW = 0.17f;
+    float subCharH = 0.25f;
+    float naturalW =
+        static_cast<float>(centerNotice.subtitle.length()) * subCharW;
+    if (naturalW > maxTextW) {
+      float scale = maxTextW / naturalW;
+      subCharW *= scale;
+      subCharH *= scale;
+    }
+    float subW = static_cast<float>(centerNotice.subtitle.length()) * subCharW;
+    gameRenderer.drawText(
+        centerNotice.subtitle, -subW * 0.5f, cardY - 0.40f, subCharW, subCharH,
+        glm::vec4(0.92f, 0.95f, 1.0f, 0.95f * alpha), orthoUI);
+  }
+}
+
 void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore,
                                int coins, float distance, float shieldTimer,
                                int playerLives, int frameCount,
                                unsigned int coinTex, unsigned int heartTex,
-                               bool isBlocking, float blockCooldown) {
+                               bool isBlocking, float blockCooldown,
+                               int previousScore) {
   glm::mat4 identityView = glm::mat4(1.0f);
   glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
 
-  float scoreCardW = 7.4f;
-  float scoreCardH = 1.45f;
+  float scoreCardW = 7.8f;
+  float scoreCardH = 1.88f;
   float scoreCardX = halfW - (scoreCardW * 0.5f) - 0.5f;
   float scoreCardY = halfH - (scoreCardH * 0.5f) - 0.6f;
 
@@ -277,7 +390,7 @@ void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore,
   // 3 Ruby Heart icons for Player Lives
   for (int i = 0; i < 3; ++i) {
     float hx = scoreCardX + (scoreCardW * 0.5f) - 1.9f + (i * 0.55f);
-    float hy = scoreCardY + 0.22f;
+    float hy = scoreCardY + 0.42f;
     glm::mat4 modelHeart = glm::mat4(1.0f);
     modelHeart = glm::translate(modelHeart, glm::vec3(hx, hy, 0.0f));
     modelHeart = glm::scale(modelHeart, glm::vec3(0.52f, 0.52f, 1.0f));
@@ -289,7 +402,9 @@ void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore,
                           (heartTex != 0), heartUV, heartTex);
   }
 
+  float textLeft = scoreCardX - (scoreCardW * 0.5f) + 1.25f;
   std::string scoreStr = "SCORE " + std::to_string(totalScore);
+  std::string prevStr = "PREV SCORE " + std::to_string(previousScore);
   std::string statsStr = "COIN " + std::to_string(coins) + "  DIST " +
                          std::to_string(static_cast<int>(distance)) + "m";
   if (shieldTimer > 0.0f) {
@@ -303,16 +418,22 @@ void UIManager::renderScoreHUD(float halfW, float halfH, int totalScore,
     snprintf(cdBuf, sizeof(cdBuf), "  [DEF: %.1fs]", blockCooldown);
     statsStr += cdBuf;
   }
-  gameRenderer.drawText(scoreStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f,
-                        scoreCardY + 0.16f, 0.26f, 0.38f,
+  gameRenderer.drawText(scoreStr, textLeft, scoreCardY + 0.36f, 0.25f, 0.36f,
                         glm::vec4(1.0f, 0.86f, 0.22f, 1.0f), orthoUI);
+  gameRenderer.drawText(prevStr, textLeft, scoreCardY - 0.04f, 0.17f, 0.25f,
+                        glm::vec4(0.72f, 0.86f, 1.0f, 0.95f), orthoUI);
+
+  bool hasStatusBadges =
+      (shieldTimer > 0.0f || isBlocking || blockCooldown > 0.0f);
+  float statsCharW = hasStatusBadges ? 0.155f : 0.175f;
+  float statsCharH = hasStatusBadges ? 0.24f : 0.26f;
   glm::vec4 statsColor =
       isBlocking               ? glm::vec4(0.35f, 1.0f, 0.95f, 1.0f)
       : (blockCooldown > 0.0f) ? glm::vec4(1.0f, 0.85f, 0.35f, 1.0f)
       : (shieldTimer > 0.0f)   ? glm::vec4(0.3f, 0.95f, 1.0f, 1.0f)
                                : glm::vec4(0.85f, 0.94f, 1.0f, 0.95f);
-  gameRenderer.drawText(statsStr, scoreCardX - (scoreCardW * 0.5f) + 1.25f,
-                        scoreCardY - 0.38f, 0.18f, 0.27f, statsColor, orthoUI);
+  gameRenderer.drawText(statsStr, textLeft, scoreCardY - 0.52f, statsCharW,
+                        statsCharH, statsColor, orthoUI);
 }
 
 void UIManager::renderEnemyHealthBars(const glm::mat4 &view,
@@ -506,9 +627,9 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
                         glm::vec4(1.0f, 0.85f, 0.25f, 1.0f), orthoUI);
   curY -= 0.70f;
 
-  int lines = drawWrappedText("HERO: SAMURAI MACK [KATANA MASTER]", textX, curY,
-                              0.22f, 0.32f, maxTextW,
-                              glm::vec4(0.35f, 0.95f, 1.0f, 1.0f), orthoUI, 0.36f);
+  int lines = drawWrappedText(
+      "HERO: SAMURAI MACK [KATANA MASTER]", textX, curY, 0.22f, 0.32f, maxTextW,
+      glm::vec4(0.35f, 0.95f, 1.0f, 1.0f), orthoUI, 0.36f);
   curY -= 0.42f + (lines - 1) * 0.36f;
 
   lines = drawWrappedText("TOTAL SCORE: " + std::to_string(totalScore) + " PTS",
@@ -577,8 +698,8 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
   glm::mat4 modelMinusBtn = glm::mat4(1.0f);
   modelMinusBtn = glm::translate(
       modelMinusBtn, glm::vec3(slider.minusBtnX, slider.trackY, 0.0f));
-  modelMinusBtn = glm::scale(
-      modelMinusBtn, glm::vec3(slider.btnSize, slider.btnSize, 1.0f));
+  modelMinusBtn = glm::scale(modelMinusBtn,
+                             glm::vec3(slider.btnSize, slider.btnSize, 1.0f));
   gameRenderer.drawQuad(modelMinusBtn, identityView, orthoUI,
                         glm::vec4(0.14f, 0.20f, 0.30f, 0.95f), false,
                         glm::vec4(0), 0);
@@ -590,8 +711,8 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
   glm::mat4 modelPlusBtn = glm::mat4(1.0f);
   modelPlusBtn = glm::translate(
       modelPlusBtn, glm::vec3(slider.plusBtnX, slider.trackY, 0.0f));
-  modelPlusBtn = glm::scale(
-      modelPlusBtn, glm::vec3(slider.btnSize, slider.btnSize, 1.0f));
+  modelPlusBtn =
+      glm::scale(modelPlusBtn, glm::vec3(slider.btnSize, slider.btnSize, 1.0f));
   gameRenderer.drawQuad(modelPlusBtn, identityView, orthoUI,
                         glm::vec4(0.14f, 0.20f, 0.30f, 0.95f), false,
                         glm::vec4(0), 0);
@@ -601,8 +722,8 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
 
   // Slider background track
   glm::mat4 modelTrackBg = glm::mat4(1.0f);
-  modelTrackBg = glm::translate(
-      modelTrackBg, glm::vec3(trackCenterX, slider.trackY, 0.0f));
+  modelTrackBg = glm::translate(modelTrackBg,
+                                glm::vec3(trackCenterX, slider.trackY, 0.0f));
   modelTrackBg =
       glm::scale(modelTrackBg, glm::vec3(trackW, slider.trackHeight, 1.0f));
   gameRenderer.drawQuad(modelTrackBg, identityView, orthoUI,
@@ -613,9 +734,9 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
   float fillW = trackW * frac;
   if (fillW > 0.01f) {
     glm::mat4 modelFill = glm::mat4(1.0f);
-    modelFill = glm::translate(
-        modelFill,
-        glm::vec3(slider.trackLeft + fillW * 0.5f, slider.trackY, 0.0f));
+    modelFill =
+        glm::translate(modelFill, glm::vec3(slider.trackLeft + fillW * 0.5f,
+                                            slider.trackY, 0.0f));
     modelFill =
         glm::scale(modelFill, glm::vec3(fillW, slider.trackHeight, 1.0f));
     glm::vec4 fillCol = bgmMuted ? glm::vec4(0.85f, 0.35f, 0.35f, 1.0f)
@@ -626,9 +747,11 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
 
   // 10% step tick notches (0%, 10%, ..., 100%)
   for (int step = 0; step <= 10; ++step) {
-    float tickX = slider.trackLeft + (static_cast<float>(step) / 10.0f) * trackW;
+    float tickX =
+        slider.trackLeft + (static_cast<float>(step) / 10.0f) * trackW;
     glm::mat4 modelTick = glm::mat4(1.0f);
-    modelTick = glm::translate(modelTick, glm::vec3(tickX, slider.trackY, 0.0f));
+    modelTick =
+        glm::translate(modelTick, glm::vec3(tickX, slider.trackY, 0.0f));
     modelTick = glm::scale(modelTick, glm::vec3(0.035f, 0.28f, 1.0f));
     glm::vec4 tickCol = (step * 10 <= displayVol)
                             ? glm::vec4(0.75f, 0.96f, 1.0f, 0.9f)
@@ -652,19 +775,19 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
       autoShiftEnabled ? "AUTO TIMER (6.5s)" : "MANUAL (RELICS ONLY)";
   glm::vec4 shiftCol = autoShiftEnabled ? glm::vec4(1.0f, 0.65f, 0.25f, 1.0f)
                                         : glm::vec4(0.4f, 0.95f, 0.5f, 1.0f);
-  lines = drawWrappedText("[Y]             SHIFT MODE: " + shiftStr, textX, curY,
-                          0.20f, 0.28f, maxTextW, shiftCol, orthoUI, 0.34f,
-                          16.0f * 0.20f);
+  lines = drawWrappedText("[Y]             SHIFT MODE: " + shiftStr, textX,
+                          curY, 0.20f, 0.28f, maxTextW, shiftCol, orthoUI,
+                          0.34f, 16.0f * 0.20f);
   curY -= 0.40f + (lines - 1) * 0.34f;
 
   std::string scenStr = (activeScenery == 0)   ? "SILVERGRASS FIELD"
                         : (activeScenery == 1) ? "AUTUMN FOLIAGE"
                         : (activeScenery == 2) ? "GREEN FOREST"
                                                : "URBAN AREA";
-  lines = drawWrappedText("[B]             SCENERY: " + scenStr, textX, curY,
-                          0.21f, 0.29f, maxTextW,
-                          glm::vec4(0.3f, 0.95f, 0.85f, 1.0f), orthoUI, 0.34f,
-                          16.0f * 0.21f);
+  lines =
+      drawWrappedText("[B]             SCENERY: " + scenStr, textX, curY, 0.21f,
+                      0.29f, maxTextW, glm::vec4(0.3f, 0.95f, 0.85f, 1.0f),
+                      orthoUI, 0.34f, 16.0f * 0.21f);
   curY -= 0.40f + (lines - 1) * 0.34f;
 
   std::string cycleStr = (isNight ? "NIGHT TIME (" : "DAY TIME (") +
@@ -677,8 +800,8 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
                           orthoUI, 0.34f, 16.0f * 0.21f);
   curY -= 0.40f + (lines - 1) * 0.34f;
 
-  lines = drawWrappedText("[T]             TUTORIAL / HOW TO PLAY", textX,
-                          curY, 0.21f, 0.29f, maxTextW,
+  lines = drawWrappedText("[T]             TUTORIAL / HOW TO PLAY", textX, curY,
+                          0.21f, 0.29f, maxTextW,
                           glm::vec4(0.35f, 1.0f, 0.65f, 1.0f), orthoUI, 0.34f,
                           16.0f * 0.21f);
   curY -= 0.40f + (lines - 1) * 0.34f;
@@ -688,17 +811,16 @@ void UIManager::renderPauseMenu(float halfW, float halfH, int totalScore,
                           orthoUI, 0.34f, 16.0f * 0.21f);
   curY -= 0.40f + (lines - 1) * 0.34f;
 
-  lines = drawWrappedText("[Q]             QUIT TO DESKTOP", textX, curY,
-                          0.21f, 0.29f, maxTextW,
-                          glm::vec4(1.0f, 0.4f, 0.4f, 1.0f), orthoUI, 0.34f,
-                          16.0f * 0.21f);
+  lines = drawWrappedText("[Q]             QUIT TO DESKTOP", textX, curY, 0.21f,
+                          0.29f, maxTextW, glm::vec4(1.0f, 0.4f, 0.4f, 1.0f),
+                          orthoUI, 0.34f, 16.0f * 0.21f);
   curY -= 0.44f + (lines - 1) * 0.34f;
 
   drawWrappedText(
       "CONTROLS: [A/D] MOVE  [W/SPACE] JUMP/CLIMB  [S] SLIDE  [SHIFT] DASH  "
       "[L-CLICK] ATK  [R-CLICK] BLOCK  [F] MODE  [M] BGM",
-      textX, curY, 0.145f, 0.20f, maxTextW,
-      glm::vec4(0.6f, 0.7f, 0.85f, 0.85f), orthoUI, 0.26f);
+      textX, curY, 0.145f, 0.20f, maxTextW, glm::vec4(0.6f, 0.7f, 0.85f, 0.85f),
+      orthoUI, 0.26f);
 }
 
 void UIManager::renderTutorialModal(float halfW, float halfH,
@@ -797,8 +919,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
   gameRenderer.drawText(mainHeading, -mhW * 0.5f, tutH * 0.5f - 0.62f, 0.27f,
                         0.38f, glm::vec4(1.0f, 0.88f, 0.25f, 1.0f), orthoUI);
 
-  std::string subHeading =
-      "Endless runner with traps to avoid, shields to pickup, and bosses to slay.";
+  std::string subHeading = "Endless runner with traps to avoid, shields to "
+                           "pickup, and bosses to slay.";
   float shW = static_cast<float>(subHeading.length()) * 0.16f;
   gameRenderer.drawText(subHeading, -shW * 0.5f, tutH * 0.5f - 0.96f, 0.16f,
                         0.23f, glm::vec4(0.68f, 0.88f, 1.0f, 1.0f), orthoUI);
@@ -812,7 +934,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
 
   const int numPlayerCells = 6;
   const float cellGap = 0.22f;
-  const float cellW = (innerW - cellGap * (numPlayerCells - 1)) / numPlayerCells;
+  const float cellW =
+      (innerW - cellGap * (numPlayerCells - 1)) / numPlayerCells;
   const float pcTop = pcHeaderY - 0.10f;
   const float pcBottom = pcTop - 1.98f;
   const float animBoxBottom = pcBottom + 0.58f;
@@ -825,11 +948,16 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
   };
   const PlayerPreviewDef playerPreviews[numPlayerCells] = {
       {"RUN", "[A / D]", "MOVE", glm::vec4(0.35f, 1.0f, 0.65f, 1.0f)},
-      {"JUMP/CLIMB", "[W / SPACE]", "ASCEND", glm::vec4(0.35f, 0.90f, 1.0f, 1.0f)},
-      {"SLIDE/DROP", "[S / DOWN]", "DESCEND", glm::vec4(1.0f, 0.80f, 0.30f, 1.0f)},
-      {"SHADOW DASH", "[SHIFT]", "INVULN BURST", glm::vec4(0.30f, 0.95f, 1.0f, 1.0f)},
-      {"KATANA ATK", "[L-CLICK]", "OR [J] / [X]", glm::vec4(1.0f, 0.45f, 0.45f, 1.0f)},
-      {"DEFEND/PARRY", "[R-CLICK]", "OR [K] (1s)", glm::vec4(0.45f, 0.92f, 1.0f, 1.0f)},
+      {"JUMP/CLIMB", "[W / SPACE]", "ASCEND",
+       glm::vec4(0.35f, 0.90f, 1.0f, 1.0f)},
+      {"SLIDE/DROP", "[S / DOWN]", "DESCEND",
+       glm::vec4(1.0f, 0.80f, 0.30f, 1.0f)},
+      {"SHADOW DASH", "[SHIFT]", "INVULN BURST",
+       glm::vec4(0.30f, 0.95f, 1.0f, 1.0f)},
+      {"KATANA ATK", "[L-CLICK]", "OR [J] / [X]",
+       glm::vec4(1.0f, 0.45f, 0.45f, 1.0f)},
+      {"DEFEND/PARRY", "[R-CLICK]", "OR [K] (1s)",
+       glm::vec4(0.45f, 0.92f, 1.0f, 1.0f)},
   };
 
   for (int i = 0; i < numPlayerCells; ++i) {
@@ -877,7 +1005,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
       } else {
         pTex = samuraiAnim.texFall;
         pFrames = samuraiAnim.fallFrames;
-        pFrame = static_cast<int>((cycle - 0.65f) * 3.0f) % std::max(1, pFrames);
+        pFrame =
+            static_cast<int>((cycle - 0.65f) * 3.0f) % std::max(1, pFrames);
       }
     } else if (i == 2) {
       pTex = samuraiAnim.texAttack;
@@ -900,7 +1029,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
       pFrame = static_cast<int>(animTimer * 8.0f) % std::max(1, pFrames);
     }
 
-    float pu = static_cast<float>(pFrame) / static_cast<float>(std::max(1, pFrames));
+    float pu =
+        static_cast<float>(pFrame) / static_cast<float>(std::max(1, pFrames));
     float pdu = 1.0f / static_cast<float>(std::max(1, pFrames));
     glm::vec4 pUV(pu, 0.0f, pdu, 1.0f);
     float animCenterY = (animBoxBottom + pcTop) * 0.5f + pOffsetY - 0.06f;
@@ -909,10 +1039,10 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
     if (drawDashGhosts && pTex != 0) {
       for (int g = 1; g <= 2; ++g) {
         glm::mat4 mGhost = glm::mat4(1.0f);
-        mGhost = glm::translate(
-            mGhost, glm::vec3(cx - 0.24f * g, animCenterY, 0.0f));
-        mGhost = glm::scale(
-            mGhost, glm::vec3(spriteQuadSize, spriteQuadSize, 1.0f));
+        mGhost = glm::translate(mGhost,
+                                glm::vec3(cx - 0.24f * g, animCenterY, 0.0f));
+        mGhost =
+            glm::scale(mGhost, glm::vec3(spriteQuadSize, spriteQuadSize, 1.0f));
         gameRenderer.drawQuad(mGhost, identityView, orthoUI,
                               glm::vec4(0.2f, 0.85f, 1.0f, 0.55f - 0.20f * g),
                               true, pUV, pTex);
@@ -925,24 +1055,27 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
       if (std::abs(pAngle) > 0.01f) {
         mSprite = glm::rotate(mSprite, pAngle, glm::vec3(0.0f, 0.0f, 1.0f));
       }
-      mSprite = glm::scale(
-          mSprite, glm::vec3(spriteQuadSize, spriteQuadSize, 1.0f));
+      mSprite =
+          glm::scale(mSprite, glm::vec3(spriteQuadSize, spriteQuadSize, 1.0f));
       gameRenderer.drawQuad(mSprite, identityView, orthoUI, pTint, true, pUV,
                             pTex);
     }
     endCellScissor(wasScissor, prevScissor);
 
     // Top tiny action badge inside cell
-    float actW = static_cast<float>(std::string(def.actionTitle).length()) * 0.115f;
+    float actW =
+        static_cast<float>(std::string(def.actionTitle).length()) * 0.115f;
     gameRenderer.drawText(def.actionTitle, cx - actW * 0.5f, pcTop - 0.22f,
                           0.115f, 0.16f, def.accent, orthoUI);
 
     // Player controls shown directly below the corresponding animation
-    float c1W = static_cast<float>(std::string(def.controlLine1).length()) * 0.135f;
+    float c1W =
+        static_cast<float>(std::string(def.controlLine1).length()) * 0.135f;
     gameRenderer.drawText(def.controlLine1, cx - c1W * 0.5f,
                           animBoxBottom - 0.24f, 0.135f, 0.19f,
                           glm::vec4(1.0f, 0.92f, 0.45f, 1.0f), orthoUI);
-    float c2W = static_cast<float>(std::string(def.controlLine2).length()) * 0.115f;
+    float c2W =
+        static_cast<float>(std::string(def.controlLine2).length()) * 0.115f;
     gameRenderer.drawText(def.controlLine2, cx - c2W * 0.5f,
                           animBoxBottom - 0.47f, 0.115f, 0.16f,
                           glm::vec4(0.84f, 0.92f, 1.0f, 0.95f), orthoUI);
@@ -960,7 +1093,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
   const float enTop = enHeaderY - 0.10f;
   const float enBottom = enTop - 2.25f;
 
-  // --- Enemy Grid Cell 1: Bringer of Death (Loops ALL 6 Animations + Thunder Spell) ---
+  // --- Enemy Grid Cell 1: Bringer of Death (Loops ALL 6 Animations + Thunder
+  // Spell) ---
   {
     float ex1 = innerLeft;
     float ex2 = ex1 + enCellW;
@@ -1035,7 +1169,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
       glm::mat4 mBod = glm::mat4(1.0f);
       mBod = glm::translate(mBod, glm::vec3(bodCenterX, bodCenterY, 0.0f));
       mBod = glm::scale(mBod, glm::vec3(2.85f, 1.90f, 1.0f));
-      gameRenderer.drawQuad(mBod, identityView, orthoUI, bTint, true, eUV, bTex);
+      gameRenderer.drawQuad(mBod, identityView, orthoUI, bTint, true, eUV,
+                            bTex);
     }
     if (showSpell && enemyTex.bodSpell != 0) {
       float su = static_cast<float>(spellFrame) / 16.0f;
@@ -1053,23 +1188,23 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
 
     float infoX = previewX2 + 0.25f;
     float infoW = ex2 - infoX - 0.20f;
-    drawWrappedText("BRINGER OF DEATH  [1 HIT]", infoX, enTop - 0.34f,
-                    0.155f, 0.22f, infoW,
-                    glm::vec4(0.88f, 0.55f, 1.0f, 1.0f), orthoUI, 0.25f);
+    drawWrappedText("BRINGER OF DEATH  [1 HIT]", infoX, enTop - 0.34f, 0.155f,
+                    0.22f, infoW, glm::vec4(0.88f, 0.55f, 1.0f, 1.0f), orthoUI,
+                    0.25f);
     gameRenderer.drawText(std::string("LOOP: ") + bPhase, infoX, enTop - 0.66f,
                           0.135f, 0.19f, glm::vec4(1.0f, 0.88f, 0.35f, 1.0f),
                           orthoUI);
-    drawWrappedText(
-        "Patrols platforms & caverns, telegraphs scythe cleaves, and casts multi-layer Thunder Spells.",
-        infoX, enTop - 0.98f, 0.13f, 0.185f, infoW,
-        glm::vec4(0.86f, 0.92f, 0.98f, 0.95f), orthoUI, 0.24f);
-    drawWrappedText(
-        "Anim: Idle > Walk > Attack > Cast+Spell > Hurt > Death",
-        infoX, enBottom + 0.38f, 0.105f, 0.15f, infoW,
-        glm::vec4(0.62f, 0.75f, 0.90f, 0.90f), orthoUI, 0.19f);
+    drawWrappedText("Patrols platforms & caverns, telegraphs scythe cleaves, "
+                    "and casts multi-layer Thunder Spells.",
+                    infoX, enTop - 0.98f, 0.13f, 0.185f, infoW,
+                    glm::vec4(0.86f, 0.92f, 0.98f, 0.95f), orthoUI, 0.24f);
+    drawWrappedText("Anim: Idle > Walk > Attack > Cast+Spell > Hurt > Death",
+                    infoX, enBottom + 0.38f, 0.105f, 0.15f, infoW,
+                    glm::vec4(0.62f, 0.75f, 0.90f, 0.90f), orthoUI, 0.19f);
   }
 
-  // --- Enemy Grid Cell 2: Slime -> Boss Demon Slime (Loops ALL 10 Animations) ---
+  // --- Enemy Grid Cell 2: Slime -> Boss Demon Slime (Loops ALL 10 Animations)
+  // ---
   {
     float ex1 = innerLeft + enCellW + enGap;
     float ex2 = ex1 + enCellW;
@@ -1176,20 +1311,20 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
 
     float infoX = previewX2 + 0.25f;
     float infoW = ex2 - infoX - 0.20f;
-    drawWrappedText("SLIME [2 HP] -> DEMON BOSS [5 HP]", infoX,
-                    enTop - 0.34f, 0.125f, 0.19f, infoW,
-                    glm::vec4(0.35f, 0.95f, 0.55f, 1.0f), orthoUI, 0.23f);
+    drawWrappedText("SLIME [2 HP] -> DEMON BOSS [5 HP]", infoX, enTop - 0.34f,
+                    0.125f, 0.19f, infoW, glm::vec4(0.35f, 0.95f, 0.55f, 1.0f),
+                    orthoUI, 0.23f);
     gameRenderer.drawText(std::string("LOOP: ") + sPhase, infoX, enTop - 0.66f,
                           0.135f, 0.19f, glm::vec4(1.0f, 0.88f, 0.35f, 1.0f),
                           orthoUI);
-    drawWrappedText(
-        "Defeating a Slime (2 hits) awakens the Demon Boss (5 hits). Leap-smashes platforms; dash or flee to despawn.",
-        infoX, enTop - 0.98f, 0.13f, 0.185f, infoW,
-        glm::vec4(0.86f, 0.92f, 0.98f, 0.95f), orthoUI, 0.24f);
-    drawWrappedText(
-        "Anim: Slime(Idle/Move/Hit) > Transform > Boss(Idle/Walk/Atk/Smash/Hit/Death)",
-        infoX, enBottom + 0.38f, 0.105f, 0.15f, infoW,
-        glm::vec4(0.62f, 0.75f, 0.90f, 0.90f), orthoUI, 0.19f);
+    drawWrappedText("Defeating a Slime (2 hits) awakens the Demon Boss (5 "
+                    "hits). Leap-smashes platforms; dash or flee to despawn.",
+                    infoX, enTop - 0.98f, 0.13f, 0.185f, infoW,
+                    glm::vec4(0.86f, 0.92f, 0.98f, 0.95f), orthoUI, 0.24f);
+    drawWrappedText("Anim: Slime(Idle/Move/Hit) > Transform > "
+                    "Boss(Idle/Walk/Atk/Smash/Hit/Death)",
+                    infoX, enBottom + 0.38f, 0.105f, 0.15f, infoW,
+                    glm::vec4(0.62f, 0.75f, 0.90f, 0.90f), orthoUI, 0.19f);
   }
 
   // =========================================================================
@@ -1215,15 +1350,18 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
     glm::vec4 color;
   };
   const TutRow gmRows[] = {
-      {"MODES  : Free Exploration is DEFAULT ([A/D] move). Press [F] to toggle Auto-Run!",
+      {"MODES  : Free Exploration is DEFAULT ([A/D] move). Press [F] to toggle "
+       "Auto-Run!",
        glm::vec4(0.35f, 1.0f, 0.65f, 1.0f)},
-      {"LIVES  : 3 Hits absorbed before death. Pick up Hearts to restore lives.",
+      {"LIVES  : 3 Hits absorbed before death. Pick up Hearts to restore "
+       "lives.",
        glm::vec4(1.0f, 0.35f, 0.65f, 1.0f)},
       {"SHIELDS: Pick up glowing Shield icons to absorb 1 hazard/enemy hit.",
        glm::vec4(0.35f, 0.95f, 1.0f, 1.0f)},
       {"WARPS  : Touch Direction Relics to transition into new dimensions.",
        glm::vec4(0.45f, 1.0f, 0.55f, 1.0f)},
-      {"SHIFTS : Press [Y] to toggle Auto-Shift Timer (or rely solely on relics).",
+      {"SHIFTS : Press [Y] to toggle Auto-Shift Timer (or rely solely on "
+       "relics).",
        glm::vec4(1.0f, 0.68f, 0.28f, 1.0f)},
   };
 
@@ -1244,11 +1382,14 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
             glm::vec4(0.65f, 0.55f, 0.95f, 0.45f));
 
   const TutRow otRows[] = {
-      {"MUSIC   : BGM defaults to 30% volume. Slider in [ESC] Pause (10% steps), [M] Mute.",
+      {"MUSIC   : BGM defaults to 30% volume. Slider in [ESC] Pause (10% "
+       "steps), [M] Mute.",
        glm::vec4(0.40f, 0.85f, 1.0f, 1.0f)},
-      {"TUTORIAL: Check the pause menu for controls, or press 'T' at any time to view this tutorial window again without losing your progress.",
+      {"TUTORIAL: Check the pause menu for controls, or press 'T' at any time "
+       "to view this tutorial window again without losing your progress.",
        glm::vec4(0.35f, 1.0f, 0.70f, 1.0f)},
-      {"EXTRAS  : [ESC] Pause  [B] Scenery  [N] Day/Night  [F11] Fullscreen  [R] Restart",
+      {"EXTRAS  : [ESC] Pause  [B] Scenery  [N] Day/Night  [F11] Fullscreen  "
+       "[R] Restart",
        glm::vec4(0.85f, 0.90f, 1.0f, 0.92f)},
   };
 
@@ -1272,7 +1413,8 @@ void UIManager::renderTutorialModal(float halfW, float halfH,
 
 void UIManager::renderGameOver(float halfW, float halfH,
                                const std::string &reason, int totalScore,
-                               int coins, float distance) {
+                               int coins, float distance, int highScore,
+                               bool isNewRecord) {
   glm::mat4 identityView = glm::mat4(1.0f);
   glm::mat4 orthoUI = glm::ortho(-halfW, halfW, -halfH, halfH, -1.0f, 1.0f);
 
@@ -1284,7 +1426,7 @@ void UIManager::renderGameOver(float halfW, float halfH,
                         glm::vec4(0), 0);
 
   float overW = 11.5f;
-  float overH = 7.0f;
+  float overH = 7.7f;
   glm::mat4 modelOver = glm::mat4(1.0f);
   modelOver = glm::scale(modelOver, glm::vec3(overW, overH, 1.0f));
   gameRenderer.drawQuad(modelOver, identityView, orthoUI,
@@ -1310,17 +1452,31 @@ void UIManager::renderGameOver(float halfW, float halfH,
                         glm::vec4(1.0f, 0.7f, 0.7f, 1.0f), orthoUI);
   curY -= 0.65f;
 
-  gameRenderer.drawText("FINAL SCORE : " + std::to_string(totalScore) + " PTS",
-                        textX, curY, 0.26f, 0.38f,
+  gameRenderer.drawText("FINAL SCORE  : " + std::to_string(totalScore) + " PTS",
+                        textX, curY, 0.25f, 0.36f,
                         glm::vec4(1.0f, 0.88f, 0.22f, 1.0f), orthoUI);
+  curY -= 0.55f;
+
+  std::string bestLine =
+      "HIGHEST SCORE: " + std::to_string(std::max(highScore, totalScore)) +
+      " PTS";
+  if (isNewRecord && totalScore > 0) {
+    bestLine += "  [NEW RECORD!]";
+  }
+  gameRenderer.drawText(bestLine, textX, curY, 0.23f, 0.34f,
+                        (isNewRecord && totalScore > 0)
+                            ? glm::vec4(0.38f, 1.0f, 0.72f, 1.0f)
+                            : glm::vec4(0.55f, 0.92f, 1.0f, 1.0f),
+                        orthoUI);
   curY -= 0.60f;
 
   gameRenderer.drawText(
-      "DISTANCE    : " + std::to_string(static_cast<int>(distance)) + " METERS",
+      "DISTANCE     : " + std::to_string(static_cast<int>(distance)) +
+          " METERS",
       textX, curY, 0.20f, 0.30f, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), orthoUI);
   curY -= 0.50f;
 
-  gameRenderer.drawText("GOLD COINS  : " + std::to_string(coins) + " (+ " +
+  gameRenderer.drawText("GOLD COINS   : " + std::to_string(coins) + " (+ " +
                             std::to_string(coins * 50) + " PTS)",
                         textX, curY, 0.20f, 0.30f,
                         glm::vec4(1.0f, 0.85f, 0.3f, 1.0f), orthoUI);

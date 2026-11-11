@@ -17,6 +17,7 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 #include <iostream>
 
 // -----------------------------------------------------------------------------
@@ -142,6 +143,46 @@ float scoreDistance = 0.0f;
 int coinsCollected = 0;
 int relicsTriggered = 0;
 int directionShiftsCount = 0;
+int previousRunScore = 0;
+int highestScore = 0;
+bool isNewHighScoreRun = false;
+
+int getCurrentScore() {
+  return static_cast<int>(scoreDistance) * 10 + coinsCollected * 50 +
+         relicsTriggered * 100;
+}
+
+void saveScoreHistory() {
+  std::ofstream out("score_record.txt");
+  if (out.is_open()) {
+    out << highestScore << " " << previousRunScore << "\n";
+  }
+}
+
+void loadScoreHistory() {
+  std::ifstream in("score_record.txt");
+  if (in.is_open()) {
+    int loadedBest = 0, loadedPrev = 0;
+    if (in >> loadedBest) {
+      highestScore = std::max(0, loadedBest);
+    }
+    if (in >> loadedPrev) {
+      previousRunScore = std::max(0, loadedPrev);
+    }
+  }
+}
+
+void triggerGameOver(const std::string &reason) {
+  currentGameState = STATE_GAME_OVER;
+  gameOverReason = reason;
+  int finalScore = getCurrentScore();
+  isNewHighScoreRun = (finalScore > 0 && finalScore > highestScore);
+  if (finalScore > highestScore) {
+    highestScore = finalScore;
+  }
+  saveScoreHistory();
+  audioMgr.play(SFX_DEATH);
+}
 
 // Traversal Direction Management with Horizontal Memory
 RunDirection currentDirection = DIR_RIGHT;
@@ -522,6 +563,17 @@ void triggerRandomDirectionShift(const std::string &sourceName,
 // Reset Game
 // -----------------------------------------------------------------------------
 void resetGame() {
+  int endedScore = getCurrentScore();
+  if (currentGameState == STATE_GAME_OVER || !isGameIdleAtStart ||
+      endedScore > 0) {
+    previousRunScore = endedScore;
+    if (endedScore > highestScore) {
+      highestScore = endedScore;
+    }
+    saveScoreHistory();
+  }
+  isNewHighScoreRun = false;
+
   isGameIdleAtStart = true;
   playerPos = glm::vec2(0.0f, SURFACE_GROUND_Y + 1.2f);
   playerVel = glm::vec2(0.0f, 0.0f);
@@ -631,6 +683,7 @@ int main() {
   glfwGetFramebufferSize(window, &initFbW, &initFbH);
   glViewport(0, 0, initFbW, initFbH);
 
+  loadScoreHistory();
   audioMgr.init();
   if (!gameRenderer.init()) {
     std::cerr << "Failed to initialize Game Renderer" << std::endl;
@@ -796,28 +849,26 @@ int main() {
       }
     }
 
-    // Notification on phase switch
+    // Notification on phase switch (centered on screen)
     if (cycleIndex != lastCycleIndex) {
       lastCycleIndex = cycleIndex;
       if (isNight) {
         showCornerNotification("CYCLE", "=== NIGHT HAS FALLEN ===",
                                "Moonlight cloaks the landscape! (1.5m cycle)",
                                glm::vec4(0.45f, 0.65f, 1.0f, 1.0f), 0);
-        spawnFloatingText("=== NIGHT HAS FALLEN (1.5m) ===",
-                          (currentScene == SCENE_PLATFORMER
-                               ? playerPos + glm::vec2(0.0f, 1.5f)
-                               : glm::vec2(0.0f, 2.0f)),
-                          glm::vec4(0.5f, 0.75f, 1.0f, 1.0f));
+        UIManager::instance().showCenterAnnouncement(
+            "=== NIGHT HAS FALLEN ===",
+            "Moonlight cloaks the landscape! (1.5m phase)",
+            glm::vec4(0.45f, 0.72f, 1.0f, 1.0f), 3.0f);
       } else {
         showCornerNotification(
             "CYCLE", "=== DAYBREAK HAS DAWNED ===",
             "Warm sunlight illuminates the horizon! (1.5m cycle)",
             glm::vec4(1.0f, 0.85f, 0.3f, 1.0f), 0);
-        spawnFloatingText("=== DAYBREAK HAS DAWNED (1.5m) ===",
-                          (currentScene == SCENE_PLATFORMER
-                               ? playerPos + glm::vec2(0.0f, 1.5f)
-                               : glm::vec2(0.0f, 2.0f)),
-                          glm::vec4(1.0f, 0.9f, 0.35f, 1.0f));
+        UIManager::instance().showCenterAnnouncement(
+            "=== DAYBREAK HAS DAWNED ===",
+            "Warm sunlight illuminates the horizon! (1.5m phase)",
+            glm::vec4(1.0f, 0.88f, 0.30f, 1.0f), 3.0f);
       }
     }
 
@@ -1013,6 +1064,7 @@ int main() {
         slideInterruptCooldown -= deltaTime;
 
       UIManager::instance().updateCornerNotification(rawDeltaTime);
+      UIManager::instance().updateCenterAnnouncement(rawDeltaTime);
       UIManager::instance().updateFloatingTexts(rawDeltaTime);
 
       // Dynamic 3-Phase Enemy Spawn Escalation (changes every 1m; Phase 3 adds
@@ -1025,33 +1077,38 @@ int main() {
             "THREAT PHASE 2", "=== ENEMY WAVE ESCALATED ===",
             "Spawn rate increased! Enemies prowl more frequently.",
             glm::vec4(1.0f, 0.72f, 0.25f, 1.0f), 0);
-        spawnFloatingText("=== PHASE 2: SPAWN RATE INCREASED ===",
-                          (currentScene == SCENE_PLATFORMER
-                               ? playerPos + glm::vec2(0.0f, 1.8f)
-                               : glm::vec2(0.0f, 1.8f)),
-                          glm::vec4(1.0f, 0.75f, 0.25f, 1.0f), 0.28f, 0.40f,
-                          3.0f, 1.2f);
+        UIManager::instance().showCenterAnnouncement(
+            "=== THREAT PHASE 2: SPAWN RATE INCREASED ===",
+            "Enemies now appear more frequently across chunks!",
+            glm::vec4(1.0f, 0.75f, 0.25f, 1.0f), 3.2f);
       } else if (spawnEvt.newPhaseStarted == 3) {
         showCornerNotification("THREAT PHASE 3",
                                "=== MAXIMUM DANGER: PHASE 3 ===",
                                "Peak spawn rate & Horde Spawns (3m CD) active!",
                                glm::vec4(1.0f, 0.28f, 0.28f, 1.0f), 0);
-        spawnFloatingText("=== PHASE 3: PEAK THREAT ===",
-                          (currentScene == SCENE_PLATFORMER
-                               ? playerPos + glm::vec2(0.0f, 1.8f)
-                               : glm::vec2(0.0f, 1.8f)),
-                          glm::vec4(1.0f, 0.30f, 0.30f, 1.0f), 0.30f, 0.42f,
-                          3.0f, 1.2f);
+        if (spawnEvt.hordeTriggered) {
+          UIManager::instance().showCenterAnnouncement(
+              "=== THREAT PHASE 3 & HORDE INCOMING! ===",
+              "Up to 5/type per chunk + 3 Slimes & 3 Bringers of Death!",
+              glm::vec4(1.0f, 0.25f, 0.42f, 1.0f), 3.5f);
+        } else {
+          UIManager::instance().showCenterAnnouncement(
+              "=== THREAT PHASE 3: PEAK THREAT ===",
+              "Peak spawn density (up to 5/type) & Horde Spawns active!",
+              glm::vec4(1.0f, 0.30f, 0.30f, 1.0f), 3.2f);
+        }
       }
       if (spawnEvt.hordeTriggered) {
         audioMgr.playMonsterRoar();
         showCornerNotification("HORDE SPAWN", "=== HORDE INCOMING! ===",
                                "3 Slimes & 3 Bringers of Death spawned nearby!",
                                glm::vec4(1.0f, 0.22f, 0.45f, 1.0f), 1, 0);
-        spawnFloatingText("!!! HORDE SPAWN: 3 SLIMES & 3 BOD !!!",
-                          playerPos + glm::vec2(0.0f, 2.3f),
-                          glm::vec4(1.0f, 0.25f, 0.45f, 1.0f), 0.32f, 0.45f,
-                          3.4f, 1.3f);
+        if (spawnEvt.newPhaseStarted != 3) {
+          UIManager::instance().showCenterAnnouncement(
+              "!!! HORDE SPAWN INCOMING !!!",
+              "3 Slimes & 3 Bringers of Death spawned nearby!",
+              glm::vec4(1.0f, 0.25f, 0.45f, 1.0f), 3.2f);
+        }
       }
 
       if (autoShiftEnabled) {
@@ -1412,9 +1469,7 @@ int main() {
                 postHitInvulnTimer = 1.25f;
                 audioMgr.play(SFX_ENEMY_HIT);
                 if (playerLives <= 0) {
-                  currentGameState = STATE_GAME_OVER;
-                  gameOverReason = "IMPALED BY SPIKY TRAP";
-                  audioMgr.play(SFX_DEATH);
+                  triggerGameOver("IMPALED BY SPIKY TRAP");
                 } else {
                   spawnFloatingText("LIFE LOST! (" +
                                         std::to_string(playerLives) + "/3)",
@@ -1480,9 +1535,7 @@ int main() {
                 postHitInvulnTimer = 1.25f;
                 audioMgr.play(SFX_ENEMY_HIT);
                 if (playerLives <= 0) {
-                  currentGameState = STATE_GAME_OVER;
-                  gameOverReason = "STRUCK BY DEATH SPELL";
-                  audioMgr.play(SFX_DEATH);
+                  triggerGameOver("STRUCK BY DEATH SPELL");
                 } else {
                   spawnFloatingText("THUNDER STRIKE! (" +
                                         std::to_string(playerLives) + "/3)",
@@ -1814,9 +1867,7 @@ int main() {
                     postHitInvulnTimer = 1.25f;
                     audioMgr.play(SFX_ENEMY_HIT);
                     if (playerLives <= 0) {
-                      currentGameState = STATE_GAME_OVER;
-                      gameOverReason = "SLAIN BY BRINGER OF DEATH";
-                      audioMgr.play(SFX_DEATH);
+                      triggerGameOver("SLAIN BY BRINGER OF DEATH");
                     } else {
                       spawnFloatingText("LIFE LOST! (" +
                                             std::to_string(playerLives) + "/3)",
@@ -1996,9 +2047,7 @@ int main() {
                   postHitInvulnTimer = 1.25f;
                   audioMgr.play(SFX_ENEMY_HIT);
                   if (playerLives <= 0) {
-                    currentGameState = STATE_GAME_OVER;
-                    gameOverReason = "DISSOLVED BY SLIME";
-                    audioMgr.play(SFX_DEATH);
+                    triggerGameOver("DISSOLVED BY SLIME");
                   } else {
                     spawnFloatingText("LIFE LOST! (" +
                                           std::to_string(playerLives) + "/3)",
@@ -2098,9 +2147,7 @@ int main() {
                     postHitInvulnTimer = 1.25f;
                     audioMgr.play(SFX_ENEMY_HIT);
                     if (playerLives <= 0) {
-                      currentGameState = STATE_GAME_OVER;
-                      gameOverReason = "CRUSHED BY DEMON SLIME";
-                      audioMgr.play(SFX_DEATH);
+                      triggerGameOver("CRUSHED BY DEMON SLIME");
                     } else {
                       spawnFloatingText("LIFE LOST! (" +
                                             std::to_string(playerLives) + "/3)",
@@ -2243,9 +2290,7 @@ int main() {
                         postHitInvulnTimer = 1.25f;
                         audioMgr.play(SFX_ENEMY_HIT);
                         if (playerLives <= 0) {
-                          currentGameState = STATE_GAME_OVER;
-                          gameOverReason = "CRUSHED BY DEMON SLAM";
-                          audioMgr.play(SFX_DEATH);
+                          triggerGameOver("CRUSHED BY DEMON SLAM");
                         } else {
                           spawnFloatingText(
                               "LIFE LOST! (" + std::to_string(playerLives) +
@@ -3001,17 +3046,19 @@ int main() {
                             glm::vec4(0), 0);
     }
 
-    // 10. Comprehensible Corner HUD Card
+    // 10. Comprehensible Corner HUD Card & Center Phase Announcements
     UIManager::instance().renderCornerNotification(halfW, halfH, frameCount,
                                                    coinTexture, fruitTexture);
+    if (currentGameState == STATE_RUNNING && !showTutorialModal) {
+      UIManager::instance().renderCenterAnnouncement(halfW, halfH);
+    }
 
     // 11. Top-Right On-Screen Score Counter HUD
-    int totalScore = static_cast<int>(scoreDistance) * 10 +
-                     coinsCollected * 50 + relicsTriggered * 100;
+    int totalScore = getCurrentScore();
     UIManager::instance().renderScoreHUD(
         halfW, halfH, totalScore, coinsCollected, scoreDistance, shieldTimer,
         playerLives, frameCount, coinTexture, heartTexture, isBlocking,
-        blockCooldown);
+        blockCooldown, previousRunScore);
 
     // On-Screen Start Hint Banner (when standing still in idle animation at
     // game start)
@@ -3042,9 +3089,9 @@ int main() {
 
     // 13. Game Over Screen
     if (currentGameState == STATE_GAME_OVER) {
-      UIManager::instance().renderGameOver(halfW, halfH, gameOverReason,
-                                           totalScore, coinsCollected,
-                                           scoreDistance);
+      UIManager::instance().renderGameOver(
+          halfW, halfH, gameOverReason, totalScore, coinsCollected,
+          scoreDistance, highestScore, isNewHighScoreRun);
     }
 
     // 14. Tutorial Window Modal Dialog (Shown once after Intro & via [T] in

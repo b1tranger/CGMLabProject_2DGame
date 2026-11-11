@@ -74,11 +74,18 @@ public:
   void renderCornerNotification(float halfW, float halfH, int frameCount,
                                 unsigned int coinTex, unsigned int shieldTex);
 
+  void showCenterAnnouncement(const std::string &title,
+                              const std::string &subtitle,
+                              const glm::vec4 &accentColor,
+                              float duration = 3.0f);
+  void updateCenterAnnouncement(float dt);
+  void renderCenterAnnouncement(float halfW, float halfH);
+
   void renderScoreHUD(float halfW, float halfH, int totalScore, int coins,
                       float distance, float shieldTimer, int playerLives,
                       int frameCount, unsigned int coinTex,
                       unsigned int heartTex, bool isBlocking = false,
-                      float blockCooldown = 0.0f);
+                      float blockCooldown = 0.0f, int previousScore = 0);
   void renderEnemyHealthBars(const glm::mat4 &view, const glm::mat4 &projection,
                              const std::vector<EnemyEntity> &enemies,
                              float animTimer);
@@ -99,7 +106,8 @@ public:
       float halfW, float halfH, bool openedFromPause, float animTimer = 0.0f,
       const TutorialPreviewTextures &enemyTex = TutorialPreviewTextures{});
   void renderGameOver(float halfW, float halfH, const std::string &reason,
-                      int totalScore, int coins, float distance);
+                      int totalScore, int coins, float distance,
+                      int highScore = 0, bool isNewRecord = false);
 
   void clear();
 
@@ -109,6 +117,7 @@ private:
 
   std::vector<FloatingText> floatingTexts;
   CornerNotification activeNotice;
+  CenterAnnouncement centerNotice;
   VolumeSliderLayout pauseSliderLayout;
 };
 

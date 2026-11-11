@@ -245,6 +245,14 @@ struct CornerNotification {
   int fruitType;
 };
 
+struct CenterAnnouncement {
+  std::string title;
+  std::string subtitle;
+  glm::vec4 accentColor;
+  float timer = 0.0f;
+  float maxTime = 0.0f;
+};
+
 struct CharacterAnimSet {
   unsigned int texRun = 0;
   unsigned int texIdle = 0;
