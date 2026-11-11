@@ -1,0 +1,37 @@
+# Session 2 Summary: Project Structure & Archiving Guidelines
+
+- **Session Number**: 2
+- **Legacy Versions**: `v2.0`
+- **Session Folder**: [`/doc/prompts/2. Project Structure & Archiving Guidelines/`](/doc/prompts/2.%20Project%20Structure%20&%20Archiving%20Guidelines/)
+- **Date(s)**: 2026-10-21
+- **Conversation Log**: [`conversation.md`](/doc/prompts/2.%20Project%20Structure%20&%20Archiving%20Guidelines/conversation.md)
+- **Transcript Status**: Migrated from legacy Markdown archives (raw `transcript_full.jsonl` unavailable).
+
+---
+
+## 1. User Goals
+- **v2.0** (Project Structure and Version Archiving Advice - v2.0): Explaining whether `src/main.cpp` contains all project code and recommending best practices for archiving project versions prior to major changes.
+
+---
+
+## 2. Engineering & Implementation Details
+### v2.0 - Project Structure and Version Archiving Advice - v2.0
+> Evaluated the repository layout to clarify the difference between single-file gameplay source code and complete project dependencies:
+> 1. In Phase 1, `src/main.cpp` is monolithic in terms of custom game logic, state machines, math routines, and inlined GLSL shader sources.
+> 2. However, the complete buildable project requires external dependencies including OpenGL loader (`src/glad.c`), third-party headers (`include/` for GLFW, GLAD, GLM), dynamic link libraries (`lib/glfw3.dll`), and build automation files (`Makefile`, `CMakeLists.txt`).
+> 3. Provided concrete archiving strategies, highlighting Git tags/commits as the standard zero-bloat versioning approach, while outlining directory-snapshot guidelines for asset-heavy upcoming phases.
+
+---
+
+## 3. Actions, Files & Verification
+### v2.0
+- Inspected repository root directory and subdirectories (`src/`, `include/`, `lib/`, `doc/prompts/`).
+- Verified `Makefile` compilation dependencies (`glad.c`, `main.cpp`, `lib/glfw3.dll`).
+- Created prompt archive `[/doc/prompts/v2.0 - Project Structure and Version Archiving Advice.md](/doc/prompts/v2.0 - Project Structure and Version Archiving Advice.md)` adhering to protocol.
+
+---
+
+## 4. Outcomes
+- **v2.0**: Clarified that `main.cpp` contains all gameplay logic and shader code for Phase 1, but does not constitute the entire project. Detailed what files make up the project and provided clear instructions on how to archive versions via Git tags or file snapshots.
+
+---

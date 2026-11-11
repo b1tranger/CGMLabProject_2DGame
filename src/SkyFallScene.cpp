@@ -16,9 +16,9 @@ SkyFallScene::SkyFallScene() {
 
 void SkyFallScene::initStars() {
     stars.clear();
-    for (int i = 0; i < 64; ++i) {
+    for (int i = 0; i < 110; ++i) {
         CelestialStar star;
-        star.x = -16.0f + static_cast<float>(std::rand() % 320) / 10.0f;
+        star.x = -28.0f + static_cast<float>(std::rand() % 560) / 10.0f;
         star.y = 1.0f + static_cast<float>(std::rand() % 70) / 10.0f;
         star.size = 0.08f + static_cast<float>(std::rand() % 14) / 100.0f;
         star.twinkleFreq = 1.8f + static_cast<float>(std::rand() % 30) / 10.0f;
@@ -85,26 +85,26 @@ void SkyFallScene::update(float deltaTime, GLFWwindow* window,
         audioMgr.play(SFX_RELIC);
         spawnFloatingText("=== EXIT APPEARED! ===", pos + glm::vec2(0.0f, 1.2f),
                           glm::vec4(0.35f, 1.0f, 0.55f, 1.0f), 0.32f, 0.46f, 3.2f, 1.3f);
-        showCornerNotification("EXIT", "=== EXIT APPEARED! ===", "Direction Arrow Relics spawned! Steer into an arrow to return!", glm::vec4(0.35f, 1.0f, 0.5f, 1.0f), 1, 0);
+        showCornerNotification("EXIT", "=== EXIT APPEARED! ===", "Open Exit Gates spawned! Steer into a gate to return!", glm::vec4(0.35f, 1.0f, 0.5f, 1.0f), 1, 0);
 
-        // Convert uncollected items ahead into Left/Right Direction Relics
+        // Convert uncollected items ahead into Open Exit Gates
         for (auto& itm : items) {
             if (!itm.collected && itm.pos.y < pos.y && itm.pos.y > pos.y - 35.0f) {
                 itm.type = 2;
-                itm.fruitType = (itm.pos.x <= 0.0f) ? DIR_LEFT : DIR_RIGHT;
+                itm.fruitType = 0;
             }
         }
 
-        // Spawn staggered Left & Right Direction Arrow gates visibly ahead in the descent route
-        items.push_back({ glm::vec2(-2.2f, pos.y - 6.5f), 2, DIR_LEFT, false });
-        items.push_back({ glm::vec2( 2.2f, pos.y - 6.5f), 2, DIR_RIGHT, false });
+        // Spawn staggered Open Exit Gates visibly ahead in the descent route
+        items.push_back({ glm::vec2(-2.2f, pos.y - 6.5f), 2, 0, false });
+        items.push_back({ glm::vec2( 2.2f, pos.y - 6.5f), 2, 0, false });
 
-        items.push_back({ glm::vec2(-3.0f, pos.y - 12.0f), 2, DIR_LEFT, false });
-        items.push_back({ glm::vec2( 0.0f, pos.y - 12.0f), 2, (platformerSavedDir == DIR_RIGHT ? DIR_RIGHT : DIR_LEFT), false });
-        items.push_back({ glm::vec2( 3.0f, pos.y - 12.0f), 2, DIR_RIGHT, false });
+        items.push_back({ glm::vec2(-3.0f, pos.y - 12.0f), 2, 0, false });
+        items.push_back({ glm::vec2( 0.0f, pos.y - 12.0f), 2, 0, false });
+        items.push_back({ glm::vec2( 3.0f, pos.y - 12.0f), 2, 0, false });
 
-        items.push_back({ glm::vec2(-2.2f, pos.y - 17.5f), 2, DIR_LEFT, false });
-        items.push_back({ glm::vec2( 2.2f, pos.y - 17.5f), 2, DIR_RIGHT, false });
+        items.push_back({ glm::vec2(-2.2f, pos.y - 17.5f), 2, 0, false });
+        items.push_back({ glm::vec2( 2.2f, pos.y - 17.5f), 2, 0, false });
     }
 
     if (!isHit) {
@@ -131,9 +131,8 @@ void SkyFallScene::update(float deltaTime, GLFWwindow* window,
             if (scenePlayTime >= SCENE_DIRECTION_COOLDOWN) {
                 int roll = std::rand() % 10;
                 if (roll < 4) {
-                    RunDirection arrowDir = (std::rand() % 2 == 0) ? DIR_LEFT : DIR_RIGHT;
-                    items.push_back({ glm::vec2(-2.2f, genBottomY - 5.0f), 2, arrowDir, false });
-                    items.push_back({ glm::vec2( 2.2f, genBottomY - 5.0f), 2, (arrowDir == DIR_LEFT ? DIR_RIGHT : DIR_LEFT), false });
+                    items.push_back({ glm::vec2(-2.2f, genBottomY - 5.0f), 2, 0, false });
+                    items.push_back({ glm::vec2( 2.2f, genBottomY - 5.0f), 2, 0, false });
                 } else if (roll < 7) {
                     items.push_back({ glm::vec2(-4.0f, genBottomY - 5.0f), 1, std::rand() % 4, false }); // Shield
                     items.push_back({ glm::vec2( 4.0f, genBottomY - 5.0f), 0, 0, false }); // Coin
@@ -225,18 +224,14 @@ void SkyFallScene::update(float deltaTime, GLFWwindow* window,
                     showCornerNotification("SHIELD", "10s ENERGY SHIELD!", "Absorbs 1 hazard hit!", glm::vec4(0.2f, 0.95f, 1.0f, 1.0f), 1, itm.fruitType);
                     spawnFloatingText("+10s ENERGY SHIELD!", pos + glm::vec2(0.0f, 0.8f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
                 } else if (itm.type == 2) {
-                    RunDirection targetDir = static_cast<RunDirection>(itm.fruitType);
                     audioMgr.play(SFX_RELIC);
                     relicsTriggered++;
-                    if (targetDir == DIR_LEFT || targetDir == DIR_RIGHT) {
-                        exitDir = targetDir;
-                        requestExitToRunner = true;
-                        std::string dirStr = (targetDir == DIR_LEFT) ? "WARP <<< LEFT" : "WARP >>> RIGHT";
-                        spawnFloatingText("DIRECTION TRIGGERED!\n" + dirStr, pos + glm::vec2(0.0f, 0.8f),
-                                          glm::vec4(0.25f, 1.0f, 0.95f, 1.0f), 0.28f, 0.40f, 2.8f, 1.3f);
-                        showCornerNotification("WARP", dirStr, "Resuming regular platform runner!", glm::vec4(0.25f, 0.95f, 1.0f, 1.0f), 1, 0);
-                        break;
-                    }
+                    exitDir = platformerSavedDir;
+                    requestExitToRunner = true;
+                    spawnFloatingText("EXIT GATE ENTERED!\nRETURNING TO RUNNER", pos + glm::vec2(0.0f, 0.8f),
+                                      glm::vec4(0.30f, 1.0f, 0.78f, 1.0f), 0.28f, 0.40f, 2.8f, 1.3f);
+                    showCornerNotification("EXIT GATE", "RETURNING TO RUNNER", "Resuming regular platform runner!", glm::vec4(0.30f, 1.0f, 0.78f, 1.0f), 1, 0);
+                    break;
                 }
             }
         }
@@ -264,7 +259,7 @@ void SkyFallScene::update(float deltaTime, GLFWwindow* window,
 void SkyFallScene::render(const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cameraPos,
                           float animTimer, float daylightFactor, float twilightFactor,
                           unsigned int birdTex, unsigned int tilesetTex, unsigned int coinTex,
-                          unsigned int shieldTex, unsigned int arrowTex, unsigned int sceneryTex,
+                          unsigned int shieldTex, unsigned int exitGateTex, unsigned int sceneryTex,
                           unsigned int spikesTex, float shieldTimerVal, const glm::vec2& playerRenderSize)
 {
     // Celestial Stars in night sky
@@ -346,19 +341,14 @@ void SkyFallScene::render(const glm::mat4& view, const glm::mat4& projection, co
             modelShield = glm::scale(modelShield, glm::vec3(1.2f, 1.2f, 1.0f));
             gameRenderer.drawQuad(modelShield, view, projection, glm::vec4(1.0f), (shieldTex != 0), getShieldUV(itm.fruitType), shieldTex);
         } else if (itm.type == 2) {
-            RunDirection relicDir = static_cast<RunDirection>(itm.fruitType);
-            float pulse = 1.65f + 0.20f * std::sin(animTimer * 5.0f);
+            float pulse = 1.85f + 0.20f * std::sin(animTimer * 5.0f);
             glm::mat4 modelRelic = glm::mat4(1.0f);
             modelRelic = glm::translate(modelRelic, glm::vec3(itm.pos.x, itm.pos.y, 0.0f));
             modelRelic = glm::scale(modelRelic, glm::vec3(pulse, pulse, 1.0f));
 
-            glm::vec4 arrowUV = getDirectionArrowUV(relicDir);
-            glm::vec4 arrowTint(1.0f);
-            if (relicDir == DIR_LEFT)       arrowTint = glm::vec4(0.2f, 0.95f, 1.0f, 1.0f);
-            else if (relicDir == DIR_RIGHT) arrowTint = glm::vec4(1.0f, 0.85f, 0.2f, 1.0f);
-            else if (relicDir == DIR_UP)    arrowTint = glm::vec4(1.0f, 0.35f, 0.35f, 1.0f);
-
-            gameRenderer.drawQuad(modelRelic, view, projection, arrowTint, (arrowTex != 0), arrowUV, arrowTex);
+            int gateFrame = static_cast<int>(animTimer * 6.0f) % 4;
+            glm::vec4 gateUV = getExitGateUV(gateFrame);
+            gameRenderer.drawQuad(modelRelic, view, projection, glm::vec4(1.0f), (exitGateTex != 0), gateUV, exitGateTex);
         }
     }
 

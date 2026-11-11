@@ -3,6 +3,11 @@
 #include "Common.h"
 #include <vector>
 
+struct SpawnEventResult {
+    int newPhaseStarted = 0; // 0 if no change, 2 or 3 on phase transition
+    bool hordeTriggered = false;
+};
+
 class World {
 public:
     World();
@@ -11,6 +16,14 @@ public:
     void reset(EnvironmentTheme initialTheme);
     void updateProcedural(float playerX, EnvironmentTheme activeTheme);
     void ensureGroundAround(float targetX, EnvironmentTheme theme);
+    SpawnEventResult updateEnemySpawning(float deltaTime, float playerX,
+                                         EnvironmentTheme activeTheme,
+                                         bool allowSpawning);
+
+    int getEnemyPhase() const { return currentEnemyPhase; }
+    float getEnemyPhaseElapsed() const { return enemyPhaseTimer; }
+    float getHordeCooldown() const { return hordeCooldownTimer; }
+    int countActiveEnemies() const;
 
     bool checkCollision(const glm::vec2& posA, const glm::vec2& sizeA,
                         const glm::vec2& posB, const glm::vec2& sizeB) const;
@@ -30,7 +43,18 @@ public:
     float leftGenEdge;
 
 private:
+    int currentEnemyPhase;
+    float enemyPhaseTimer;
+    float periodicSpawnTimer;
+    float hordeCooldownTimer;
+
     void generateChunk(float startX, float endX, bool isInitial, EnvironmentTheme theme);
+    bool isNearHazardOrShaft(float x, bool checkSlopes) const;
+    EnemyEntity makeEnemy(EnemyType type, const glm::vec2& pos) const;
+    bool trySpawnEnemyInRange(EnemyType type, float minX, float maxX,
+                              float avoidX, float avoidRadius,
+                              bool relaxSeparation = false);
+    void spawnHordeWave(float playerX, EnvironmentTheme activeTheme);
 };
 
 extern World gameWorld;

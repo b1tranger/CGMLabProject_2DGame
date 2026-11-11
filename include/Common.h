@@ -99,6 +99,10 @@ constexpr float DAY_NIGHT_CYCLE_DURATION =
     90.0f; // 1.5 minutes (90 seconds) per Day/Night half-cycle
 constexpr float SCENE_DIRECTION_COOLDOWN =
     15.0f; // 15 seconds trial before following direction changes
+constexpr float ENEMY_PHASE_DURATION =
+    120.0f; // 2 minutes per enemy spawn phase (3 phases total)
+constexpr float HORDE_SPAWN_COOLDOWN =
+    180.0f; // 3 minutes cooldown between Phase 3 Horde spawns
 
 enum SFXType {
   SFX_STEP,
@@ -321,6 +325,15 @@ inline glm::vec4 getDirectionArrowUV(RunDirection dir) {
     idx = 2;
   else if (dir == DIR_DOWN)
     idx = 3;
+  float u = static_cast<float>(idx) * 0.25f;
+  float v = 0.0f;
+  float du = 0.25f;
+  float dv = 1.0f;
+  return glm::vec4(u, v, du, dv);
+}
+
+inline glm::vec4 getExitGateUV(int frame = 0) {
+  int idx = (frame % 4);
   float u = static_cast<float>(idx) * 0.25f;
   float v = 0.0f;
   float du = 0.25f;

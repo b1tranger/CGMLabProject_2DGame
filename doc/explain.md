@@ -94,13 +94,13 @@ void Renderer::drawQuad(const glm::mat4& model, const glm::mat4& view, const glm
     Generates 4 distinct vertical zones: Sky Canopy Tier ($Y \approx +5.5\text{m}$), Surface Platforms ($Y \approx +1.0$ to $+2.8\text{m}$), Surface Ground ($Y = -0.5\text{m}$), and Underground Caverns ($Y = -4.5\text{m}$).
   - **Bedrock Safety Floor**:  
     A continuous bedrock foundation at $Y = -7.5\text{m}$ guarantees zero out-of-bounds pit deaths. The only lethal hazards are spiky traps and enemy attacks!
-  - **Procedural Enemy Spawning & Separation**:  
-    Procedurally populates each 35m chunk with 1–3 Bringer of Death wraiths and 2–4 Slimes ([`/src/World.cpp#L521-L632`](/src/World.cpp#L521-L632)), enforcing a guaranteed 9.0m separation buffer between enemy types to prevent spawn crowding.
+  - **3-Phase Dynamic Enemy Spawning & Separation**:  
+    Escalates enemy spawn rate across 3 phases changing every 2 minutes (`ENEMY_PHASE_DURATION = 120.0f` in [`/src/World.cpp`](/src/World.cpp)): Phase 1 spawns rarely (max 2 active enemies at once), Phase 2 increases density (up to 6 active), and Phase 3 enables peak spawns plus **Horde Spawn** (3 Slimes + 3 Bringers of Death at random with a 3-minute cooldown), while enforcing spatial separation buffers.
 
 ```cpp
-// Procedural Enemy Spawn Formulas (/src/World.cpp)
-int numBod = 1 + (std::rand() % 3);       // 1 to 3 Bringer of Death per 35m chunk
-int numSlimes = 2 + (std::rand() % 3);    // 2 to 4 Slimes per 35m chunk
+// Time-Scaled Enemy Spawn Phases & Horde Cooldown (/src/World.cpp)
+// Phase 1 (0-2m): rare spawns, max 2 active | Phase 2 (2-4m): max 6 active
+// Phase 3 (4m+):  max 12 active + Horde Spawn (3 Slimes + 3 BOD, 180s cooldown)
 ```
 
 ---
@@ -138,7 +138,7 @@ int numSlimes = 2 + (std::rand() % 3);    // 2 to 4 Slimes per 35m chunk
   Dedicated mini-game scenes that challenge the player whenever a vertical direction shift occurs:
   - **`LadderScene` (Upward Shift)**: 3 parallel climbing tracks with alternating sawblades, moving spikes, and climbing shields.
   - **`SkyFallScene` (Downward Shift)**: High-speed aerial free-fall dive with steering controls to dodge raptor birds and floating spike mines.
-  - **Exit Predictability & Arrowhead Relics**: Both trials feature a 15-second survival timer (`SURVIVE UNTIL EXIT: XX.Xs`) and a prominent glowing `=== EXIT APPEARED! ===` banner before directional arrow relics spawn ahead on the tracks ([`/src/LadderScene.cpp#L74-L78`](/src/LadderScene.cpp#L74-L78) and [`/src/SkyFallScene.cpp#L98-L108`](/src/SkyFallScene.cpp#L98-L108)) to return the player to the runner.
+  - **Exit Predictability & Open Exit Gates**: Both trials feature a 15-second survival timer (`SURVIVE UNTIL EXIT: XX.Xs`) and a prominent glowing `=== EXIT APPEARED! ===` banner before animated **Open Exit Gate** relics ([`/assets/exit_gate.png`](/assets/exit_gate.png)) spawn ahead on the tracks ([`/src/LadderScene.cpp`](/src/LadderScene.cpp) and [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp)) to return the player to the runner.
 
 ---
 
@@ -356,9 +356,8 @@ Combined with an **Orthographic Projection Matrix** (`glm::ortho(-8.0, 8.0, -4.5
 > 2. Typography is rendered directly from an embedded 8x8 bitmap font ([`/include/font8x8_basic.h`](/include/font8x8_basic.h)), eliminating external image dependencies.
 > 3. Fade transitions are calculated via piece-wise linear alpha interpolation ($\alpha(t) = \frac{t}{T_{\text{in}}}$), modulating quad colors cleanly before launching the intro video.
 
-### Q8: How do the Direction Arrow Relics control the multi-directional mechanics?
+### Q8: How do the Direction Relics & Mini-Game Open Exit Gates work?
 > **Answer**:  
-> Direction relics ([`DirectionRelic`](/include/Common.h#L159)) store target vectors (`DIR_LEFT`, `DIR_RIGHT`, `DIR_UP`, `DIR_DOWN`) and floating animation phases. When the player intersects their $1.1\times 1.1\,\text{m}$ hitbox ([`/src/main.cpp#L1230-L1246`](/src/main.cpp#L1230-L1246)):
-> 1. Horizontal relics (`DIR_LEFT`/`DIR_RIGHT`) invert running velocity, swap player facing direction, and switch biome themes.
-> 2. Vertical relics (`DIR_UP`/`DIR_DOWN`) trigger transitions into dedicated mini-game scenes ([`LadderScene`](/src/LadderScene.cpp) or [`SkyFallScene`](/src/SkyFallScene.cpp)).
-> 3. Inside mini-games, Left/Right arrow relics spawn after a 15-second survival cooldown to serve as return exit gates back to the platformer world.
+> Direction relics ([`DirectionRelic`](/include/Common.h)) store target directions and floating animation phases. When the player intersects their $1.1\times 1.1\,\text{m}$ hitbox ([`/src/main.cpp`](/src/main.cpp)):
+> 1. In the regular run scene, redundant Left/Right relics are removed so only vertical relics (`DIR_UP`/`DIR_DOWN`) spawn, triggering transitions into dedicated mini-game scenes ([`LadderScene`](/src/LadderScene.cpp) or [`SkyFallScene`](/src/SkyFallScene.cpp)).
+> 2. Inside mini-games, animated **Open Exit Gate** relics ([`/assets/exit_gate.png`](/assets/exit_gate.png)) spawn after the 15-second survival cooldown to return the player cleanly to the platformer world.

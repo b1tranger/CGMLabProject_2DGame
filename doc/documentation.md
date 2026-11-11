@@ -105,8 +105,8 @@ Combines zero-dependency procedural synthesis with hardware-accelerated media st
     4. `SFX_HEART_PICKUP`: Dual-tone melodic restoration chime ($587\,\text{Hz} \rightarrow 880\,\text{Hz}$).
     5. `SFX_STEP`, `SFX_JUMP`, `SFX_CLIMB`, `SFX_SLIDE`, `SFX_COIN`, `SFX_RELIC`, `SFX_SHIFT`, `SFX_DEATH`.
 - **Windows MCI Hardware-Accelerated Streaming**:
-  - Streams looping background music [`assets/Quarter_in_the_Slot.mp3`](/assets/Quarter_in_the_Slot.mp3) using `mciSendStringA` at 50% default volume.
-  - Features real-time `[M]` key mute/unmute toggle with HUD badges and floating text notifications.
+  - Streams looping background music [`assets/Quarter_in_the_Slot.mp3`](/assets/Quarter_in_the_Slot.mp3) using `mciSendStringA` at **30% default volume**.
+  - Features an interactive **10%-step Pause Menu volume slider** (0%–100%, mouse drag, `[-]`/`[+]` buttons, `Left`/`Right` in Pause, `-`/`=` quick keys) and real-time `[M]` mute/unmute toggle.
   - Handles the 3-phase sequenced Demon Slime transformation audio ($5.5\text{s}$: wet splat $\rightarrow$ bubbling acid $\rightarrow$ monster roar), thunder spell strikes, and the Boss Demon Slime dying roar vocalization [`assets/dyingRoar.mp3`](/assets/dyingRoar.mp3).
 
 ---
@@ -165,10 +165,13 @@ Implements Modern OpenGL 3.3 Core Profile graphics:
 - **Endless Chunk Streaming**:
   - Generates chunks $35\,\text{m}$ ahead in both horizontal directions ($+X$ and $-X$).
   - Automatically prunes chunks farther than $85\,\text{m}$ behind the player, keeping memory usage constant and sustaining 60+ FPS indefinitely.
-- **High-Density Slime Spawning & Starter Encounters**:
-  - **Guaranteed Starter Slimes**: Spawns 2 initial slimes at $X = +17.5\,\text{m}$ and $X = -18.0\,\text{m}$ on the initial spawn chunk, ensuring immediate combat gameplay without long empty treks.
-  - **100% Chunk Spawn Rate & Increased Density**: Replaced probabilistic spawning with guaranteed generation of 2 to 4 slimes (`numSlimes = 2 + (std::rand() % 3)`) per $35\,\text{m}$ chunk.
-  - **Multi-Elevation Cavern Spawning**: Implemented a 33% probability for slimes to spawn in subterranean caverns (`CAVERN_FLOOR_Y + 0.5\,\text{m}`) as well as surface ground, populating underground explorations.
+- **3-Phase Dynamic Enemy Spawning & Horde Waves**:
+  - **Guaranteed Starter Slimes**: Spawns 2 initial slimes at $X = +17.5\,\text{m}$ and $X = -18.0\,\text{m}$ on the initial spawn chunk.
+  - **Time-Escalating Phases (2-Minute Intervals)**: `World::updateEnemySpawning` advances through 3 phases every $120\,\text{s}$:
+    - **Phase 1 ($0\text{–}2\,\text{min}$)**: Rare spawns, capped at a maximum of **2 active enemies** at once.
+    - **Phase 2 ($2\text{–}4\,\text{min}$)**: Increased spawn rate across chunks and periodic patrols (up to 6 active enemies).
+    - **Phase 3 ($4+\,\text{min}$)**: Peak spawn density (up to 12 active enemies) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`), randomly spawning **3 Slimes** and **3 Bringers of Death** around the player on a 3-minute cooldown.
+  - **Multi-Elevation Cavern Spawning**: 33% probability to spawn enemies in subterranean caverns (`CAVERN_FLOOR_Y + 0.5\,\text{m}`), 67% on surface ground.
 - **Grouped Spike Clusters & Vertical-Aware Enemy Separation**:
   - Spawns platform spikes in grouped clusters of 2 to 4 spikes (`SpikeTrap`).
   - **Vertical-Aware Separation Buffers**: Bringer of Death and Slimes maintain a $9.0\,\text{m}$ horizontal buffer only when sharing the same elevation tier ($\Delta y < 2.5\,\text{m}$), allowing surface Bringers of Death and cavern slimes to coexist within the same horizontal sector without blocking spawns. Slime-to-slime spacing is calibrated to $4.0\,\text{m}$.
@@ -179,14 +182,15 @@ Implements Modern OpenGL 3.3 Core Profile graphics:
 
 ### 3.7 UI & Mini-Game Subsystems
 - **`UIManager` ([`/src/UIManager.cpp`](/src/UIManager.cpp) & [`/include/UIManager.h`](/include/UIManager.h))**:
-  - Thread-safe singleton managing the score counter, coin meter, distance tracking, 3 animated heart life pips, Guard status badge, overhead segmented enemy health bars, floating combat text, and glassmorphic modals.
+  - Thread-safe singleton managing the score counter, coin meter, distance tracking, 3 animated heart life pips, Guard status badge, overhead segmented enemy health bars, floating combat text, and glassmorphic modals with `drawWrappedText` 2-line word-boundary wrapping (preventing Pause/Tutorial text overflow).
+  - **Letterboxed Fullscreen Viewport ([`/src/main.cpp`](/src/main.cpp))**: `computeGameViewport` and `beginViewportFrame` (`[F11]` or Maximize) expand horizontal camera coverage across the full window width while rendering clean vertical black borders (top/bottom `glScissor` clearing) with exact 1:1 pixel aspect scaling (zero stretching).
   - **Procedural Academic Splash Screen ([`/src/UIManager.cpp#L68-L230`](/src/UIManager.cpp#L68-L230))**:
     - Pre-video formal academic proposal presentation card ($15.6\,\text{m} \times 8.6\,\text{m}$) rendered 100% through Modern OpenGL primitives and embedded 8x8 font ([`/include/font8x8_basic.h`](/include/font8x8_basic.h)).
     - Displays course metadata (*CSE0611328*), faculty credentials (*Engineer Robiul Islam* & *Tasneen Tanvir*), and student group details (*Gaus Saraf Murady*, *Lima Akter*, *Fahima Akter*) with smooth alpha fade in/out transitions ($\alpha(t) = \frac{t}{T_{\text{in}}}$), matching the official project metadata at the top of [`/README.md`](/README.md).
 - **`LadderScene` & `SkyFallScene` ([`/src/LadderScene.cpp`](/src/LadderScene.cpp) & [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp))**:
-  - Vertical 3-track climbing trial and aerial free-fall diving trial. Both include real-time survival countdown badges (`SURVIVE UNTIL EXIT: XX.Xs`), exit announcement banners, and direction arrow relic gates ([`/src/LadderScene.cpp#L74-L78`](/src/LadderScene.cpp#L74-L78) and [`/src/SkyFallScene.cpp#L98-L108`](/src/SkyFallScene.cpp#L98-L108)) returning the player safely to the platformer runner.
-- **Direction Arrowhead Relics ([`/src/main.cpp#L1230-L1246`](/src/main.cpp#L1230-L1246))**:
-  - Clear glowing arrow symbols ([`getDirectionArrowUV`](/include/Common.h#L314)) with pulsating colored auras (`DIR_LEFT`: Orange, `DIR_RIGHT`: Cyan, `DIR_UP`: Green, `DIR_DOWN`: Gold) that trigger autonomous direction switches and dimension transitions.
+  - Vertical 3-track climbing trial and aerial free-fall diving trial. Both include real-time survival countdown badges (`SURVIVE UNTIL EXIT: XX.Xs`), exit announcement banners, and animated **Open Exit Gate** relics ([`/assets/exit_gate.png`](/assets/exit_gate.png)) returning the player safely to the platformer runner.
+- **Direction Arrowhead Relics ([`/src/main.cpp`](/src/main.cpp) & [`/src/World.cpp`](/src/World.cpp))**:
+  - In the regular platformer scene, glowing vertical arrowheads ([`getDirectionArrowUV`](/include/Common.h), `DIR_UP`: Green $\rightarrow$ Ladder Scene, `DIR_DOWN`: Gold $\rightarrow$ Sky-Fall Scene) spawn on elevated platforms (redundant Left/Right relics removed).
 - **`VideoPlayer` ([`/src/VideoPlayer.cpp`](/src/VideoPlayer.cpp) & [`/include/VideoPlayer.h`](/include/VideoPlayer.h))**:
   - Decodes `introVid.mp4` via Microsoft Media Foundation directly into an OpenGL texture with presentation timestamp synchronization and instant skip controls.
 

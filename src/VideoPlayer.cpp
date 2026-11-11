@@ -1,6 +1,8 @@
 #include "VideoPlayer.h"
 
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
 #include <mfapi.h>
 #include <mfidl.h>

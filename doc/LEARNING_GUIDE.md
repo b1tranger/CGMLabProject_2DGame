@@ -543,7 +543,7 @@ Instead of flat, plain-color geometric rectangles, the world is constructed from
        $$y_{\text{ground}} = \max \{ t_y + 0.5 \cdot t_h \mid |t_x - p_x| \le 0.5 \cdot t_w + 0.4 \}$$
      - If solid ground is detected within $4.0\,\text{m}$ below the player, the player's feet are snapped flush ($p_y = y_{\text{ground}} + 0.5 \cdot h$) and `isGrounded = true`. If returning over an intentional gap/chasm, `isGrounded = false` is preserved and normal downward gravity accelerates the character, eliminating mid-air freezing.
    - **Direction Arrowheads vs. Shield Fruits**:
-     - *Direction Arrowhead Relics*: Custom 4-frame sprite sheet (`assets/direction_arrows.png`, $256 \times 64$) provides unambiguous visual cues (Left, Right, Up, Down). `Common.h` provides `getDirectionArrowUV(RunDirection dir)` mapping normalized UV coordinates $[\frac{i}{4}, \frac{i+1}{4}]$. Relics trigger the exact direction indicated by their arrowhead.
+     - *Direction Arrowhead Relics*: Custom 4-frame sprite sheet (`assets/direction_arrows.png`, $256 \times 64$). In the regular run scene, only `DIR_UP` (Ladder Ascent) and `DIR_DOWN` (Sky-Fall Dive) arrowheads spawn on platforms (redundant `DIR_LEFT`/`DIR_RIGHT` relics were removed). `Common.h` provides `getDirectionArrowUV(RunDirection dir)` mapping normalized UV coordinates $[\frac{i}{4}, \frac{i+1}{4}]$.
      - *Fruit Energy Shield*: Separated fruit pickups from direction warps. Picking up a fruit activates `shieldTimer = 10.0f`. While active, a pulsating cyan energy bubble renders around the warrior, and spike hazards, flying raptor birds, and sky mines are harmlessly deflected without damage.
    - **Idle Stance at Launch**:
      - On game initialization and reset, `isGameIdleAtStart = true`, zeroing initial velocity $\mathbf{v} = (0, 0)$ and locking animation to `ANIM_IDLE`. Pressing `A`, `D`, or `Space` dismisses the idle state and initiates active traversal.
@@ -552,18 +552,18 @@ Instead of flat, plain-color geometric rectangles, the world is constructed from
      - Reduced bird flock spawn probability to $50\%$ with calibrated horizontal flight speeds ($3.0 - 4.5\,\text{m/s}$).
      - Reduced spike mine density to $33\%$ and tightened collision AABB bounding radii to $0.85\,\text{m}$ for crisp, skill-based dodging.
 
-9. **Mini-Game Scene Direction Relics & Safe Runner Return (`v0.5.7` & `v0.5.8`)**:
-   - **Post-15s Immediate Relic Injection (Ladders & Sky-Fall)**:
+9. **Mini-Game Open Exit Gates & Safe Runner Return (`v0.5.7`, `v0.5.8`, `v0.8.0`)**:
+   - **Post-15s Immediate Exit Gate Injection (Ladders & Sky-Fall)**:
      - As soon as the 15-second survival trial expires (`scenePlayTime >= SCENE_DIRECTION_COOLDOWN`):
-       - **In 3-Ladder Ascent (`UP`)**: The engine immediately injects glowing directional arrow relics directly ahead of the climber on Lane 0 (`DIR_LEFT`), Lane 2 (`DIR_RIGHT`), and Lane 1 (`DIR_LEFT`).
-       - **In Sky-Fall Diving (`DOWN`)**: The engine retroactively converts all uncollected items ahead of the falling character into Left and Right direction relics, and spawns three staggered multi-lane gates in the descent route ($y - 5\,\text{m}$, $y - 10\,\text{m}$, $y - 15\,\text{m}$).
-     - This ensures the player is never trapped without an immediate, visible exit trigger after surviving the trial.
-   - **Procedural Relic Streaming**:
-     - Once $t \ge 15.0\,\text{s}$, runtime generation guarantees Left (Cyan) and Right (Gold) arrow relics in every descent tier of Sky-Fall and with 40% probability on ladder tracks.
+       - **In 3-Ladder Ascent (`UP`)**: The engine immediately injects animated glowing **Open Exit Gate** relics (`assets/exit_gate.png`, `getExitGateUV`) directly ahead of the climber on Lanes 0, 2, and 1.
+       - **In Sky-Fall Diving (`DOWN`)**: The engine retroactively converts uncollected items ahead of the falling character into Open Exit Gates, and spawns staggered multi-lane exit gates in the descent route ($y - 6.5\,\text{m}$, $y - 12.0\,\text{m}$, $y - 17.5\,\text{m}$).
+     - This ensures the player has clear, intuitive exit portals after surviving the trial without redundant Left/Right arrows.
+   - **Procedural Exit Gate Streaming**:
+     - Once $t \ge 15.0\,\text{s}$, runtime generation spawns Open Exit Gates in Sky-Fall descent tiers and with 40% probability on ladder tracks.
    - **Expanded Aerial Collision Volume & Scaling**:
-     - Aerial relics in Sky-Fall feature an enlarged collision volume ($1.85\,\text{m} \times 2.1\,\text{m}$) and scaled sprite footprint ($1.65\,\text{m}$ with a $1.65 + 0.20\sin(5t)$ pulse) so players diving at $9.2\,\text{m/s}$ easily touch the relic when steering sideways.
-   - **Touch & Warp Scene Return**:
-     - Touching a direction arrow relic plays `SFX_RELIC`, sets `platformerSavedDir`, `lastHorizontalDir`, and `currentDirection` to that direction, displays floating text (`"DIRECTION TRIGGERED!\nWARP <<< LEFT"` or `"WARP >>> RIGHT"`), and invokes `returnToPlatformerScene(true)`. The warrior immediately resumes running horizontally across the platformer world with ground snapping.
+     - Aerial exit gates in Sky-Fall feature an enlarged collision volume ($1.85\,\text{m} \times 2.1\,\text{m}$) and scaled sprite footprint ($1.85\,\text{m}$ with a $1.85 + 0.20\sin(5t)$ pulse) so players diving at $9.2\,\text{m/s}$ easily enter the gate when steering sideways.
+   - **Enter Gate & Safe Runner Return**:
+     - Touching an Open Exit Gate plays `SFX_RELIC`, restores `platformerSavedDir`, displays floating text (`"EXIT GATE ENTERED!\nRETURNING TO RUNNER"`), and invokes `returnToPlatformerScene(true)`. The warrior immediately resumes in the platformer world with ground snapping.
 
 10. **In-Engine Video Playback & Asset Embedding Analysis (`v0.5.9`)**:
     - **In-Engine Video Architecture (`VideoPlayer`)**:
@@ -743,31 +743,33 @@ In academic capstone and lab submissions, displaying course context, university 
       - Displays Course (*Computer Graphics & Multimedia Lab - CSE0611328*), Faculty (*Engineer Robiul Islam - Assistant Professor* & *Tasneen Tanvir - Lecturer*), and Student Group Members (*Gaus Saraf Murady 0432410005101088*, *Lima Akter 0432410005101063*, *Fahima Akter 0432410005101093*).
       - Synced directly to the academic header at the top of [`/README.md`](/README.md).
 
-20. **Direction Arrow Relics, Autonomous Warps & Minigame Return Gates (`v0.5.7`, `v0.5.8`)**:
+20. **Direction Arrow Relics, Open Exit Gates & Audio Volume Slider (`v0.5.7`, `v0.5.8`, `v0.8.0`)**:
     - **Direction Relic Architecture**:
-      - Defined by `DirectionRelic` in [`/include/Common.h#L159`](/include/Common.h#L159), storing target direction (`DIR_LEFT`, `DIR_RIGHT`, `DIR_UP`, `DIR_DOWN`) and animation phase.
-      - Generated procedurally on elevated perches in [`/src/World.cpp#L425-L435`](/src/World.cpp#L425-L435) and starting platforms ([`/src/World.cpp#L215-L224`](/src/World.cpp#L215-L224)).
-    - **Color Tinting & Glowing Auras**:
-      - Implemented in [`/src/main.cpp#L2160-L2184`](/src/main.cpp#L2160-L2184):
-        - `DIR_LEFT`: Radiant Orange aura `glm::vec4(1.0f, 0.55f, 0.15f, 0.35f)`
-        - `DIR_RIGHT`: Electric Cyan aura `glm::vec4(0.1f, 0.85f, 1.0f, 0.35f)`
-        - `DIR_UP`: Emerald Green aura `glm::vec4(0.2f, 0.95f, 0.45f, 0.35f)`
-        - `DIR_DOWN`: Golden Amber aura `glm::vec4(1.0f, 0.85f, 0.2f, 0.35f)`
-    - **Minigame Return Gate Mechanism**:
-      - Inside mini-games ([`/src/LadderScene.cpp#L74-L78`](/src/LadderScene.cpp#L74-L78) and [`/src/SkyFallScene.cpp#L98-L108`](/src/SkyFallScene.cpp#L98-L108)), collecting Left or Right direction relics after the 15-second survival window immediately exits the minigame and returns the player safely to the horizontal runner.
+      - Defined by `DirectionRelic` in [`/include/Common.h`](/include/Common.h), storing target direction (`DIR_UP` or `DIR_DOWN` in regular platformer chunks) and animation phase.
+      - Generated procedurally on elevated perches and starting platforms in [`/src/World.cpp`](/src/World.cpp) (redundant `DIR_LEFT`/`DIR_RIGHT` relics removed from regular runs).
+    - **Background-Free Floating Icons**:
+      - Relics (`direction_arrows.png`, regenerated without the dark circle disc via [`/scratch/gen_arrows.cpp`](/scratch/gen_arrows.cpp)), Shield pickups (`shield_pickup.png`), Heart pickups (`heart_pickup.png`), and Open Exit Gates (`exit_gate.png`) render directly as floating transparent sprites in [`/src/main.cpp`](/src/main.cpp), [`/src/LadderScene.cpp`](/src/LadderScene.cpp), and [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp) without background aura quads.
+    - **Responsive Letterboxed Fullscreen & Modal Word-Wrapping**:
+      - `computeGameViewport` and `beginViewportFrame` in [`/src/main.cpp`](/src/main.cpp) (`[F11]` or Maximize) expand horizontal visibility (`halfW = halfH * (vpW / vpH)`) while adding clean top/bottom vertical black borders (`glScissor`) so the game is never stretched.
+      - `drawWrappedText` in [`/src/UIManager.cpp`](/src/UIManager.cpp) wraps long Pause Menu and Tutorial Modal lines onto 2 lines inside the dialog borders.
+    - **Minigame Open Exit Gate Mechanism**:
+      - Inside mini-games ([`/src/LadderScene.cpp`](/src/LadderScene.cpp) and [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp)), entering an animated **Open Exit Gate** ([`/assets/exit_gate.png`](/assets/exit_gate.png)) after the 15-second survival window exits the minigame and returns the player safely to the platformer world.
+    - **10%-Step BGM Volume Slider (Default 30%)**:
+      - [`/src/Audio.cpp`](/src/Audio.cpp) defaults `bgmVolumePercent = 30` (MCI volume `300`) and snaps slider/hotkey adjustments (`setBgmVolumePercent`, `adjustBgmVolume`) to 10% increments from `0%` to `100%`. [`/src/UIManager.cpp`](/src/UIManager.cpp) renders the interactive Pause Menu slider with 11 notch ticks, `[-]`/`[+]` step buttons, and drag/keyboard support.
 
-21. **Calibrated Enemy Spawn Density, Strata Distribution & Spatial Buffering (`v0.6.12`, `v0.6.14`)**:
-    - **Procedural Spawn Formulas**:
-      - In [`/src/World.cpp#L521-L632`](/src/World.cpp#L521-L632), each 35-meter world chunk dynamically spawns:
-        - **Bringer of Death**: `int numBod = 1 + (std::rand() % 3);` (1 to 3 per chunk).
-        - **Initial Slimes**: `int numSlimes = 2 + (std::rand() % 3);` (2 to 4 per chunk).
+21. **Dynamic 3-Phase Enemy Spawning, Horde Wave & Spatial Buffering (`v0.6.12`, `v0.6.14`, `v0.8.0`)**:
+    - **Time-Escalating 3-Phase Spawn Schedule**:
+      - Managed by `World::updateEnemySpawning` and `World::generateChunk` in [`/src/World.cpp`](/src/World.cpp) (`ENEMY_PHASE_DURATION = 120.0f`, changing every 2 minutes):
+        - **Phase 1 ($0\text{–}2\,\text{min}$)**: Rare spawns with a hard cap of **2 active enemies** at once.
+        - **Phase 2 ($2\text{–}4\,\text{min}$)**: Moderate spawn rate (1–2 per type per chunk + 10s periodic spawns, cap 6).
+        - **Phase 3 ($4+\,\text{min}$)**: High spawn rate (1–3 Bringer of Death, 2–4 Slimes per chunk + 6s periodic spawns, cap 12) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`, 3-minute cooldown) spawning **3 Slimes** and **3 Bringers of Death** at random around the player.
     - **Vertical Strata Distribution**:
       - `bool inCavern = (std::rand() % 3 == 0);`: 33% chance to spawn in subterranean caverns ($Y = -4.5\text{m}$), 67% chance on surface ground ($Y = -0.5\text{m}$).
     - **Distance Clearance Buffering**:
       - `dx < 9.0f`: Minimum 9.0m horizontal buffer between Bringer of Death and Slimes on the same elevation.
-      - `dx < 4.0f`: Minimum 4.0m buffer between individual Slimes, preventing cluttered clumping.
+      - `dx < 4.0f` / `6.5f`: Minimum buffer between individual Slimes and Bringers of Death, preventing cluttered clumping.
     - **Boss Metamorphosis Countdown**:
-      - When an Initial Slime reaches 0 HP, it enters a 5.5-second metamorphosis timer in [`/src/main.cpp#L1564-L1578`](/src/main.cpp#L1564-L1578), playing sequenced audio (splat $\rightarrow$ acid $\rightarrow$ dying roar) before ascending into the 5-HP Boss Demon Slime.
+      - When an Initial Slime reaches 0 HP, it enters a 5.5-second metamorphosis timer in [`/src/main.cpp`](/src/main.cpp), playing sequenced audio (splat $\rightarrow$ acid $\rightarrow$ dying roar) before ascending into the 5-HP Boss Demon Slime.
 
 ---
 

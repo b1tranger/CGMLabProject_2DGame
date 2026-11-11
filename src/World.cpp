@@ -6,7 +6,121 @@
 World gameWorld;
 
 World::World()
-    : rightGenEdge(35.0f), leftGenEdge(-25.0f) {}
+    : rightGenEdge(35.0f), leftGenEdge(-25.0f),
+      currentEnemyPhase(1), enemyPhaseTimer(0.0f),
+      periodicSpawnTimer(16.0f), hordeCooldownTimer(0.0f) {}
+
+int World::countActiveEnemies() const {
+    int count = 0;
+    for (const auto& e : enemies) {
+        if (e.active && e.state != ENEMY_STATE_DEATH) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+bool World::isNearHazardOrShaft(float x, bool checkSlopes) const {
+    for (const auto& tunnel : tunnels) {
+        if (std::abs(x - tunnel.x) < 1.5f) {
+            return true;
+        }
+    }
+    if (checkSlopes) {
+        for (const auto& slope : slopes) {
+            float minS = std::min(slope.startX, slope.endX) - 1.8f;
+            float maxS = std::max(slope.startX, slope.endX) + 1.8f;
+            if (x >= minS && x <= maxS) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+EnemyEntity World::makeEnemy(EnemyType type, const glm::vec2& pos) const {
+    EnemyEntity enemy{};
+    enemy.type = type;
+    enemy.state = ENEMY_STATE_PATROL;
+    enemy.pos = pos;
+    enemy.animTimer = static_cast<float>(std::rand() % 10) * 0.1f;
+    enemy.stateTimer = 0.0f;
+    enemy.jumpCooldown = 0.0f;
+    enemy.hurtTimer = 0.0f;
+    enemy.active = true;
+    enemy.hasHitPlayerThisAttack = false;
+
+    if (type == ENEMY_BRINGER_OF_DEATH) {
+        enemy.size = glm::vec2(1.6f, 2.6f);
+        enemy.vel = glm::vec2((std::rand() % 2 == 0) ? -1.0f : 1.0f, 0.0f);
+        enemy.hp = 1;
+        enemy.maxHp = 1;
+        enemy.attackCooldown = 0.5f + static_cast<float>(std::rand() % 15) * 0.1f;
+        enemy.spellCooldown = 1.5f + static_cast<float>(std::rand() % 25) * 0.1f;
+    } else {
+        enemy.size = glm::vec2(1.8f, 1.4f);
+        enemy.vel = glm::vec2((std::rand() % 2 == 0) ? -0.75f : 0.75f, 0.0f);
+        enemy.hp = 2;
+        enemy.maxHp = 2;
+        enemy.attackCooldown = 0.0f;
+        enemy.spellCooldown = 0.0f;
+    }
+    enemy.facingLeft = (enemy.vel.x < 0.0f);
+    return enemy;
+}
+
+bool World::trySpawnEnemyInRange(EnemyType type, float minX, float maxX,
+                                 float avoidX, float avoidRadius,
+                                 bool relaxSeparation) {
+    float span = maxX - minX;
+    if (span < 2.0f) return false;
+
+    const float crossSep = relaxSeparation ? 3.0f : 9.0f;
+    const float sameSep  = relaxSeparation ? 1.8f : ((type == ENEMY_BRINGER_OF_DEATH) ? 6.5f : 4.0f);
+    const float yOffset  = (type == ENEMY_BRINGER_OF_DEATH) ? 1.45f : 1.2f;
+
+    for (int attempt = 0; attempt < 24; ++attempt) {
+        bool inCavern = (std::rand() % 3 == 0);
+        float footY = inCavern ? (CAVERN_FLOOR_Y + 0.5f) : (SURFACE_GROUND_Y + 0.5f);
+        float spawnY = footY + yOffset;
+
+        float rNorm = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        float candX = minX + rNorm * span;
+
+        if (avoidRadius > 0.0f && std::abs(candX - avoidX) < avoidRadius) {
+            continue;
+        }
+        if (isNearHazardOrShaft(candX, !inCavern)) {
+            continue;
+        }
+        if (!hasSolidGroundAt(candX, footY, 0.35f) ||
+            !hasSolidGroundAt(candX - 0.7f, footY, 0.35f) ||
+            !hasSolidGroundAt(candX + 0.7f, footY, 0.35f)) {
+            continue;
+        }
+
+        bool tooClose = false;
+        for (const auto& existing : enemies) {
+            if (!existing.active) continue;
+            float dx = std::abs(existing.pos.x - candX);
+            float dy = std::abs(existing.pos.y - spawnY);
+            bool isDifferentFamily = (type == ENEMY_BRINGER_OF_DEATH)
+                ? (existing.type == ENEMY_SLIME_INITIAL || existing.type == ENEMY_BOSS_DEMON_SLIME)
+                : (existing.type == ENEMY_BRINGER_OF_DEATH);
+
+            if (isDifferentFamily) {
+                if (dx < crossSep && dy < 2.5f) { tooClose = true; break; }
+            } else {
+                if (dx < sameSep && dy < 2.0f) { tooClose = true; break; }
+            }
+        }
+        if (tooClose) continue;
+
+        enemies.push_back(makeEnemy(type, glm::vec2(candX, spawnY)));
+        return true;
+    }
+    return false;
+}
 
 bool World::checkCollision(const glm::vec2& posA, const glm::vec2& sizeA,
                            const glm::vec2& posB, const glm::vec2& sizeB) const {
@@ -213,12 +327,12 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
             }
 
             if (withRelic) {
-                // If withRelic is true, spawn a Direction Arrow relic
+                // Spawn only Up (Ladder) or Down (Sky-Fall) Direction Relics in regular run scene
                 DirectionRelic relic;
                 relic.pos = glm::vec2(px + (length * 0.5f) * TILE_SIZE, py + 1.25f);
                 relic.animPhase = 0.0f;
-                RunDirection dirs[] = { DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN };
-                relic.targetDir = dirs[std::rand() % 4];
+                RunDirection dirs[] = { DIR_UP, DIR_DOWN };
+                relic.targetDir = dirs[std::rand() % 2];
                 relic.collected = false;
                 relics.push_back(relic);
             }
@@ -421,15 +535,15 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
                 }
             }
 
-            // 1. Direction Arrow Relic on elevated perch
+            // 1. Direction Arrow Relic on elevated perch (Up -> Ladder Scene, Down -> Sky-Fall Scene)
             bool hasDirectionRelic = false;
             if (platY > 4.5f || (std::rand() % 3 == 0)) {
                 hasDirectionRelic = true;
                 DirectionRelic relic;
                 relic.pos = glm::vec2(curX + (platLen * 0.5f) * TILE_SIZE, platY + 1.35f);
                 relic.animPhase = static_cast<float>(std::rand() % 100) / 10.0f;
-                RunDirection dirs[] = { DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN };
-                relic.targetDir = dirs[std::rand() % 4];
+                RunDirection dirs[] = { DIR_UP, DIR_DOWN };
+                relic.targetDir = dirs[std::rand() % 2];
                 relic.collected = false;
                 relics.push_back(relic);
             }
@@ -518,118 +632,117 @@ void World::generateChunk(float startX, float endX, bool isInitial, EnvironmentT
         curX += (platLen * TILE_SIZE) + 4.0f;
     }
 
-    // 6. Spawn Roaming Enemies in non-initial chunks (Multiple enemies with increased frequency):
+    // 6. Spawn Roaming Enemies in non-initial chunks scaled by the 3 Time Phases:
+    //    Phase 1 (0-2m): Rare spawns, maximum 2 active enemies at once
+    //    Phase 2 (2-4m): Moderate spawn rate, maximum 6 active enemies at once
+    //    Phase 3 (4m+):  High spawn rate, maximum 12 active enemies + Horde Spawn
     if (!isInitial) {
-        // Bringer of Death (1 to 3 spawns per chunk):
-        int numBod = 1 + (std::rand() % 3);
-        for (int b = 0; b < numBod; ++b) {
-            bool inCavern = (std::rand() % 3 == 0);
-            float footY = inCavern ? (CAVERN_FLOOR_Y + 0.5f) : (SURFACE_GROUND_Y + 0.5f);
-            float spawnY = footY + 1.45f;
-
-            // Search for candidate locations on solid ground away from chasms/shafts
-            for (int attempt = 0; attempt < 12; ++attempt) {
-                float candX = startX + 3.0f + static_cast<float>(std::rand() % static_cast<int>(std::max(4.0f, endX - startX - 6.0f)));
-                if (!inCavern && (isInsideChasm(candX - 1.8f) || isInsideChasm(candX) || isInsideChasm(candX + 1.8f))) {
-                    continue;
-                }
-                if (isUndergroundShaft(candX - 1.4f) || isUndergroundShaft(candX) || isUndergroundShaft(candX + 1.4f)) {
-                    continue;
-                }
-                if (!hasSolidGroundAt(candX, footY, 0.35f)) {
-                    continue;
-                }
-
-                // Check distance from already spawned enemies:
-                // Bringer of Death and Slime must NOT spawn together / close (12.0m buffer)!
-                bool tooClose = false;
-                for (const auto& existing : enemies) {
-                    float dx = std::abs(existing.pos.x - candX);
-                    float dy = std::abs(existing.pos.y - spawnY);
-                    if (existing.type == ENEMY_SLIME_INITIAL || existing.type == ENEMY_BOSS_DEMON_SLIME) {
-                        if (dx < 9.0f && dy < 2.5f) { tooClose = true; break; }
-                    } else {
-                        if (dx < 6.5f && dy < 2.0f) { tooClose = true; break; }
-                    }
-                }
-                if (tooClose) continue;
-
-                EnemyEntity bod;
-                bod.type = ENEMY_BRINGER_OF_DEATH;
-                bod.state = ENEMY_STATE_PATROL;
-                bod.pos = glm::vec2(candX, spawnY);
-                bod.size = glm::vec2(1.6f, 2.6f);
-                bod.vel = glm::vec2((std::rand() % 2 == 0) ? -1.0f : 1.0f, 0.0f);
-                bod.hp = 1;
-                bod.maxHp = 1;
-                bod.facingLeft = (bod.vel.x < 0.0f);
-                bod.animTimer = static_cast<float>(std::rand() % 10) * 0.1f;
-                bod.stateTimer = 0.0f;
-                bod.attackCooldown = 0.5f + static_cast<float>(std::rand() % 15) * 0.1f;
-                bod.jumpCooldown = 0.0f;
-                bod.spellCooldown = 1.5f + static_cast<float>(std::rand() % 25) * 0.1f;
-                bod.hurtTimer = 0.0f;
-                bod.active = true;
-                bod.hasHitPlayerThisAttack = false;
-                enemies.push_back(bod);
-                break;
+        int activeCount = countActiveEnemies();
+        if (currentEnemyPhase == 1) {
+            if (activeCount < 2 && (std::rand() % 3 == 0)) {
+                EnemyType pick = (std::rand() % 2 == 0) ? ENEMY_SLIME_INITIAL : ENEMY_BRINGER_OF_DEATH;
+                trySpawnEnemyInRange(pick, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false);
             }
-        }
+        } else {
+            int maxActive = (currentEnemyPhase == 2) ? 6 : 12;
+            int numBod    = (currentEnemyPhase == 2) ? (1 + (std::rand() % 2)) : (1 + (std::rand() % 3));
+            int numSlimes = (currentEnemyPhase == 2) ? (1 + (std::rand() % 2)) : (2 + (std::rand() % 3));
 
-        // Initial Slimes (Guaranteed high-density spawning: 2 to 4 slimes per chunk across surface & caverns):
-        int numSlimes = 2 + (std::rand() % 3); // 2, 3, or 4 slimes per chunk!
-        for (int s = 0; s < numSlimes; ++s) {
-            bool inCavern = (std::rand() % 3 == 0); // 33% chance to spawn in subterranean caverns
-            float footY = inCavern ? (CAVERN_FLOOR_Y + 0.5f) : (SURFACE_GROUND_Y + 0.5f);
-            float spawnY = footY + 1.2f;
-
-            for (int attempt = 0; attempt < 24; ++attempt) {
-                float candX = startX + 3.0f + static_cast<float>(std::rand() % static_cast<int>(std::max(4.0f, endX - startX - 6.0f)));
-                if (!inCavern && (isInsideChasm(candX - 1.8f) || isInsideChasm(candX) || isInsideChasm(candX + 1.8f))) {
-                    continue;
-                }
-                if (isUndergroundShaft(candX - 1.4f) || isUndergroundShaft(candX) || isUndergroundShaft(candX + 1.4f)) {
-                    continue;
-                }
-                if (!hasSolidGroundAt(candX, footY, 0.35f)) {
-                    continue;
-                }
-
-                // Distance buffer: 9.0m from Bringer of Death if on same elevation tier (dy < 2.5m), 4.0m between slimes
-                bool tooClose = false;
-                for (const auto& existing : enemies) {
-                    float dx = std::abs(existing.pos.x - candX);
-                    float dy = std::abs(existing.pos.y - spawnY);
-                    if (existing.type == ENEMY_BRINGER_OF_DEATH) {
-                        if (dx < 9.0f && dy < 2.5f) { tooClose = true; break; }
-                    } else {
-                        if (dx < 4.0f && dy < 2.0f) { tooClose = true; break; }
-                    }
-                }
-                if (tooClose) continue;
-
-                EnemyEntity slime;
-                slime.type = ENEMY_SLIME_INITIAL;
-                slime.state = ENEMY_STATE_PATROL;
-                slime.pos = glm::vec2(candX, spawnY);
-                slime.size = glm::vec2(1.8f, 1.4f);
-                slime.vel = glm::vec2((std::rand() % 2 == 0) ? -0.75f : 0.75f, 0.0f);
-                slime.hp = 2;
-                slime.maxHp = 2;
-                slime.facingLeft = (slime.vel.x < 0.0f);
-                slime.animTimer = static_cast<float>(std::rand() % 10) * 0.1f;
-                slime.stateTimer = 0.0f;
-                slime.attackCooldown = 0.0f;
-                slime.jumpCooldown = 0.0f;
-                slime.spellCooldown = 0.0f;
-                slime.hurtTimer = 0.0f;
-                slime.active = true;
-                slime.hasHitPlayerThisAttack = false;
-                enemies.push_back(slime);
-                break;
+            for (int b = 0; b < numBod && countActiveEnemies() < maxActive; ++b) {
+                trySpawnEnemyInRange(ENEMY_BRINGER_OF_DEATH, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false);
+            }
+            for (int s = 0; s < numSlimes && countActiveEnemies() < maxActive; ++s) {
+                trySpawnEnemyInRange(ENEMY_SLIME_INITIAL, startX + 3.0f, endX - 3.0f, 0.0f, 0.0f, false);
             }
         }
     }
+}
+
+void World::spawnHordeWave(float playerX, EnvironmentTheme activeTheme) {
+    ensureGroundAround(playerX, activeTheme);
+    float minX = playerX - 24.0f;
+    float maxX = playerX + 24.0f;
+
+    // Spawn 3 Slimes at random positions around the player
+    for (int i = 0; i < 3; ++i) {
+        if (!trySpawnEnemyInRange(ENEMY_SLIME_INITIAL, minX, maxX, playerX, 6.0f, false)) {
+            trySpawnEnemyInRange(ENEMY_SLIME_INITIAL, minX, maxX, playerX, 4.5f, true);
+        }
+    }
+    // Spawn 3 Bringers of Death at random positions around the player
+    for (int i = 0; i < 3; ++i) {
+        if (!trySpawnEnemyInRange(ENEMY_BRINGER_OF_DEATH, minX, maxX, playerX, 6.0f, false)) {
+            trySpawnEnemyInRange(ENEMY_BRINGER_OF_DEATH, minX, maxX, playerX, 4.5f, true);
+        }
+    }
+}
+
+SpawnEventResult World::updateEnemySpawning(float deltaTime, float playerX,
+                                            EnvironmentTheme activeTheme,
+                                            bool allowSpawning) {
+    SpawnEventResult result;
+    enemyPhaseTimer += deltaTime;
+
+    int targetPhase = 1;
+    if (enemyPhaseTimer >= ENEMY_PHASE_DURATION * 2.0f) {
+        targetPhase = 3;
+    } else if (enemyPhaseTimer >= ENEMY_PHASE_DURATION) {
+        targetPhase = 2;
+    }
+
+    if (targetPhase > currentEnemyPhase) {
+        currentEnemyPhase = targetPhase;
+        result.newPhaseStarted = targetPhase;
+        if (currentEnemyPhase == 2) {
+            periodicSpawnTimer = std::min(periodicSpawnTimer, 5.0f);
+        } else if (currentEnemyPhase == 3) {
+            periodicSpawnTimer = std::min(periodicSpawnTimer, 4.0f);
+            hordeCooldownTimer = 0.0f; // Allow initial Phase 3 Horde Spawn immediately
+        }
+    }
+
+    if (currentEnemyPhase == 3 && hordeCooldownTimer > 0.0f) {
+        hordeCooldownTimer = std::max(0.0f, hordeCooldownTimer - deltaTime);
+    }
+
+    if (!allowSpawning) {
+        return result;
+    }
+
+    // Phase 3 Horde Spawn: 3 Slimes + 3 Bringers of Death with 3-minute (180s) cooldown
+    if (currentEnemyPhase == 3 && hordeCooldownTimer <= 0.0f) {
+        spawnHordeWave(playerX, activeTheme);
+        hordeCooldownTimer = HORDE_SPAWN_COOLDOWN;
+        result.hordeTriggered = true;
+    }
+
+    // Periodic time-based enemy spawns scaled by phase
+    periodicSpawnTimer -= deltaTime;
+    if (periodicSpawnTimer <= 0.0f) {
+        int activeCount = countActiveEnemies();
+        if (currentEnemyPhase == 1) {
+            periodicSpawnTimer = 20.0f;
+            if (activeCount < 2 && (std::rand() % 2 == 0)) {
+                EnemyType pick = (std::rand() % 2 == 0) ? ENEMY_SLIME_INITIAL : ENEMY_BRINGER_OF_DEATH;
+                trySpawnEnemyInRange(pick, playerX - 24.0f, playerX + 24.0f, playerX, 7.0f, false);
+            }
+        } else if (currentEnemyPhase == 2) {
+            periodicSpawnTimer = 10.0f;
+            if (activeCount < 6) {
+                EnemyType pick = (std::rand() % 2 == 0) ? ENEMY_SLIME_INITIAL : ENEMY_BRINGER_OF_DEATH;
+                trySpawnEnemyInRange(pick, playerX - 24.0f, playerX + 24.0f, playerX, 6.5f, false);
+            }
+        } else {
+            periodicSpawnTimer = 6.0f;
+            int toSpawn = 1 + (std::rand() % 2);
+            for (int i = 0; i < toSpawn && countActiveEnemies() < 12; ++i) {
+                EnemyType pick = (std::rand() % 2 == 0) ? ENEMY_SLIME_INITIAL : ENEMY_BRINGER_OF_DEATH;
+                trySpawnEnemyInRange(pick, playerX - 24.0f, playerX + 24.0f, playerX, 6.5f, false);
+            }
+        }
+    }
+
+    return result;
 }
 
 void World::updateProcedural(float playerX, EnvironmentTheme activeTheme) {
@@ -717,6 +830,10 @@ void World::reset(EnvironmentTheme initialTheme) {
 
     rightGenEdge = 35.0f;
     leftGenEdge  = -25.0f;
+    currentEnemyPhase = 1;
+    enemyPhaseTimer = 0.0f;
+    periodicSpawnTimer = 16.0f;
+    hordeCooldownTimer = 0.0f;
 
     // Safe starter area
     generateChunk(-25.0f, 35.0f, true, initialTheme);

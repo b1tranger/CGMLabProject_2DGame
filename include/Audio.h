@@ -28,6 +28,10 @@ public:
     void startBGM();
     void stopBGM();
     void toggleBgmMute();
+    void setBgmVolumePercent(int percent);
+    void adjustBgmVolume(int deltaPercent);
+    int getBgmVolumePercent() const { return isBgmMuted ? 0 : bgmVolumePercent; }
+    int getSavedBgmVolumePercent() const { return bgmVolumePercent; }
     bool isMuted() const { return isBgmMuted; }
 
     float stepCooldown;
@@ -36,6 +40,8 @@ public:
 
 private:
     bool isBgmMuted = false;
+    int bgmVolumePercent = 30;
+    void applyBgmVolume();
     std::vector<uint8_t> sfxBuffers[SFX_COUNT];
     std::vector<uint8_t> buildWav(const std::vector<int16_t>& samples, int sampleRate = 22050);
 };

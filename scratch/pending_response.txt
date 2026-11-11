@@ -1,0 +1,15 @@
+Fixed the `make package` build pipeline and built both the executable and standalone package cleanly:
+
+### Root Causes Fixed
+1. **MSYS2 POSIX `g++.exe` Shadowing**: On this machine, `C:\msys64\usr\bin\g++.exe` (MSYS POSIX target) appears ahead of the WinLibs MinGW-w64 toolchain (`x86_64-w64-mingw32-g++.exe`) on `PATH`, so bare `g++.exe` in [Makefile](file:///d:/GitHub/UITS/CGMLabProject_2DGame/Makefile) invoked the wrong compiler.
+2. **Packaging Robustness & Progress Buffer Error**: `Copy-Item assets -Recurse dist/TheWenderer/` lacked `-Force` (failing if a prior `dist/` directory existed), and `Compress-Archive` emitted a `Write-Progress` console buffer error in non-interactive hosts unless `$ProgressPreference = 'SilentlyContinue'` is set.
+3. **`NOMINMAX` Redefinition Warnings**: Guarded `#define NOMINMAX` with `#ifndef NOMINMAX` in [VideoPlayer.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/VideoPlayer.cpp#L3-L5) and [Audio.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/Audio.cpp#L3-L5).
+
+### Changes & Build Output
+- Created [build/win_tasks.ps1](file:///d:/GitHub/UITS/CGMLabProject_2DGame/build/win_tasks.ps1) and updated [Makefile](file:///d:/GitHub/UITS/CGMLabProject_2DGame/Makefile#L5-L18) so `make build` and `make package` automatically prefer `x86_64-w64-mingw32-g++.exe` (or any non-MSYS MinGW-w64 `g++.exe`), clean stale `dist/` folders, and generate `TheWenderer_Standalone.zip` reliably.
+- Ran both `build` and `package` tasks (`exit code 0`, zero C++ warnings):
+  - Built [build/main.exe](file:///d:/GitHub/UITS/CGMLabProject_2DGame/build/main.exe) (`3,629,434` bytes)
+  - Packaged [TheWenderer_Standalone.zip](file:///d:/GitHub/UITS/CGMLabProject_2DGame/TheWenderer_Standalone.zip) (`13,705,647` bytes)
+- Updated [changelog.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/changelog.md) and synced the Session 9 archive (`doc/prompts/9. Relics, Dynamic Enemy Spawning, and Music Volume Slider/`).
+
+You can now run `make package` (or `make`) in your regular terminal, or launch `./build/main.exe` directly.

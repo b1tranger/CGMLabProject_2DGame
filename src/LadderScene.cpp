@@ -69,12 +69,12 @@ void LadderScene::update(float deltaTime, GLFWwindow* window,
         audioMgr.play(SFX_RELIC);
         spawnFloatingText("=== EXIT APPEARED! ===", glm::vec2(playerX, playerY + 1.2f),
                           glm::vec4(0.35f, 1.0f, 0.55f, 1.0f), 0.32f, 0.46f, 3.2f, 1.3f);
-        showCornerNotification("EXIT", "=== EXIT APPEARED! ===", "Direction Arrow Relics spawned! Climb into an arrow to return!", glm::vec4(0.35f, 1.0f, 0.5f, 1.0f), 1, 0);
+        showCornerNotification("EXIT", "=== EXIT APPEARED! ===", "Open Exit Gates spawned! Climb into a gate to return!", glm::vec4(0.35f, 1.0f, 0.5f, 1.0f), 1, 0);
 
-        // Spawn Left and Right Direction Arrow Relics visibly ahead on the tracks
-        items.push_back({ 0, playerY + 5.2f, 2, DIR_LEFT, false });
-        items.push_back({ 2, playerY + 8.2f, 2, DIR_RIGHT, false });
-        items.push_back({ 1, playerY + 11.8f, 2, DIR_LEFT, false });
+        // Spawn Open Exit Gates visibly ahead on the tracks
+        items.push_back({ 0, playerY + 5.2f, 2, 0, false });
+        items.push_back({ 2, playerY + 8.2f, 2, 0, false });
+        items.push_back({ 1, playerY + 11.8f, 2, 0, false });
     }
 
     if (!isHit && !isResurrectingState) {
@@ -107,8 +107,7 @@ void LadderScene::update(float deltaTime, GLFWwindow* window,
             if (scenePlayTime >= SCENE_DIRECTION_COOLDOWN) {
                 int roll = std::rand() % 10;
                 if (roll < 4) {
-                    RunDirection arrowDir = (std::rand() % 2 == 0) ? DIR_LEFT : DIR_RIGHT;
-                    items.push_back({ itemLane, genTopY + 1.2f, 2, arrowDir, false });
+                    items.push_back({ itemLane, genTopY + 1.2f, 2, 0, false });
                 } else if (roll < 7) {
                     items.push_back({ itemLane, genTopY + 1.2f, 1, std::rand() % 4, false }); // Shield pickup
                 } else {
@@ -162,22 +161,14 @@ void LadderScene::update(float deltaTime, GLFWwindow* window,
                     showCornerNotification("SHIELD", "10s ENERGY SHIELD!", "Absorbs 1 hazard hit!", glm::vec4(0.2f, 0.95f, 1.0f, 1.0f), 1, itm.fruitType);
                     spawnFloatingText("+10s ENERGY SHIELD!", glm::vec2(playerX, itm.y + 0.8f), glm::vec4(0.3f, 1.0f, 0.95f, 1.0f));
                 } else if (itm.type == 2) {
-                    RunDirection targetDir = static_cast<RunDirection>(itm.fruitType);
                     audioMgr.play(SFX_RELIC);
                     relicsTriggered++;
-                    if (targetDir == DIR_LEFT || targetDir == DIR_RIGHT) {
-                        exitDir = targetDir;
-                        requestExitToRunner = true;
-                        std::string dirStr = (targetDir == DIR_LEFT) ? "WARP <<< LEFT" : "WARP >>> RIGHT";
-                        spawnFloatingText("DIRECTION TRIGGERED!\n" + dirStr, glm::vec2(playerX, itm.y + 0.8f),
-                                          glm::vec4(0.25f, 1.0f, 0.95f, 1.0f), 0.28f, 0.40f, 2.8f, 1.3f);
-                        showCornerNotification("WARP", dirStr, "Exiting ladder climb to platform runner!", glm::vec4(0.25f, 0.95f, 1.0f, 1.0f), 1, 0);
-                        break;
-                    } else if (targetDir == DIR_DOWN) {
-                        requestSkyFall = true;
-                        spawnFloatingText("WARP vvv SKY-FALL", glm::vec2(playerX, itm.y + 0.8f), glm::vec4(0.3f, 1.0f, 0.5f, 1.0f));
-                        break;
-                    }
+                    exitDir = platformerSavedDir;
+                    requestExitToRunner = true;
+                    spawnFloatingText("EXIT GATE ENTERED!\nRETURNING TO RUNNER", glm::vec2(playerX, itm.y + 0.8f),
+                                      glm::vec4(0.30f, 1.0f, 0.78f, 1.0f), 0.28f, 0.40f, 2.8f, 1.3f);
+                    showCornerNotification("EXIT GATE", "RETURNING TO RUNNER", "Exiting ladder climb via open gate!", glm::vec4(0.30f, 1.0f, 0.78f, 1.0f), 1, 0);
+                    break;
                 }
             }
         }
@@ -229,7 +220,7 @@ void LadderScene::update(float deltaTime, GLFWwindow* window,
 
 void LadderScene::render(const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cameraPos,
                          float animTimer, float daylightFactor, float twilightFactor,
-                         unsigned int tilesetTex, unsigned int coinTex, unsigned int shieldTex, unsigned int arrowTex,
+                         unsigned int tilesetTex, unsigned int coinTex, unsigned int shieldTex, unsigned int exitGateTex,
                          unsigned int sceneryTex, unsigned int spikesTex, float shieldTimerVal, const glm::vec2& playerRenderSize)
 {
     // Thematic Scenery Backdrop behind ladders
@@ -312,19 +303,14 @@ void LadderScene::render(const glm::mat4& view, const glm::mat4& projection, con
             modelShield = glm::scale(modelShield, glm::vec3(1.2f, 1.2f, 1.0f));
             gameRenderer.drawQuad(modelShield, view, projection, glm::vec4(1.0f), (shieldTex != 0), getShieldUV(itm.fruitType), shieldTex);
         } else if (itm.type == 2) {
-            RunDirection relicDir = static_cast<RunDirection>(itm.fruitType);
-            float pulse = 1.35f + 0.15f * std::sin(animTimer * 5.0f);
+            float pulse = 1.65f + 0.16f * std::sin(animTimer * 5.0f);
             glm::mat4 modelRelic = glm::mat4(1.0f);
             modelRelic = glm::translate(modelRelic, glm::vec3(ix, itm.y, 0.0f));
             modelRelic = glm::scale(modelRelic, glm::vec3(pulse, pulse, 1.0f));
 
-            glm::vec4 arrowUV = getDirectionArrowUV(relicDir);
-            glm::vec4 arrowTint(1.0f);
-            if (relicDir == DIR_LEFT)       arrowTint = glm::vec4(0.2f, 0.95f, 1.0f, 1.0f);
-            else if (relicDir == DIR_RIGHT) arrowTint = glm::vec4(1.0f, 0.85f, 0.2f, 1.0f);
-            else if (relicDir == DIR_DOWN)  arrowTint = glm::vec4(0.3f, 1.0f, 0.5f, 1.0f);
-
-            gameRenderer.drawQuad(modelRelic, view, projection, arrowTint, (arrowTex != 0), arrowUV, arrowTex);
+            int gateFrame = static_cast<int>(animTimer * 6.0f) % 4;
+            glm::vec4 gateUV = getExitGateUV(gateFrame);
+            gameRenderer.drawQuad(modelRelic, view, projection, glm::vec4(1.0f), (exitGateTex != 0), gateUV, exitGateTex);
         }
     }
 

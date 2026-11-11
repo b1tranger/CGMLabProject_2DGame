@@ -16,6 +16,16 @@ struct FloatingText {
   float riseSpeed;
 };
 
+struct VolumeSliderLayout {
+  float trackLeft;
+  float trackRight;
+  float trackY;
+  float trackHeight;
+  float minusBtnX;
+  float plusBtnX;
+  float btnSize;
+};
+
 class UIManager {
 public:
   static UIManager &instance();
@@ -54,12 +64,15 @@ public:
                         float totalTime, float animTimer);
   void renderStartHintBanner(float halfW, float halfH, float animTimer);
 
+  static VolumeSliderLayout getPauseVolumeSliderLayout();
+
   void renderSplashScreen(float halfW, float halfH, float fadeAlpha,
                           float progress);
   void renderPauseMenu(float halfW, float halfH, int totalScore, int coins,
                        int relics, float distance, bool freeExploration,
                        int activeScenery, bool isNight, float timeLeftInPhase,
-                       bool autoShiftEnabled = true, bool bgmMuted = false);
+                       bool autoShiftEnabled = true, int bgmVolumePercent = 30,
+                       bool bgmMuted = false);
   void renderTutorialModal(float halfW, float halfH, bool openedFromPause);
   void renderGameOver(float halfW, float halfH, const std::string &reason,
                       int totalScore, int coins, float distance);
@@ -72,6 +85,7 @@ private:
 
   std::vector<FloatingText> floatingTexts;
   CornerNotification activeNotice;
+  VolumeSliderLayout pauseSliderLayout;
 };
 
 inline void spawnFloatingText(const std::string &text, const glm::vec2 &pos,

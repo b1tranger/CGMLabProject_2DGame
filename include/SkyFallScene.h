@@ -19,7 +19,7 @@ struct SkySpikeTrap {
 
 struct SkyItem {
     glm::vec2 pos;
-    int type; // 0=coin, 1=shield, 2=direction relic
+    int type; // 0=coin, 1=shield, 2=open exit gate
     int fruitType;
     bool collected;
 };
@@ -45,7 +45,7 @@ public:
     void render(const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cameraPos,
                 float animTimer, float daylightFactor, float twilightFactor,
                 unsigned int birdTex, unsigned int tilesetTex, unsigned int coinTex,
-                unsigned int shieldTex, unsigned int arrowTex, unsigned int sceneryTex,
+                unsigned int shieldTex, unsigned int exitGateTex, unsigned int sceneryTex,
                 unsigned int spikesTex, float shieldTimerVal, const glm::vec2& playerRenderSize);
 
     const glm::vec2& getPlayerPos() const { return pos; }

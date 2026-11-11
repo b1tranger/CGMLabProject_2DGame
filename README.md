@@ -85,14 +85,16 @@ build\main.exe
 ### Controls
 - **`A` / `D` (or Left / Right Arrow)**: **Walk & Run (Free Exploration - DEFAULT)** — Explore the world at your own pace! Samurai Mack stands still in idle stance when keys are released.
 - **`F`**: **Toggle Auto-Runner Mode** — Switches between default manual Free Exploration and continuous autonomous sprinting platformer mode.
-- **`M`**: **Mute / Unmute Background Music** — Toggles looping background music (`Quarter_in_the_Slot.mp3`, default 50% volume) with real-time HUD notification.
+- **`M`**: **Mute / Unmute Background Music** — Toggles looping background music (`Quarter_in_the_Slot.mp3`, default 30% volume) with real-time HUD notification.
+- **Music Volume Slider (`ESC` Pause Menu / `-` & `=`)**: Drag the interactive Pause Menu volume slider (or press `Left`/`Right`, `-`/`=`, or click `[-]`/`[+]`) to adjust BGM volume in **10% increments** (0%–100%, default **30%**).
 - **`J` / `X` / `Left Mouse Click`**: **Sword Slash Attack** — Swing katana to defeat Bringer of Death (1 hit), Initial Slime (2 hits), and Demon Slime Boss (5 hits)!
 - **`Right Mouse Click` / `K`**: **Defend / Parry Stance** — Raise katana in defensive guard for up to 1.0s using `Defend_nobg.png`! Absorbs all enemy attacks (Slime, Bringer of Death scythe, Thunder cloud spell, Demon Boss cleave/smash) with a resonant metallic parry clang (`SFX_BLOCK`), floating `[PARRY]` text, and 0.6s grace invulnerability (2.0s cooldown on deflection).
 - **`Space` / `Esc` / `Enter` (During Intro Splash & Video)**: **Skip Intro Screen & Video** — Instantly advance from the academic course/group intro splash screen or skip the cinematic video directly into gameplay.
 - **`Left Shift`**: **Dash Movement** — High-speed burst with ghost trail afterimages and spike/hazard invulnerability!
 - **`Space` / `W` / `Up Arrow`**: Jump across gaps and over spiky traps, or latch on and climb upward inside ladder shafts
 - **`S` / `Down Arrow`**: Drop down through one-way platforms or descend into underground ladder shafts
-- **`Esc`**: Open / Close **Pause Menu** (pause physics simulation, inspect stats, restart, or quit)
+- **`Esc`**: Open / Close **Pause Menu** (pause physics simulation, inspect stats, adjust BGM slider, restart, or quit)
+- **`F11`**: **Toggle Fullscreen** — Expands the horizontal field of view across the full screen width with vertical black letterbox borders and zero stretching.
 - **`B`**: **Cycle Background Scenery** (Silvergrass Field <-> Autumn Foliage <-> Green Forest Foliage <-> Urban Area)
 - **`N`**: **Fast-Forward Day / Night Cycle** (Instantly advance 90-second half-cycle between Day and Night)
 - **`T`**: **Open Tutorial Window** — View the comprehensive How-to-Play guide modal dialog during active exploration or inside the Pause Menu.
@@ -100,15 +102,19 @@ build\main.exe
 - **`R`**: Quick restart run (when paused or after Game Over)
 - **`Q`**: Quit game to desktop (from Pause Menu or Game Over screen)
 - **3-Lives Health System & Heart Relics**: The player possesses 3 life pips displayed on the HUD. Collect ruby heart relics (spawned alongside shields) to restore lost lives, or gain +150 bonus overheal points.
-- **Roaming Enemies & Boss Fight**:
-  - **Bringer of Death**: Roaming scythe-wielding wraith. Now accurately pixel-centered on platforms. Casts ranged thunder spells targeting the player across multi-layer elevations (underground cavern to overground surface/sky canopy). Features a generous 1.0s telegraphed gathering cloud window allowing players to dodge before lightning strikes with `thunder-after-crackle.mp3` SFX! Cleave in **1 hit** before it attacks.
-  - **Enemy Separation**: Bringer of Death and Slime spawns now maintain a guaranteed 12.0m horizontal distance buffer, preventing cluttered spawn clumping.
-  - **Initial Slime & Boss Demon Slime**: Defeating the green slime in **2 hits** triggers a sequenced 3-phase audio metamorphosis ($5.5\text{s}$) with wet splat impact, acid bubbling, and demon roar. The Boss Demon Slime leaps between platforms with ground smash attacks that produce a heavy distant bang on impact. Slay the boss in **5 hits** or dash away to despawn!
+- **Roaming Enemies, Time-Escalating Spawn Phases & Boss Fight**:
+  - **3-Phase Dynamic Enemy Spawning**: Enemy spawn rate escalates automatically every **2 minutes** (`ENEMY_PHASE_DURATION = 120s`):
+    - **Phase 1 (0–2m)**: Rare enemy spawns, capped at a **maximum of 2 active enemies** at once.
+    - **Phase 2 (2–4m)**: Increased spawn rate (up to 6 active enemies across chunks and periodic patrols).
+    - **Phase 3 (4m+)**: Peak spawn density (up to 12 active enemies) plus **Horde Spawn** — randomly spawns **3 Slimes** and **3 Bringers of Death** around the player on a **3-minute cooldown** (`180s`).
+  - **Bringer of Death**: Roaming scythe-wielding wraith. Accurately pixel-centered on platforms. Casts ranged thunder spells targeting the player across multi-layer elevations (underground cavern to overground surface/sky canopy) with a 1.0s telegraphed gathering cloud window before lightning strikes (`thunder-after-crackle.mp3`). Cleave in **1 hit**.
+  - **Enemy Separation**: Bringer of Death and Slime spawns maintain a 9.0m horizontal distance buffer on the same elevation tier, preventing cluttered spawn clumping.
+  - **Initial Slime & Boss Demon Slime**: Defeating the green slime in **2 hits** triggers a sequenced 3-phase audio metamorphosis ($5.5\text{s}$) with wet splat impact, acid bubbling, and demon roar. The Boss Demon Slime leaps between platforms with ground smash attacks. Slay the boss in **5 hits** or dash away to despawn!
 - **Grouped Platform Spikes**: Metallic spikes now spawn in challenging clusters of 2 to 4 spikes on elevated platforms, requiring careful jumps or dash bursts.
-- **Mini-Game Scene Exits**: Mini-game scenes (3-Ladder Climbing and Sky-Fall Diving) can strictly **only** be exited by collecting Direction Arrow Relics (which unlock and spawn after the 15-second survival trial) or by taking an obstacle hit (resurrecting back on the main platformer). Manual scene switching via key presses is disabled.
+- **Mini-Game Scene Exits**: Mini-game scenes (3-Ladder Climbing and Sky-Fall Diving) can strictly **only** be exited by entering an **Open Exit Gate** (`assets/exit_gate.png`, which spawns after the 15-second survival trial) or by taking an obstacle hit (resurrecting back on the main platformer). Manual scene switching via key presses is disabled.
 - **Underground Ladder Shafts**: Approach any underground ladder shaft from the surface and press `S` or `Down Arrow` to smoothly latch on and climb down into the subterranean caverns.
 - **Idle Stance at Start**: The Samurai starts in a grounded idle breathing stance upon game launch and restart until directional movement keys (`A`, `D`) or `Space` are pressed.
-- **Direction Arrow Relics**: Distinct glowing neon arrowheads (Left, Right, Up, Down) explicitly indicate which direction change or scene transition they trigger when touched.
+- **Direction Arrow Relics (Regular Run Scene)**: In the regular platformer scene, glowing **Up** (green, Ladder Ascent) and **Down** (gold, Sky-Fall Dive) arrowheads spawn on elevated platforms (redundant Left/Right direction relics removed). Inside mini-games, **Open Exit Gate** relics return you to the platform runner.
 - **Heraldic Shield Pickups (10s Energy Shield)**: Collecting the glowing golden-cyan shield icon (`assets/shield_pickup.png`) grants a 10-second circular energy shield bubble that deflects spikes, floating mines, and raptor birds!
 - **Steep Slopes**: Walk or fall onto an angled slope to automatically engage controllable downhill **Sliding**! (Press `Space` to jump out at any midpoint)
 - **Ladder Tunnels**: Approach a ladder shaft to immediately stop horizontal run and ascend/descend

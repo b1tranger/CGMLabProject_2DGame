@@ -14,7 +14,7 @@ struct LadderTrap {
 struct LadderItem {
     int lane;
     float y;
-    int type; // 0=coin, 1=shield, 2=direction relic
+    int type; // 0=coin, 1=shield, 2=open exit gate
     int fruitType;
     bool collected;
 };
@@ -33,7 +33,7 @@ public:
                 bool& requestExitToRunner, RunDirection& exitDir, bool& requestSkyFall);
     void render(const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cameraPos,
                 float animTimer, float daylightFactor, float twilightFactor,
-                unsigned int tilesetTex, unsigned int coinTex, unsigned int shieldTex, unsigned int arrowTex,
+                unsigned int tilesetTex, unsigned int coinTex, unsigned int shieldTex, unsigned int exitGateTex,
                 unsigned int sceneryTex, unsigned int spikesTex, float shieldTimer, const glm::vec2& playerRenderSize);
 
     float getPlayerX() const { return playerX; }

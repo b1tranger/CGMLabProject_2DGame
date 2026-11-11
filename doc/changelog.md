@@ -12,6 +12,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
 |---|---|---|---|
+| **v0.8.0** | [Session 9](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md) | 2026-11-11 | Up/Down-Only Run Relics, Open Exit Gate Icon (`exit_gate.png`), 3-Phase Dynamic Enemy Spawning with Phase 3 Horde Spawn, 10%-Step BGM Volume Slider (30% Default), 2-Line Modal Text Wrapping, Letterboxed Fullscreen (`F11`), and Background-Free Floating Icons |
 | **v0.7.4** | [v8.3](#v83---comprehensive-code-contexts-and-documentation-synchronization) | 2026-11-05 | Documentation & Code Context Synchronization: Embedded Root-Relative Code Contexts, Viva Q&A Expansion & Modern Subsystem Mapping Across explain.md, LEARNING_GUIDE.md, and documentation.md |
 | **v0.7.3** | [v8.1](#v81---synchronize-academic-group-details-at-readme-top) | 2026-11-05 | Academic Metadata Synchronization: Added Course, Faculty, and Student Group Details Table Prominently to the Top of README.md |
 | **v0.7.2** | [v7.2](#v72---render-academic-splash-screen-graphically-in-opengl-and-purge-bitmap-texture) | 2026-11-02 | Procedural Graphical Splash Screen: 100% Vector/Text Rendering in Modern OpenGL, Tables & Borders, Zero Disk Image Dependency |
@@ -65,22 +66,44 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 ## Detailed Version Logs
 
+### [v0.8.0] - 2026-11-11
+#### Session Archive: [`9. Relics, Dynamic Enemy Spawning, and Music Volume Slider`](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md)
+* **Open Exit Gate Relics & Regular-Run Relic Cleanup**:
+  - Removed redundant `DIR_LEFT` and `DIR_RIGHT` direction relics from the regular platformer world generation in [`/src/World.cpp`](/src/World.cpp); only `DIR_UP` (Ladder Ascent) and `DIR_DOWN` (Sky-Fall Dive) relics now spawn on platform perches.
+  - Created a 4-frame animated glowing **Open Exit Gate** spritesheet ([`/assets/exit_gate.png`](/assets/exit_gate.png), $256\times 64$) via [`/scratch/gen_exit_gate.cpp`](/scratch/gen_exit_gate.cpp) and UV helper `getExitGateUV` in [`/include/Common.h`](/include/Common.h).
+  - Updated [`/src/LadderScene.cpp`](/src/LadderScene.cpp), [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp), and [`/src/UIManager.cpp`](/src/UIManager.cpp) so post-15s exit triggers spawn and render animated Open Exit Gates instead of Left/Right arrowheads.
+* **3-Phase Dynamic Enemy Spawning & Phase 3 Horde Spawn**:
+  - Replaced static per-chunk enemy counts with time-escalating 3-phase spawning (`ENEMY_PHASE_DURATION = 120.0f` seconds per phase, changing every 2 minutes) via `World::updateEnemySpawning` in [`/src/World.cpp`](/src/World.cpp):
+    - **Phase 1 (0–2 min)**: Rare enemy spawns with a strict maximum of **2 active enemies** at once.
+    - **Phase 2 (2–4 min)**: Increased spawn frequency across chunks and periodic patrols (up to 6 active enemies).
+    - **Phase 3 (4+ min)**: Peak spawn rate (up to 12 active enemies) plus **Horde Spawn** (`HORDE_SPAWN_COOLDOWN = 180.0f`), randomly spawning **3 Slimes** and **3 Bringers of Death** around the player with a 3-minute cooldown, accompanied by roar SFX and HUD alerts.
+* **Interactive 10%-Step BGM Volume Slider (Default 30%)**:
+  - Updated `AudioManager` in [`/include/Audio.h`](/include/Audio.h) and [`/src/Audio.cpp`](/src/Audio.cpp) to default looping background music to **30%** (`bgmVolumePercent = 30`, MCI volume `300`) with `setBgmVolumePercent` and `adjustBgmVolume` snapping to 10% increments (`0%`–`100%`).
+  - Added an interactive Pause Menu volume slider in [`/src/UIManager.cpp`](/src/UIManager.cpp) and [`/src/main.cpp`](/src/main.cpp) supporting mouse click/drag, `[-]`/`[+]` buttons, `Left`/`Right` keys in Pause, `-`/`=` quick steps, and `[M]` mute toggle.
+* **UI Text Wrapping, Letterboxed Fullscreen & Background-Free Floating Icons**:
+  - Added word-boundary wrapping (`drawWrappedText`) in [`/src/UIManager.cpp`](/src/UIManager.cpp) so long lines in both the Pause Menu (`renderPauseMenu`) and Tutorial Modal (`renderTutorialModal`) wrap cleanly onto 2 lines inside the window borders instead of overflowing.
+  - Implemented `computeGameViewport`, `beginViewportFrame`, and `[F11]` fullscreen toggling in [`/src/main.cpp`](/src/main.cpp): maximizing or fullscreening expands the horizontal world view (`halfW = halfH * aspect`) with vertical black borders (top/bottom `glScissor` letterboxing) and zero stretching, while mapping Pause Menu mouse coordinates accurately through the active viewport.
+  - Removed all colored background aura quads behind Relics, Shields, Hearts, and Exit Gates in [`/src/main.cpp`](/src/main.cpp), [`/src/LadderScene.cpp`](/src/LadderScene.cpp), and [`/src/SkyFallScene.cpp`](/src/SkyFallScene.cpp), and regenerated [`/assets/direction_arrows.png`](/assets/direction_arrows.png) without the dark disc backing so only crisp icons float.
+* **Windows Build & `make package` Fix**:
+  - Updated [`/Makefile`](/Makefile) to route `build` and `package` through [`/build/win_tasks.ps1`](/build/win_tasks.ps1), automatically selecting the native MinGW-w64 compiler (`x86_64-w64-mingw32-g++.exe`) instead of MSYS2 POSIX `g++.exe`, cleaning stale `dist/` folders, and suppressing non-interactive archive progress errors.
+  - Guarded `#define NOMINMAX` with `#ifndef NOMINMAX` in [`/src/VideoPlayer.cpp`](/src/VideoPlayer.cpp) and [`/src/Audio.cpp`](/src/Audio.cpp) to eliminate compiler redefinition warnings.
+
 ### [v0.7.4] - 2026-11-05
-#### Session Archive: [`v8.3 - Comprehensive Code Contexts and Documentation Synchronization.md`](/doc/prompts/v8.3%20-%20Comprehensive%20Code%20Contexts%20and%20Documentation%20Synchronization.md)
+#### Session Archive: [`8. Code Snippets, Academic Metadata & Documentation Sync/conversation.md (v8.3)`](/doc/prompts/8.%20Code%20Snippets,%20Academic%20Metadata%20&%20Documentation%20Sync/conversation.md)
 * **Comprehensive Documentation & Code Context Synchronization**:
   - Embedded granular root-relative code references and line numbers across [`/doc/explain.md`](/doc/explain.md), [`/doc/LEARNING_GUIDE.md`](/doc/LEARNING_GUIDE.md), and [`/doc/documentation.md`](/doc/documentation.md).
   - Synchronized architectural guides with modern project structures: procedural graphical splash screen (`UIManager::renderSplashScreen`), Direction Arrow Relics and minigame exit gates, calibrated enemy spawn density (BOD 1-3, Slimes 2-4), 9.0m/4.0m spatial separation buffers, and 5.5s boss metamorphosis timing.
   - Expanded Academic Viva Q&A in `explain.md` with Q7 (Procedural Academic Splash Screen) and Q8 (Direction Relics and Autonomous Direction Shifts).
 
 ### [v0.7.3] - 2026-11-05
-#### Session Archive: [`v8.1 - Synchronize Academic Group Details at README Top.md`](/doc/prompts/v8.1%20-%20Synchronize%20Academic%20Group%20Details%20at%20README%20Top.md)
+#### Session Archive: [`8. Code Snippets, Academic Metadata & Documentation Sync/conversation.md (v8.1)`](/doc/prompts/8.%20Code%20Snippets,%20Academic%20Metadata%20&%20Documentation%20Sync/conversation.md)
 * **Academic Proposal & Group Metadata Synchronization**:
   - Integrated full academic course, faculty submission, and student group details directly to the top of [`/README.md`](/README.md).
   - Synchronized course information (*Computer Graphics & Multimedia Lab - CSE0611328*, *Autumn 2026*, *Batch 55*, *Department of CSE*).
   - Added formatted tables for course instructors (**Engineer Robiul Islam**, Assistant Professor, and **Tasneen Tanvir**, Lecturer) and student group members (**Gaus Saraf Murady** `0432410005101088`, **Lima Akter** `0432410005101063`, and **Fahima Akter** `0432410005101093`).
 
 ### [v0.7.2] - 2026-11-02
-#### Session Archive: [`v7.2 - Render Academic Splash Screen Graphically in OpenGL and Purge Bitmap Texture.md`](/doc/prompts/v7.2%20-%20Render%20Academic%20Splash%20Screen%20Graphically%20in%20OpenGL%20and%20Purge%20Bitmap%20Texture.md)
+#### Session Archive: [`7. Academic Intro Splash Screen & OpenGL Rendering/conversation.md (v7.2)`](/doc/prompts/7.%20Academic%20Intro%20Splash%20Screen%20&%20OpenGL%20Rendering/conversation.md)
 * **100% Procedural Graphical Splash Screen (No Texture Loading)**:
   - Eliminated bitmap disk dependency by removing `assets/splash.png` from the rendering pipeline, memory allocation, and distribution packages.
   - Re-architected `UIManager::renderSplashScreen(halfW, halfH, fadeAlpha, progress)` to render all visual components purely through modern OpenGL primitives:
@@ -94,7 +117,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Eliminated `splashTextureID` from `src/main.cpp`, saving VRAM and avoiding file I/O latency on game launch.
 
 ### [v0.7.1] - 2026-11-02
-#### Session Archive: [`v7.1 - Fix OpenGL Header Order Conflict in MSYS2 and Restore Splash Screen Build.md`](/doc/prompts/v7.1%20-%20Fix%20OpenGL%20Header%20Order%20Conflict%20in%20MSYS2%20and%20Restore%20Splash%20Screen%20Build.md)
+#### Session Archive: [`7. Academic Intro Splash Screen & OpenGL Rendering/conversation.md (v7.1)`](/doc/prompts/7.%20Academic%20Intro%20Splash%20Screen%20&%20OpenGL%20Rendering/conversation.md)
 * **OpenGL Header Conflict Resolution in MSYS2**:
   - Diagnosed compilation error when invoking `make win`: `fatal error: #error OpenGL header already included, remove this include, glad already provides it`.
   - In MSYS2 GCC environments, `<GLFW/glfw3.h>` defaults to including the system `<GL/gl.h>` unless told otherwise. Because `include/Common.h` included `GLFW/glfw3.h` before `glad/glad.h`, GLAD detected that `__gl_h_` was already defined and aborted compilation.
@@ -102,7 +125,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Validated clean compilation under both MSYS2 `make win` and MinGW `mingw32-make build`, ensuring the updated binary `build/main.exe` is generated and launches the intro splash screen as expected.
 
 ### [v0.7.0] - 2026-11-02
-#### Session Archive: [`v7.0 - Academic Intro Splash Screen with Course and Group Details and Fade Transition.md`](/doc/prompts/v7.0%20-%20Academic%20Intro%20Splash%20Screen%20with%20Course%20and%20Group%20Details%20and%20Fade%20Transition.md)
+#### Session Archive: [`7. Academic Intro Splash Screen & OpenGL Rendering/conversation.md (v7.0)`](/doc/prompts/7.%20Academic%20Intro%20Splash%20Screen%20&%20OpenGL%20Rendering/conversation.md)
 * **Academic Intro Splash Screen**:
   - **Pre-Video Cinematic Sequence**: Introduced `STATE_INTRO_SPLASH` (Game State 0) executing seamlessly before the opening intro video (`STATE_INTRO_VIDEO`).
   - **Academic Proposal Card Details**: Features the official Computer Graphics & Multimedia Lab project proposal card with course information, faculty details (Assistant Professor Engineer Robiul Islam, Lecturer Tasneen Tanvir), student group member names and IDs (Gaus Saraf Murady `0432410005101088`, Lima Akter `0432410005101063`, Fahima Akter `0432410005101093`), Semester (Autumn 2026), Batch (55), and Department (CSE).
@@ -113,7 +136,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **VRAM Lifecycle Management**: Automatically unloads and deletes the splash texture (`glDeleteTextures`) immediately upon transitioning into video playback or game exit to eliminate memory waste.
 
 ### [v0.6.16] - 2026-10-26
-#### Session Archive: [`v6.0 - Fix Build & Run Commands, Makefile Pipeline, and CMake Specification.md`](/doc/prompts/v6.0%20-%20Fix%20Build%20%26%20Run%20Commands,%20Makefile%20Pipeline,%20and%20CMake%20Specification.md)
+#### Session Archive: [`6. Build Pipeline, Makefile & CMake Validation/conversation.md (v6.0)`](/doc/prompts/6.%20Build%20Pipeline,%20Makefile%20&%20CMake%20Validation/conversation.md)
 * **Build System & Quick Start Command Diagnosis**:
   - Diagnosed command failure in [`README.md`](/README.md) where `mingw32-make` is not recognized on standard MSYS2/Windows environments where GNU make is named `make` (`make.exe`).
   - Resolved implicit execution side-effect where `make win` directly executed `./build/main.exe`, preventing pure compilation steps. Decoupled Makefile targets into dedicated `.PHONY: all build run win linux package clean`.
@@ -123,14 +146,14 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Documented explicit commands for PowerShell, Windows Command Prompt (`cmd.exe`), and Git Bash across [`README.md`](/README.md) and [`doc/documentation.md`](/doc/documentation.md).
 
 ### [v0.6.15] - 2026-10-26
-#### Session Archive: [`v5.15 - Boss Demon Slime Death Animation Calibration to Match Updated Dying Roar Audio.md`](/doc/prompts/v5.15%20-%20Boss%20Demon%20Slime%20Death%20Animation%20Calibration%20to%20Match%20Updated%20Dying%20Roar%20Audio.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.15)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Boss Demon Slime Death Animation Timing Calibration (`05_d_death.gif` / `demon_death.png`)**:
   - **Acoustic Waveform Analysis**: Measured the newly updated [`assets/dyingRoar.mp3`](/assets/dyingRoar.mp3) audio stream, determining an exact total duration of $3.958\,\text{seconds}$ ($44,100\,\text{Hz}$, 16-bit mono) with sustained acoustic reverberations persisting up to $4.0\,\text{seconds}$.
   - **Framerate Deceleration ($6.0\,\text{FPS}$)**: Decelerated the 22-frame death animation playback rate from $10.0\,\text{FPS}$ down to $6.0\,\text{FPS}$ (`eFrame = std::min(static_cast<int>(enemy.animTimer * 6.0f), 21)`). This expands the visual death sequence across $3.67\,\text{seconds}$, giving the boss's agony collapse and dissolution deliberate, dramatic weight.
   - **Despawn Timer Alignment**: Extended the active death state threshold from $2.4\,\text{seconds}$ to $4.0\,\text{seconds}$ (`enemy.animTimer >= 4.0f`), allowing the final dissipating smoke frames to linger smoothly and dissolve in unison with the closing tail of the audio roar.
 
 ### [v0.6.14] - 2026-10-26
-#### Session Archive: [`v5.14 - Slime Ground Placement & AI Unfreezing, and Boss Demon Slime Dying Roar Audio Integration.md`](/doc/prompts/v5.14%20-%20Slime%20Ground%20Placement%20%26%20AI%20Unfreezing,%20and%20Boss%20Demon%20Slime%20Dying%20Roar%20Audio%20Integration.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.14)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Slime Ground Placement & AI Unfreezing**:
   - **Ground Alignment Fix**: Diagnosed and resolved issue where initial slimes were spawned with `spawnY = footY + 0.7f` instead of `spawnY = footY + 1.2f`. Because the slime render quad is $2.4\,\text{m}$ tall ($1.2\,\text{m}$ half-height) with pixels anchored at the bottom edge, a $0.7\,\text{m}$ offset placed the bottom of the slime at $Y = -0.5\,\text{m}$—sinking $0.5\,\text{m}$ (1 full tile layer) underground into the dirt.
   - **AI Movement Unfreezing**: Fixed collision raycasting deadlock where `footY` was evaluated at $0.7\,\text{m} - 1.2\,\text{m} = -0.5\,\text{m}$. Because surface platform tiles have tops at $Y = 0.0\,\text{m}$, the difference ($0.5\,\text{m}$) exceeded the $0.4\,\text{m}$ ground tolerance check (`hasSolidGroundAt`), causing the slime AI to believe it was perpetually falling into an abyss and freezing its movement in place every frame. With `spawnY = footY + 1.2f`, `footY` evaluates precisely to $0.0\,\text{m}$ (surface) and $-4.0\,\text{m}$ (caverns), restoring active hopping patrols.
@@ -140,7 +163,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Triggered asynchronous playback via Windows MCI when the Boss Demon Slime reaches 0 HP, accompanying the full 22-frame death animation sequence (`05_d_death.gif` / `demon_death.png`) and smoke dissipation.
 
 ### [v0.6.13] - 2026-10-25
-#### Session Archive: [`v5.13 - Scale Down Player Defend Animation to Match Idle Spritesheet Proportions.md`](/doc/prompts/v5.13%20-%20Scale%20Down%20Player%20Defend%20Animation%20to%20Match%20Idle%20Spritesheet%20Proportions.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.13)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Player Defend Animation Proportional Rescaling (`Defend_nobg.png`)**:
   - **Empirical Pixel Analysis**: Evaluated sprite coordinate bounding boxes across all character animations. In [`assets/samurai/Idle.png`](/assets/samurai/Idle.png), [`Run.png`](/assets/samurai/Run.png), and [`Attack1.png`](/assets/samurai/Attack1.png), Samurai Mack is drawn inside $200\times 200$ frames with an average body height of $51$–$52\,\text{px}$, centered horizontally at $X = 94\,\text{px}$ with feet grounded at $Y = 121\,\text{px}$. In contrast, [`Defend_nobg.png`](/assets/samurai/Defend_nobg.png) had the character drawn at $154$–$190\,\text{px}$ height with feet at $Y = 194\,\text{px}$, causing the player to balloon to $3.0\times$ normal size and sink below platforms when guarding.
   - **Super-Sampled Resampling ($0.3377\times$)**: Executed a precision 64-sample box area resampler across all 8 frames of [`Defend_nobg.png`](/assets/samurai/Defend_nobg.png), scaling down the character by scale factor $S = 52.0 / 154.0 \approx 0.33766$.
@@ -148,7 +171,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Seamless In-Engine Compatibility**: Because the texture itself now adheres to the exact coordinate reference frame of all other Samurai Mack sprites, the uniform `playerRenderSize = (5.5f, 5.5f)` and vertical offset `playerPos.y - 0.10f` in [`src/main.cpp`](/src/main.cpp) render the defensive stance with perfect visual continuity and zero size jump.
 
 ### [v0.6.12] - 2026-10-25
-#### Session Archive: [`v5.12 - Increase Slime Enemy Spawn Frequency and Multi-Elevation Density.md`](/doc/prompts/v5.12%20-%20Increase%20Slime%20Enemy%20Spawn%20Frequency%20and%20Multi-Elevation%20Density.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.12)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Increased Slime Spawn Frequency & Encounter Density**:
   - **Guaranteed Starter Slimes in Spawn Chunk**: Added two guaranteed initial slime enemies on the surface at $X = +17.5\,\text{m}$ (moving left) and $X = -18.0\,\text{m}$ (moving right) upon game initialization, providing immediate, engaging combat encounters without requiring players to trek into distant chunks.
   - **100% Chunk Spawning Rate**: Removed the prior $60\%$ probabilistic roll, guaranteeing that every newly generated $35\,\text{m}$ procedural world chunk spawns slimes.
@@ -157,14 +180,14 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Vertical-Aware Separation Buffers**: Refined the enemy distance deconfliction check: Bringer of Death and Slimes now require a $9.0\,\text{m}$ horizontal separation buffer only when sharing the same elevation tier ($\Delta y < 2.5\,\text{m}$). This allows surface Bringers of Death and cavern slimes to coexist within the same horizontal coordinates without mutually blocking spawns. Slime-to-slime spacing is tightened to $4.0\,\text{m}$, and candidate placement search attempts were doubled from 12 to 24 per slime.
 
 ### [v0.6.11] - 2026-10-25
-#### Session Archive: [`v5.11 - Mid-Animation Death Spell Damage and Visual Telegraph Window.md`](/doc/prompts/v5.11%20-%20Mid-Animation%20Death%20Spell%20Damage%20and%20Visual%20Telegraph%20Window.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.11)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Mid-Animation Death Spell Damage Calibration**:
   - Diagnosed and resolved issue where Bringer of Death thundercloud spells dealt damage immediately upon initial frame manifestation ($t = 0.0\text{s}$), making hits unavoidable if the player was at the target location.
   - Aligned damage collision evaluation strictly to the cloud's mid-animation strike phase (frames 7–10 at 12 FPS, $t \in [0.58\text{s}, 0.85\text{s}]$), where the lightning bolt visually extends and crashes into the ground.
   - Granted a generous $0.58\text{s}$ visual telegraph window (frames 0–6) accompanied by a `"THUNDER CLOUD GATHERING! MOVE!"` floating text alert, providing ample reaction time for players to sprint, dash, jump away, or raise their Katana Defend guard (`RMB`/`K`) to parry the strike.
 
 ### [v0.6.10] - 2026-10-25
-#### Session Archive: [`v5.10 - Documentation and Academic Guide Synchronization with Modern Subsystems.md`](/doc/prompts/v5.10%20-%20Documentation%20and%20Academic%20Guide%20Synchronization%20with%20Modern%20Subsystems.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.10)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Academic Guide Enhancement (`/doc/explain.md`)**:
   - Authored a dedicated technical chapter on **"How 2D Sprites Work in Modern OpenGL"**:
     - Explains single-quad GPU VBO/VAO instancing, normalized UV coordinate space ($U \in [0, 1], V \in [0, 1]$), spritesheet frame slicing math ($u_0 = i/N, u_1 = (i+1)/N$), horizontal UV mirroring (`flipHorizontal`), fragment shader alpha discard (`if (texColor.a < 0.1) discard;`), and orthographic MVP matrix projection.
@@ -176,7 +199,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Updated direct `g++` compilation command to link all modular sources (`UIManager.cpp`, `LadderScene.cpp`, `SkyFallScene.cpp`).
 
 ### [v0.6.9] - 2026-10-25
-#### Session Archive: [`v5.9 - Synchronized Thunder Spell SFX and Right-Click Katana Defend Mechanic.md`](/doc/prompts/v5.9%20-%20Synchronized%20Thunder%20Spell%20SFX%20and%20Right-Click%20Katana%20Defend%20Mechanic.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.9)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Synchronized Bringer of Death Spellcast SFX**:
   - Re-anchored `audioMgr.playThunderSpell()` (`assets/thunder-after-crackle.mp3`) to trigger immediately upon the Bringer of Death initiating its spellcast attack animation (`ENEMY_STATE_CAST`).
   - By matching the wraith's cast wind-up duration ($9\text{ frames} / 7.5\text{ fps} \approx 1.2\text{s}$) with the audio's 1.0s initial electrical crackle build-up, the explosive lightning thunderclap impacts precisely as the ground thunder cloud animation spawns at the player's ground coordinate.
@@ -189,7 +212,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Updated Tutorial modal window and Pause Menu with Defend controls and combat instructions.
 
 ### [v0.6.8] - 2026-10-25
-#### Session Archive: [`v5.8 - Delayed Multi-Layer Thunder Spell, BGM Integration, Free Exploration Default, and Enemy Separation.md`](/doc/prompts/v5.8%20-%20Delayed%20Multi-Layer%20Thunder%20Spell,%20BGM%20Integration,%20Free%20Exploration%20Default,%20and%20Enemy%20Separation.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.8)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Telegraphed Multi-Layer Thunder Spells & Audio Synchronization**:
   - Broadened Bringer of Death vertical spell targeting threshold from `absY < 2.8f` to `absY < 14.0f` and horizontal range to `[3.0m, 14.0m]`, enabling underground cavern enemies to detect and cast thunder spells at players exploring ground-level or high sky-canopy platforms.
   - Implemented a 3-phase `SpellHazard` lifecycle:
@@ -212,7 +235,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Removed obsolete `assets/enemies/bringer_of_death/Bringer-Of-Death/Individual Sprite/No Effect Sprites` directory and registered it under [`.gitignore`](/.gitignore).
 
 ### [v0.6.7] - 2026-10-25
-#### Session Archive: [`v5.7 - Shift Control Remap, BOD Centering & Spell Attack, Spike Clusters, and Boss Transformation SFX.md`](/doc/prompts/v5.7%20-%20Shift%20Control%20Remap,%20BOD%20Centering%20&%20Spell%20Attack,%20Spike%20Clusters,%20and%20Boss%20Transformation%20SFX.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.7)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Shift Mode Control Decoupled & Tutorial Window Flash Bug Resolved**:
   - Remapped Shift Mode toggle from `[T]` to `[Y]` (`GLFW_KEY_Y`), eliminating the conflict where pressing `T` simultaneously triggered autonomous direction shifts and opened the tutorial window.
   - Diagnosed and fixed the "split-second flash and disappear" bug of the Tutorial Window: when opening the modal via `[T]` in the pause menu, the keypress was being captured on the very next frame by the modal's dismissal check, immediately closing it. Added `tutDismissLast = true` upon modal trigger to enforce a fresh key-release cycle before dismissal can occur.
@@ -238,7 +261,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Replaced the placeholder bounce thump on `06_Smash.gif` platform touchdown with `dragon-studio-distant-bang-472364.mp3`, delivering a resonant impact on ground slam.
 
 ### [v0.6.6] - 2026-10-25
-#### Session Archive: [`v5.6 - Updated Slime Animations and Boss Demon Slime Platform Jump Mechanics.md`](/doc/prompts/v5.6%20-%20Updated%20Slime%20Animations%20and%20Boss%20Demon%20Slime%20Platform%20Jump%20Mechanics.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.6)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Initial Slime Zoom & Crisp Proportions**:
   - Cropped and centered the active slime bounding box ($160\times 160$) from the lower-middle region of the raw $576\times 320$ GIF assets, eliminating vast empty transparent margins.
   - Generates compact, crystal-clear horizontal spritesheets: `slime_idle.png` ($960\times 160$), `slime_move.png` ($1280\times 160$), and `slime_take_hit.png` ($960\times 160$).
@@ -259,7 +282,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Updated `TheWenderer_Standalone.zip` via `mingw32-make package`.
 
 ### [v0.6.5] - 2026-10-25
-#### Session Archive: [`v5.5 - Lock Boss Attack Direction and Directional Damage Sector.md`](/doc/prompts/v5.5%20-%20Lock%20Boss%20Attack%20Direction%20and%20Directional%20Damage%20Sector.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.5)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Boss Attack Directional Commitment (Zero Mid-Attack Spinning)**:
   - Fixed an issue where the Demon Slime Boss (and Bringer of Death) continually updated their facing direction based on `distX < 0.0f` on every frame, even mid-swing, causing them to unnaturally flip $180^\circ$ mid-animation if the player jumped or dashed behind them.
   - Locked `enemy.facingLeft` at the start of the attack animation: while `enemy.state == ENEMY_STATE_ATTACK`, facing direction updates are suppressed.
@@ -268,7 +291,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Dashing or jumping behind the boss during its telegraph wind-up now cleanly evades the attack.
 
 ### [v0.6.4] - 2026-10-25
-#### Session Archive: [`v5.4 - Fix Bringer of Death Facing, Realistic Katana Slash SFX, Guaranteed Tutorial Window, and Idle Stillness on Restart.md`](/doc/prompts/v5.4%20-%20Fix%20Bringer%20of%20Death%20Facing,%20Realistic%20Katana%20Slash%20SFX,%20Guaranteed%20Tutorial%20Window,%20and%20Idle%20Stillness%20on%20Restart.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.4)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Enemy Facing Direction Correction (Eliminated Moonwalking)**:
   - Discovered that enemy sprite sheets (`bod_walk.png`, `slime_move.png`, `demon_walk.png`) natively face **LEFT** in raw texture space, opposite to player sprites which natively face right.
   - Corrected horizontal UV flip calculation in [`src/main.cpp`](/src/main.cpp): `bool flipHorizontal = !enemy.facingLeft;`. When moving left (`facingLeft = true`), textures are rendered unflipped (`edu`), and when moving right (`facingLeft = false`), textures are flipped horizontally (`-edu`). Bringer of Death now walks forward in both directions.
@@ -285,7 +308,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Preserved idle stance until directional navigation keys (`A`, `D`, `Left`, `Right`) are deliberately pressed, allowing the player full control over when to start running.
 
 ### [v0.6.3] - 2026-10-25
-#### Session Archive: [`v5.3 - Calibrate Enemy Proportions, Speeds, Platform Grounding, and Telegraphed Attack Windups.md`](/doc/prompts/v5.3%20-%20Calibrate%20Enemy%20Proportions,%20Speeds,%20Platform%20Grounding,%20and%20Telegraphed%20Attack%20Windups.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.3)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Enemy Quad Aspect Ratios & Proportional Rendering**:
   - **Bringer of Death**: Corrected render quad from squished 1:1 square `(4.8, 4.8)` to true 1.5:1 aspect ratio `glm::vec2(4.5f, 3.0f)`, matching its $140\times 93$ sprite dimensions and completely eliminating vertical stretching.
   - **Initial Slime**: Scaled render quad from `(2.4, 2.4)` to `glm::vec2(4.5f, 2.5f)` (1.8:1 aspect ratio matching its $576\times 320$ canvas), making it fully visible and correctly proportioned rather than sunken and tiny.
@@ -312,7 +335,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Fixed animation timer framerate calculation: standardized `enemy.animTimer` to real-world seconds (`+= deltaTime`), eliminating compounded double-multiplication framerate glitch that caused instant attacks.
 
 ### [v0.6.2] - 2026-10-25
-#### Session Archive: [`v5.2 - Modular Decomposition of Main Engine into UIManager, LadderScene, and SkyFallScene.md`](/doc/prompts/v5.2%20-%20Modular%20Decomposition%20of%20Main%20Engine%20into%20UIManager,%20LadderScene,%20and%20SkyFallScene.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.2)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Code Size Optimization & Subsystem Modularization**:
   - Refactored monolithic [`src/main.cpp`](/src/main.cpp) by extracting three major functional domains into dedicated header and source pairs matching the project's existing modular design:
     1. **`UIManager` Subsystem** ([`include/UIManager.h`](/include/UIManager.h), [`src/UIManager.cpp`](/src/UIManager.cpp)):
@@ -326,14 +349,14 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Verified clean compilation with zero warnings and zero errors, and re-generated `TheWenderer_Standalone.zip`.
 
 ### [v0.6.1] - 2026-10-25
-#### Session Archive: [`v5.1 - Standardize Standalone Executable to TheWenderer.exe and Eliminate Redundant main.exe.md`](/doc/prompts/v5.1%20-%20Standardize%20Standalone%20Executable%20to%20TheWenderer.exe%20and%20Eliminate%20Redundant%20main.exe.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.1)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Packaging & Distribution Cleanup**:
   - Eliminated duplicate executable issue where both `main.exe` and `TheWenderer.exe` were packaged into `TheWenderer_Standalone.zip`.
   - Updated [`makefile`](/makefile) `package` target to explicitly copy `build/main.exe` directly as `TheWenderer.exe` in both `TheWenderer/` and `dist/TheWenderer/`.
   - Purged leftover `TheWenderer/main.exe` and regenerated `TheWenderer_Standalone.zip` with a single, branded executable: `TheWenderer/TheWenderer.exe`.
 
 ### [v0.6.0] - 2026-10-25
-#### Session Archive: [`v5.0 - Combat System, 3 Lives, Spikes, Bringer of Death, and Demon Slime Boss Battle.md`](/doc/prompts/v5.0%20-%20Combat%20System,%203%20Lives,%20Spikes,%20Bringer%20of%20Death,%20and%20Demon%20Slime%20Boss%20Battle.md)
+#### Session Archive: [`5. Combat System, Roaming Enemies, Boss Battle & Audio/conversation.md (v5.0)`](/doc/prompts/5.%20Combat%20System,%20Roaming%20Enemies,%20Boss%20Battle%20&%20Audio/conversation.md)
 * **Real-Time Combat & Player Attack System**:
   - Implemented melee sword slash attack triggered by **`[J]`**, **`[X]`**, or **Left Mouse Button (LMB)**.
   - Dynamically activates `samuraiAnim.texAttack` with an oriented front-facing hitbox sweep arc ($2.4\times 2.0$ meters at $1.35\text{m}$ reach).
@@ -362,7 +385,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Shield relics rebalanced to spawn less frequently (1 in 5 platform roll) and positioned strictly on separate platforms away from direction-change relics.
 
 ### [v0.5.15] - 2026-10-25
-#### Session Archive: [`Ladder Hero Scale Fix, Post-Intro Tutorial Modal, Shield Pickup Icon, and Scene Exit Timers - v4.17`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#ladder-hero-scale-fix-post-intro-tutorial-modal-shield-pickup-icon-and-scene-exit-timers---v417)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Visual Presentation & Proportions**:
   - **Ladder Climb Hero Scale Restoration**:
     - *Root Cause*: In `SCENE_LADDER_CLIMB`, the climbing Samurai Mack sprite quad was translated without matrix scaling, rendering at a tiny default $1.0\times 1.0$ meter dimension ($5.5\times$ smaller than intended).
@@ -383,7 +406,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
     - *Definitive Exit Notice*: When the 15-second survival trial completes, triggers an audio cue and displays a prominent glowing banner: `=== EXIT APPEARED! === [TOUCH A DIRECTION ARROW TO RETURN]` alongside directional arrow relics positioned visibly ahead on the tracks/sky lanes.
 
 ### [v0.5.14] - 2026-10-25
-#### Session Archive: [`Circular Energy Shield Bubble and Single-Hit Trap Absorption - v4.16`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#circular-energy-shield-bubble-and-single-hit-trap-absorption---v416)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Mechanics & Combat State**:
   - **Single-Hit Shield Trap Absorption**:
     - *Root Cause of Deflection Loop*: The fruit shield timer (`shieldTimer`) was never reduced or cleared upon colliding with hazards, allowing players to overlap spikes, mines, or raptors for up to 10 seconds while spamming "DEFLECTED" sound and visual notifications on every single frame.
@@ -398,7 +421,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
     - *Glowing Electric Rim*: Applies a power-curve rim glow formula $\text{rim} = \text{pow}(\text{dist} \times 2.0, \text{uRimPower})$, yielding a translucent protective core and an intense, shimmering electric perimeter wrapped snugly around the hero.
 
 ### [v0.5.13] - 2026-10-25
-#### Session Archive: [`Mini-Game Scene Exit Restrictions and Underground Ladder Descent Fix - v4.13`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#mini-game-scene-exit-restrictions-and-underground-ladder-descent-fix---v413)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Mechanics & Level Interactivity**:
   - **Mini-Game Scene Exit Restrictions**:
     - *Disallowed Key Switching*: Removed arbitrary manual key transitions that switched between `SCENE_LADDER_CLIMB` and `SCENE_SKY_FALL` via Up/Down keys, and disabled leaping off outer edge lanes to exit.
@@ -417,7 +440,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
       5. Added support for `GLFW_KEY_DOWN` alongside `GLFW_KEY_S` for dropping through one-way tiles and descending ladders.
 
 ### [v0.5.12] - 2026-10-25
-#### Session Archive: [`Free Exploration Mode and Manual Movement Toggle - v4.12`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#free-exploration-mode-and-manual-movement-toggle---v412)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Mechanics & Player Controls**:
   - **Free Exploration Mode (`F` Key)**:
     - *Motivation*: The default game mode operates as a continuous high-speed endless runner where the Samurai sprints forward autonomously. Players exploring intricate platforms, cavern shafts, or avoiding obstacles needed full, unhurried manual control.
@@ -427,7 +450,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
     - *UI & Feedback*: Displays floating popup `FREE EXPLORATION: ON / OFF`, adds on-screen HUD badge in top-left, updates window title, and adds status item `[F] MODE: FREE EXPLORATION` in the ESC Pause Menu.
 
 ### [v0.5.11] - 2026-10-25
-#### Session Archive: [`Fix Standalone Missing DLL and Video Rendering Alpha Discard - v4.11`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#fix-standalone-missing-dll-and-video-rendering-alpha-discard---v411)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Resolved Issues & Edge Cases**:
   - **`msys-stdc++-6.dll` Missing System Error**:
     - *Root Cause*: The default compiler configuration dynamically linked against MSYS2's `libstdc++` and `libgcc`, causing runtime failures on machines without an MSYS environment in PATH.
@@ -440,7 +463,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
       3. Added proper initial `glViewport` initialization based on active window framebuffer dimensions in [`src/main.cpp`](/src/main.cpp).
 
 ### [v0.5.10] - 2026-10-25
-#### Session Archive: [`Standalone Single-File Game Packaging Analysis - v4.10`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#standalone-single-file-game-packaging-analysis---v410)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Packaging & Distribution Engineering**:
   - **Standalone Feasibility & Architecture**: Comprehensively analyzed all three technical methods for packaging *The Wenderer* into a standalone file:
     1. **Virtual Container / Single-File SFX**: Packaging `main.exe`, `glfw3.dll`, and `assets/` into a single self-contained `.exe` container with zero user extraction required.
@@ -450,7 +473,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Runtime Dependency Verification**: Inspected PE import tables via `objdump`, confirming standard Windows UCRT, Media Foundation (`MFPlat`, `MFReadWrite`), WinMM, and GDI32 system linkage across Windows 10 and 11 environments.
 
 ### [v0.5.9] - 2026-10-25
-#### Session Archive: [`In-Engine Intro Video Playback and Asset Embedding Analysis - v4.9`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#in-engine-intro-video-playback-and-asset-embedding-analysis---v49)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Architectural Additions**:
   - **In-Engine Video Subsystem (`VideoPlayer`)**: Created [`include/VideoPlayer.h`](/include/VideoPlayer.h) and [`src/VideoPlayer.cpp`](/src/VideoPlayer.cpp) utilizing native Windows Media Foundation (`IMFSourceReader`) with zero external binary dependencies. Streams and decodes H.264 video frames directly to an OpenGL 2D texture (`GL_BGRA` / `glTexSubImage2D`) at native 1080p resolution while simultaneously decoding AAC audio streams into in-memory PCM Wave audio played asynchronously via `PlaySoundA`.
   - **Game State Transition**: Introduced `STATE_INTRO_VIDEO = 0` to `GameState` in [`include/Common.h`](/include/Common.h). The engine initializes into this state before the platformer begins.
@@ -461,7 +484,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - Explained mathematical reasons why embedding an already-compressed H.264 MP4 file into executable binary files does **not** reduce its file size, and detailed real size-reduction strategies (transcoding to 720p H.265/AV1 or lowered bitrates).
 
 ### [v0.5.8] - 2026-10-25
-#### Session Archive: [`Sky-Fall Down Scene Left and Right Direction Relics - v4.8`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#sky-fall-down-scene-left-and-right-direction-relics---v48)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Resolved Issues & Edge Cases**:
   - **Sky-Fall Direction Relic Scarcity & Missed Pickups**: In [`src/main.cpp`](/src/main.cpp), diving at $9.2\,\text{m/s}$ caused single small direction relics at random coordinates to be easily bypassed in $< 0.5\,\text{s}$. Pre-generated items below the player were previously only coins and fruit shields, leaving a dead zone upon 15s trial completion.
 * **Added & Improved**:
@@ -473,7 +496,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Seamless Platform Runner Resumption**: Touching any Left or Right arrow relic immediately calls `returnToPlatformerScene(true)`, snapping the player flush to solid ground via vertical raycast and resuming the horizontal runner in the indicated direction.
 
 ### [v0.5.7] - 2026-10-25
-#### Session Archive: [`Ladder Scene Direction Trigger Relics & Exit Spawning - v4.7`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#ladder-scene-direction-trigger-relics-exit-spawning---v47)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Resolved Issues & Edge Cases**:
   - **Missing Left/Right Direction Objects on Ladders**: In [`src/main.cpp`](/src/main.cpp), `SCENE_LADDER_CLIMB` previously only spawned Gold Coins (`type = 0`) and Fruit Shields (`type = 1`), leaving players with no direction relic trigger objects to exit back to the platformer runner without dying to traps.
   - **Ladder Generation Boundary Sync**: Fixed `enterLadderScene()` which pre-generated up to 85m while leaving `ladderGenTopY = 8.0f`. Initial tier generation is now tightly bounded ($y \le 26.0\text{m}$) and synchronized with runtime generation.
@@ -485,7 +508,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Sky-Fall Parity & Leap Direction Alignment**: Extended identical post-15s direction relic spawning to `SCENE_SKY_FALL` and ensured outer-lane leaps off Lane 0 and Lane 2 explicitly orient `platformerSavedDir` to Left and Right.
 
 ### [v0.5.6] - 2026-10-25
-#### Session Archive: [`Left Chunk Persistence, Direction Arrows, Shield Fruits, Idle Start, Single Hero, and Down Scene Pacing - v4.6`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#left-chunk-persistence-direction-arrows-shield-fruits-idle-start-single-hero-and-down-scene-pacing---v46)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Resolved Issues & Edge Cases**:
   - **Left Chunk Persistence & Unbounded Deletion Fix**: Fixed chunk eviction in [`src/World.cpp`](/src/World.cpp) where `leftGenEdge` was previously unbounded and failed to track culled chunks. Clamped `leftGenEdge = std::max(leftGenEdge, playerX - 80.0f)` and `rightGenEdge = std::min(rightGenEdge, playerX + 80.0f)`.
   - **Zero Airborne Floating on Scene Return**: Implemented `World::ensureGroundAround(targetX, theme)` and dynamic ground surface scanning upon returning from Up (Ladder) or Down (Sky-Fall) mini-games. If returning over a solid platform, player snaps flush to ground; if over an open chasm, player retains downward velocity with active gravity, preventing any mid-air floating.
@@ -497,7 +520,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
   - **Sky-Fall Scene Obstacle Deconfliction**: Increased vertical tier spacing from 5.0m to 14.0m, reduced bird spawn rate to 50% on alternate tiers, lowered spike mine frequency to 33%, and calibrated collision boxes from 1.15m to 0.85m for fair, readable evasive diving.
 
 ### [v0.5.5] - 2026-10-25
-#### Session Archive: [`Dynamic Day-Night Cycle, Thematic Background Sceneries, and Scene Cooldown - v4.5`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#dynamic-day-night-cycle-thematic-background-sceneries-and-scene-cooldown---v45)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added & Improved**:
   - **Four Thematic Background Scenery Assets**:
     - **Silvergrass Field** ([`assets/scenery_silvergrass.png`](/assets/scenery_silvergrass.png)): Shimmering Japanese Susuki grass / pampas plumes swaying along rolling hills.
@@ -525,7 +548,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.4] - 2026-10-25
-#### Session Archive: [`Dash Mechanic, Left Starting Platforms, and Dynamic Up-Down Mini-Game Scenes - v4.4`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#dash-mechanic-left-starting-platforms-and-dynamic-up-down-mini-game-scenes---v44)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added & Improved**:
   - **High-Velocity Dash Mechanic (`SHIFT` Key)**:
     - Implemented a burst dash ($15.0\,\text{m/s}$ for $0.22\,\text{s}$ with a $0.65\,\text{s}$ cooldown).
@@ -553,7 +576,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.3] - 2026-10-25
-#### Session Archive: [`Downward Ladder Entry and Procedural World Generation Analysis - v4.3`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#downward-ladder-entry-and-procedural-world-generation-analysis---v43)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added & Improved**:
   - **Downward Ladder Shaft Entry via `S`/`Down` Key**:
     - Players can now press `S` or `Down Arrow` while standing near the top of a ladder shaft to latch onto the ladder and descend into underground caverns.
@@ -568,7 +591,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.2] - 2026-10-25
-#### Session Archive: [`Floating Text for Fruit Pickups and Auto-Shift Disabling - v4.2`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#floating-text-for-fruit-pickups-and-auto-shift-disabling---v42)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added & Improved**:
   - **World-Space Floating Text Engine**:
     - Extended `Renderer::drawText` to support dynamic camera transformations via an optional `const glm::mat4& view` parameter.
@@ -584,7 +607,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.1] - 2026-10-25
-#### Session Archive: [`Slow Down Running and Climbing Animation Framerate - v4.1`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#slow-down-running-and-climbing-animation-framerate---v41)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Bug Fixes & Animation Calibrations**:
   - **Eliminated Double-Multiplication Framerate Glitch**: Fixed an issue where `animTimer` was multiplied by $10.0$ in the update loop and then multiplied by $12.0$ in the frame index selector, causing the running animation to play at a glitchy $120\,\text{FPS}$ ($15$ full run cycles per second).
   - **Normalized Timer Accumulation**: `animTimer` now accumulates pure elapsed real-world seconds (`animTimer += deltaTime`).
@@ -595,7 +618,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.5.0] - 2026-10-24
-#### Session Archive: [`Samurai Ninja Player Animations Pause Menu and Score Counter - v4.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#samurai-ninja-player-animations-pause-menu-and-score-counter---v40)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added**:
   - **Samurai Mack & Shinobi Kenji Character Integration**:
     - Hand-crafted 2D pixel-art character animation sheets with high-resolution frames for **Samurai Mack** and **Shinobi Kenji**.
@@ -624,7 +647,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.3] - 2026-10-24
-#### Session Archive: [`Technical Documentation and Academic Guide Creation - v3.6`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#technical-documentation-and-academic-guide-creation---v36)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added**:
   - Created [`/doc/documentation.md`](/doc/documentation.md): Comprehensive technical progress report covering architecture, subsystem design, graphics pipeline, physics tuning, and build specifications.
   - Created [`/doc/explain.md`](/doc/explain.md): Accessible academic guide stripping away technical jargon, using everyday analogies (*Rulebook, Musician, Artist, Architect, Director*) to explain each code module for project presentations and lab viva exams.
@@ -633,7 +656,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.2] - 2026-10-24
-#### Session Archive: [`Modular Code Refactoring Ladder Stopping and Cavern Chasm Fixes - v3.5`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#modular-code-refactoring-ladder-stopping-and-cavern-chasm-fixes---v35)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Architectural Refactoring**:
   - Decoupled the ~1,900-line monolithic `src/main.cpp` into 5 maintainable, focused modules:
     - [`/include/Common.h`](/include/Common.h): Central shared constants, calibrated physics parameters, and data models.
@@ -649,7 +672,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.1] - 2026-10-24
-#### Session Archive: [`Multi-Elevation Worlds Caverns Sky Tier and Midpoint Interrupts - v3.4`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#multi-elevation-worlds-caverns-sky-tier-and-midpoint-interrupts---v34)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added**:
   - **Horizontal Direction Memory (`lastHorizontalDir`)**: Ascending or descending ladder shafts now remembers the prior horizontal run direction (`DIR_RIGHT` or `DIR_LEFT`), resuming that direction upon summiting instead of forcing an arbitrary rightward turn.
   - **Mid-Slope Jumping & Traversal Interrupts**: Mid-slope sliding can now be interrupted at any point by jumping (`Space`/`W`/Up) or steering (`A`/`D`), giving full control over downward momentum.
@@ -661,7 +684,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.4.0] - 2026-10-24
-#### Session Archive: [`Tunnels Slopes Audio SFX Dynamic Endless Platforms and Corner HUD - v3.2`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#tunnels-slopes-audio-sfx-dynamic-endless-platforms-and-corner-hud---v32)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added**:
   - **Truly Endless Procedural Platforms**: Replaced fixed layer structures with a randomized multi-tier platform generator producing randomized elevations, lengths, and gaps.
   - **Vertical Ladder Tunnel Shafts**: Enclosed ladders within masonry-walled vertical shafts featuring shadowed interior backdrops and illuminated guide lines.
@@ -673,7 +696,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.3.0] - 2026-10-24
-#### Session Archive: [`Brackeys Assets Ladders Pitfalls Spikes and Direction Relics - v3.1`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#brackeys-assets-ladders-pitfalls-spikes-and-direction-relics---v31)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Added**:
   - **Brackeys Platformer Asset Integration**: Integrated pixel-art textures from the Brackeys platformer bundle: `world_tileset.png`, `platforms.png`, `coin.png`, and `fruit.png`.
   - **Mystery Direction Relics**: Floating fruit pickups that immediately trigger autonomous direction shifts (`DIR_RIGHT`, `DIR_LEFT`, `DIR_UP`, `DIR_DOWN`) with an on-screen alert banner.
@@ -685,7 +708,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.2.0] - 2026-10-24
-#### Session Archive: [`Side-View Endless Runner Transition with Dynamic Direction and Sprites - v3.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#side-view-endless-runner-transition-with-dynamic-direction-and-sprites---v30)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Major Perspective Shift**:
   - Converted the game from a top-down ribbon runner to a classic 2D side-view endless platformer.
   - Re-mapped physics coordinates: horizontal axis ($X$) represents travel progression, vertical axis ($Y$) represents elevation, jump physics, and downward gravity.
@@ -697,7 +720,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.2] - 2026-10-21
-#### Session Archive: [`Project Structure and Version Archiving Advice - v2.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#project-structure-and-version-archiving-advice---v20)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Documentation & Repository Structure**:
   - Evaluated repository structure and documented the distinction between monolithic gameplay source files and external project dependencies (`glad.c`, `include/`, `lib/`).
   - Formulated version snapshot strategies and best practices for archiving game builds before major milestone refactoring.
@@ -705,7 +728,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.1] - 2026-10-21
-#### Session Archive: [`Convert File Paths to Root-Relative - v1.2`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#convert-file-paths-to-root-relative---v12)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Standards & Compliance**:
   - Converted all internal documentation file paths and markdown links across `README.md`, `AGENTS.md`, and prompt archives to repository root-relative paths (`/doc/...`).
   - Eliminated machine-specific absolute file URIs (`file:///...`) for portability across platforms and remote Git hosting.
@@ -713,7 +736,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.0-hotfix] - 2026-10-18
-#### Session Archive: [`Fix Makefile for MSYS2 Sh Environment - v1.1`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#fix-makefile-for-msys2-sh-environment---v11)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Build System Fix**:
   - Diagnosed and resolved MSYS2 `/bin/sh` syntax error when executing `make win` on Windows.
   - Removed shell-dependent batch conditions from [`/Makefile`](/Makefile).
@@ -722,7 +745,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ### [v0.1.0] - 2026-10-17
-#### Session Archive: [`Project Analysis and Phase 1 Implementation - v1.0`](/doc/prompts/v1.0-v4.17%20-%20Merged%20Prompts%20Archive.md#project-analysis-and-phase-1-implementation---v10)
+#### Session Archive: [`1. Phase 1 Prototype & Documentation/conversation.md (v1.0)`](/doc/prompts/1.%20Phase%201%20Prototype%20&%20Documentation/conversation.md)
 * **Initial Release (Phase 1 Complete)**:
   - Implemented the core engine prototype using Modern OpenGL 3.3 Core Profile in C++.
   - Created a single reusable $1 \times 1$ Quad VAO/VBO and MVP GLSL shader replacing hardcoded geometry.
