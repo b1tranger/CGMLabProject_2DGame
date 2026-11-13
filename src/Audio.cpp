@@ -13,27 +13,55 @@
 
 EM_JS(void, js_play_sfx_path, (const char* pathStr, float vol), {
     var path = UTF8ToString(pathStr);
-    var audio = new Audio(path);
-    audio.volume = Math.max(0.0, Math.min(1.0, vol));
-    audio.play().catch(function(e) {});
+    try {
+        var url = path;
+        if (typeof FS !== 'undefined') {
+            try {
+                var bytes = FS.readFile(path);
+                var mime = path.endsWith('.mp3') ? 'audio/mpeg' : (path.endsWith('.ogg') ? 'audio/ogg' : 'audio/wav');
+                var blob = new Blob([bytes], {type: mime});
+                url = URL.createObjectURL(blob);
+            } catch(e) {}
+        }
+        var audio = new Audio(url);
+        audio.volume = Math.max(0.0, Math.min(1.0, vol));
+        audio.play().catch(function(e) {});
+    } catch(err) {
+        console.warn('SFX audio error:', err);
+    }
 });
 
 EM_JS(void, js_play_wav_buffer, (const uint8_t* data, int len), {
-    var bytes = HEAPU8.subarray(data, data + len);
-    var blob = new Blob([bytes], {type: 'audio/wav'});
-    var url = URL.createObjectURL(blob);
-    var audio = new Audio(url);
-    audio.play().catch(function(e) {});
+    try {
+        var bytes = HEAPU8.subarray(data, data + len);
+        var blob = new Blob([bytes], {type: 'audio/wav'});
+        var url = URL.createObjectURL(blob);
+        var audio = new Audio(url);
+        audio.play().catch(function(e) {});
+    } catch(err) {}
 });
 
 EM_JS(void, js_start_bgm_web, (const char* pathStr, float vol), {
     var path = UTF8ToString(pathStr);
-    if (!window.g_bgm) {
-        window.g_bgm = new Audio(path);
-        window.g_bgm.loop = true;
+    try {
+        if (!window.g_bgm) {
+            var url = path;
+            if (typeof FS !== 'undefined') {
+                try {
+                    var bytes = FS.readFile(path);
+                    var mime = path.endsWith('.mp3') ? 'audio/mpeg' : (path.endsWith('.ogg') ? 'audio/ogg' : 'audio/wav');
+                    var blob = new Blob([bytes], {type: mime});
+                    url = URL.createObjectURL(blob);
+                } catch(e) {}
+            }
+            window.g_bgm = new Audio(url);
+            window.g_bgm.loop = true;
+        }
+        window.g_bgm.volume = Math.max(0.0, Math.min(1.0, vol));
+        window.g_bgm.play().catch(function(e) {});
+    } catch(err) {
+        console.warn('BGM audio error:', err);
     }
-    window.g_bgm.volume = Math.max(0.0, Math.min(1.0, vol));
-    window.g_bgm.play().catch(function(e) {});
 });
 
 EM_JS(void, js_set_bgm_vol_web, (float vol), {
