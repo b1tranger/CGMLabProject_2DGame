@@ -12,6 +12,7 @@ All entries in this changelog map directly to session archives recorded in [`/do
 
 | Release Version | Session Version | Date | Core Milestone / Focus |
 |---|---|---|---|
+| **v0.8.2** | [Session 11](/doc/prompts/11.%20Web%20Port%20%26%20Itch.io%20Deployment%20Guide/summary.md) | 2026-11-13 | Web Porting Architecture & itch.io Online Playable Guide: Emscripten Toolchain Setup, Asynchronous Main Loop Callback (`emscripten_set_main_loop`), WebGL 2.0 (`#version 300 es`), JavaScript Web Audio Bridge (`EM_JS`), Virtual Filesystem (`--preload-file assets`), Local HTTP Server Testing, Clean Itch Shell (`shell_minimal.html`), and `build_web.bat` / Makefile `web` Pipelines |
 | **v0.8.1** | [Session 10](/doc/prompts/10.%20Presentation%20Guide%20%26%20Video%20Narration%20Script/summary.md) | 2026-11-11 | Presentation Guide, Pre-Gameplay Video Narration Script, Gameplay B-Roll Storyboard, Live Demo Playbook & Viva Cheat Sheet |
 | **v0.8.0** | [Session 9](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md) | 2026-11-11 | Up/Down-Only Run Relics, Open Exit Gate Icon (`exit_gate.png`), 3-Phase Dynamic Enemy Spawning (1m Phase 1/2, Max 5/Type in Phase 3) with Horde Spawn, 10%-Step BGM Volume Slider (40% Default), Center-Screen Phase Banners, Previous & Highest Score UI, 2-Line Modal Text Wrapping, Letterboxed Fullscreen (`F11`), Background-Free Floating Icons, and Tutorial Screen Animation Grids |
 | **v0.7.4** | [v8.3](#v83---comprehensive-code-contexts-and-documentation-synchronization) | 2026-11-05 | Documentation & Code Context Synchronization: Embedded Root-Relative Code Contexts, Viva Q&A Expansion & Modern Subsystem Mapping Across explain.md, LEARNING_GUIDE.md, and documentation.md |
@@ -66,6 +67,19 @@ All entries in this changelog map directly to session archives recorded in [`/do
 ---
 
 ## Detailed Version Logs
+
+### [v0.8.2] - 2026-11-13
+#### Session Archive: [`11. Web Port & Itch.io Deployment Guide`](/doc/prompts/11.%20Web%20Port%20%26%20Itch.io%20Deployment%20Guide/summary.md)
+* **Web Porting & itch.io Online Playable Guide ([`/doc/WEB_PORT_AND_ITCH_GUIDE.md`](/doc/WEB_PORT_AND_ITCH_GUIDE.md))**:
+  - Authored an exhaustive, production-grade guide detailing the end-to-end process of turning The Wenderer from a Windows C++17/OpenGL desktop game into a WebAssembly (Wasm) + WebGL 2.0 browser game published on itch.io.
+  - Documented the **6 Architectural Pillars** of desktop-to-web migration:
+    1. **Asynchronous Main Loop**: Refactoring blocking desktop `while (!glfwWindowShouldClose)` into non-blocking `mainLoopTick` driven by `emscripten_set_main_loop(..., 0, 1)`.
+    2. **Graphics Migration**: Transitioning from desktop OpenGL 3.3 Core (`glad.c`, `#version 330 core`) to WebGL 2.0 (`<GLES3/gl3.h>`, `#version 300 es`, `precision highp float;`).
+    3. **Audio System Bridge**: Replacing Windows-only `winmm.lib` / `mciSendStringA` with a zero-dependency JavaScript Web Audio / HTML5 Audio bridge via Emscripten's `EM_JS`.
+    4. **Cinematic Handling**: Graceful fallback from Windows Media Foundation (`mfplat.lib`) to the procedural Modern OpenGL academic splash screen.
+    5. **Virtual Filesystem & Persistence**: Packaging `assets/` into `index.data` via `--preload-file assets`, keeping file paths identical, and persisting `score_record.txt` in browser `localStorage`.
+    6. **Build Pipelines & Shell Template**: Created [`/shell_minimal.html`](/shell_minimal.html) (dark-themed, crisp pixel rendering, progress bar, key-scroll suppression), [`/build_web.bat`](/build_web.bat), and added `make web` / `make package-web` targets in [`/Makefile`](/Makefile).
+  - Provided a step-by-step itch.io deployment walkthrough: preparing the root `index.html` ZIP package, selecting the `HTML` project kind, configuring 1024x720 canvas dimensions, enabling the fullscreen button, and local HTTP CORS testing.
 
 ### [v0.8.1] - 2026-11-11
 #### Session Archive: [`10. Presentation Guide & Video Narration Script`](/doc/prompts/10.%20Presentation%20Guide%20%26%20Video%20Narration%20Script/summary.md)

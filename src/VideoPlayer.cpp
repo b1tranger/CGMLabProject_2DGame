@@ -1,5 +1,51 @@
 #include "VideoPlayer.h"
 
+#ifdef __EMSCRIPTEN__
+#include <algorithm>
+
+VideoPlayer introVideoPlayer;
+
+VideoPlayer::VideoPlayer()
+    : m_pReader(nullptr)
+    , m_textureID(0)
+    , m_width(0)
+    , m_height(0)
+    , m_isPlaying(false)
+    , m_hasFinished(true)
+    , m_elapsedTime(0.0f)
+    , m_duration(0.0f)
+    , m_lastSampleTimeHns(0)
+{
+}
+
+VideoPlayer::~VideoPlayer() {
+    close();
+}
+
+void VideoPlayer::decodeAudio(const std::wstring&) {}
+
+bool VideoPlayer::open(const std::wstring&) {
+    m_hasFinished = true;
+    m_isPlaying = false;
+    return true;
+}
+
+void VideoPlayer::update(float) {}
+
+void VideoPlayer::skip() {
+    m_hasFinished = true;
+    m_isPlaying = false;
+}
+
+void VideoPlayer::close() {
+    m_hasFinished = true;
+    m_isPlaying = false;
+}
+
+float VideoPlayer::getProgress() const {
+    return 1.0f;
+}
+#else
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -276,3 +322,4 @@ float VideoPlayer::getProgress() const {
     if (m_duration <= 0.0f) return 1.0f;
     return std::clamp(m_elapsedTime / m_duration, 0.0f, 1.0f);
 }
+#endif // !__EMSCRIPTEN__

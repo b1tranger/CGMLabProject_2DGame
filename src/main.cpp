@@ -152,14 +152,39 @@ int getCurrentScore() {
          relicsTriggered * 100;
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+EM_JS(int, js_load_high_score, (), {
+    var v = localStorage.getItem("thewenderer_highest");
+    return v ? parseInt(v, 10) : 0;
+});
+EM_JS(int, js_load_prev_score, (), {
+    var v = localStorage.getItem("thewenderer_prev");
+    return v ? parseInt(v, 10) : 0;
+});
+EM_JS(void, js_save_scores, (int highest, int prev), {
+    localStorage.setItem("thewenderer_highest", highest);
+    localStorage.setItem("thewenderer_prev", prev);
+});
+#endif
+
 void saveScoreHistory() {
+#ifdef __EMSCRIPTEN__
+  js_save_scores(highestScore, previousRunScore);
+#else
   std::ofstream out("score_record.txt");
   if (out.is_open()) {
     out << highestScore << " " << previousRunScore << "\n";
   }
+#endif
 }
 
 void loadScoreHistory() {
+#ifdef __EMSCRIPTEN__
+  highestScore = std::max(0, js_load_high_score());
+  previousRunScore = std::max(0, js_load_prev_score());
+#else
   std::ifstream in("score_record.txt");
   if (in.is_open()) {
     int loadedBest = 0, loadedPrev = 0;
@@ -170,6 +195,7 @@ void loadScoreHistory() {
       previousRunScore = std::max(0, loadedPrev);
     }
   }
+#endif
 }
 
 void triggerGameOver(const std::string &reason) {
@@ -648,36 +674,38 @@ void startIntroVideo() {
 }
 
 // -----------------------------------------------------------------------------
-// Main Entry Point
+// Game Engine Initialization
 // -----------------------------------------------------------------------------
-int main() {
+bool initializeGame(GLFWwindow *&window) {
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
-    return -1;
+    return false;
   }
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT,
-                                        WINDOW_TITLE, nullptr, nullptr);
+  window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT,
+                            WINDOW_TITLE, nullptr, nullptr);
   if (!window) {
     std::cerr << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
-    return -1;
+    return false;
   }
 
   glfwMakeContextCurrent(window);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSwapInterval(1);
 
+#ifndef __EMSCRIPTEN__
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     std::cerr << "Failed to initialize GLAD" << std::endl;
-    return -1;
+    return false;
   }
+#endif
 
   int initFbW = 0, initFbH = 0;
   glfwGetFramebufferSize(window, &initFbW, &initFbH);
@@ -687,7 +715,7 @@ int main() {
   audioMgr.init();
   if (!gameRenderer.init()) {
     std::cerr << "Failed to initialize Game Renderer" << std::endl;
-    return -1;
+    return false;
   }
 
   // Load Character Textures (Samurai Mack)
@@ -777,14 +805,19 @@ int main() {
   currentGameState = STATE_INTRO_SPLASH;
   splashTimer = 0.0f;
 
-  float lastFrameTime = static_cast<float>(glfwGetTime());
-  float titleUpdateTimer = 0.0f;
-  int frameCount = 0;
+  return true;
+}
 
-  // -------------------------------------------------------------------------
-  // Main Game Loop
-  // -------------------------------------------------------------------------
-  while (!glfwWindowShouldClose(window)) {
+// -----------------------------------------------------------------------------
+// Main Game Loop Callback (Supports both WebAssembly and Native Desktop)
+// -----------------------------------------------------------------------------
+static GLFWwindow *g_gameWindow = nullptr;
+
+void mainLoopIteration() {
+  GLFWwindow *window = g_gameWindow;
+  static float lastFrameTime = static_cast<float>(glfwGetTime());
+  static float titleUpdateTimer = 0.0f;
+  static int frameCount = 0;
     float currentFrameTime = static_cast<float>(glfwGetTime());
     float rawDeltaTime = currentFrameTime - lastFrameTime;
     lastFrameTime = currentFrameTime;
@@ -956,7 +989,7 @@ int main() {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-        continue;
+        return;
       }
     }
 
@@ -1048,7 +1081,7 @@ int main() {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-        continue;
+        return;
       }
     }
 
@@ -3122,9 +3155,18 @@ int main() {
 
     glfwSwapBuffers(window);
     glfwPollEvents();
-  }
 
-  // Cleanup Resources
+#ifdef __EMSCRIPTEN__
+    if (glfwWindowShouldClose(window)) {
+      emscripten_cancel_main_loop();
+    }
+#endif
+}
+
+// -----------------------------------------------------------------------------
+// Resource Cleanup
+// -----------------------------------------------------------------------------
+void cleanupGameResources(GLFWwindow *window) {
   introVideoPlayer.close();
   audioMgr.stopBGM();
   gameRenderer.cleanup();
@@ -3204,6 +3246,28 @@ int main() {
 
   glfwDestroyWindow(window);
   glfwTerminate();
+}
+
+// -----------------------------------------------------------------------------
+// Main Entry Point
+// -----------------------------------------------------------------------------
+int main() {
+  GLFWwindow *window = nullptr;
+  if (!initializeGame(window)) {
+    return -1;
+  }
+
+  g_gameWindow = window;
+
+#ifdef __EMSCRIPTEN__
+  emscripten_set_main_loop(mainLoopIteration, 0, 1);
+#else
+  while (!glfwWindowShouldClose(window)) {
+    mainLoopIteration();
+  }
+  cleanupGameResources(window);
+#endif
+
   return 0;
 }
 

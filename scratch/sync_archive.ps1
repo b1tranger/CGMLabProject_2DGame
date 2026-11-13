@@ -1,7 +1,8 @@
 param(
-    [string]$TranscriptSrc = "C:\Users\gsmur\.gemini\antigravity\brain\89776864-ea2f-4258-93e9-47803a82641c\.system_generated\logs\transcript_full.jsonl",
-    [string]$ArchiveDir = "d:\GitHub\UITS\CGMLabProject_2DGame\doc\prompts\9. Relics, Dynamic Enemy Spawning, and Music Volume Slider",
-    [string]$PendingFile = ""
+    [string]$TranscriptSrc = "C:\Users\gsmur\.gemini\antigravity\brain\2d323f1e-f3b4-4713-94a4-8240185698a6\.system_generated\logs\transcript_full.jsonl",
+    [string]$ArchiveDir = "d:\GitHub\UITS\CGMLabProject_2DGame\doc\prompts\11. Web Port & Itch.io Deployment Guide",
+    [string]$PendingFile = "",
+    [string]$ConversationId = "2d323f1e-f3b4-4713-94a4-8240185698a6"
 )
 
 $PendingResponse = ""
@@ -13,17 +14,20 @@ if (!(Test-Path $ArchiveDir)) {
     New-Item -ItemType Directory -Path $ArchiveDir -Force | Out-Null
 }
 
+$folderName = Split-Path -Leaf $ArchiveDir
+$encodedFolderName = [System.Uri]::EscapeDataString($folderName)
+
 $TranscriptDest = Join-Path $ArchiveDir "transcript_full.jsonl"
 $ConvDest = Join-Path $ArchiveDir "conversation.md"
 
 Copy-Item -Path $TranscriptSrc -Destination $TranscriptDest -Force
 
 $sb = [System.Text.StringBuilder]::new()
-[void]$sb.AppendLine('# Conversation Archive: Session 9 - Relics, Dynamic Enemy Spawning, and Music Volume Slider')
+[void]$sb.AppendLine("# Conversation Archive: $folderName")
 [void]$sb.AppendLine('')
-[void]$sb.AppendLine('- **Conversation ID**: `89776864-ea2f-4258-93e9-47803a82641c`')
-[void]$sb.AppendLine('- **Session Folder**: [`/doc/prompts/9. Relics, Dynamic Enemy Spawning, and Music Volume Slider/`](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/)')
-[void]$sb.AppendLine('- **Transcript Source**: [`transcript_full.jsonl`](/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/transcript_full.jsonl)')
+[void]$sb.AppendLine("- **Conversation ID**: ``$ConversationId``")
+[void]$sb.AppendLine(('- **Session Folder**: [`/doc/prompts/' + $folderName + '/`](/doc/prompts/' + $encodedFolderName + '/)'))
+[void]$sb.AppendLine(('- **Transcript Source**: [`transcript_full.jsonl`](/doc/prompts/' + $encodedFolderName + '/transcript_full.jsonl)'))
 [void]$sb.AppendLine('')
 [void]$sb.AppendLine('---')
 [void]$sb.AppendLine('')

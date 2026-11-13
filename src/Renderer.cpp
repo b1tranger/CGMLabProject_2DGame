@@ -10,6 +10,69 @@
 Renderer gameRenderer;
 
 namespace {
+#ifdef __EMSCRIPTEN__
+const char *vertexShaderSource = R"(#version 300 es
+precision highp float;
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec2 aTexCoord;
+
+out vec2 TexCoord;
+
+uniform mat4 uMVP;
+uniform vec4 uUVRect;
+
+void main()
+{
+    gl_Position = uMVP * vec4(aPos, 1.0);
+    TexCoord = vec2(uUVRect.x + aTexCoord.x * uUVRect.z,
+                    uUVRect.y + aTexCoord.y * uUVRect.w);
+}
+)";
+
+const char *fragmentShaderSource = R"(#version 300 es
+precision highp float;
+out vec4 FragColor;
+
+in vec2 TexCoord;
+
+uniform sampler2D uTexture;
+uniform vec4 uColor;
+uniform bool uUseTexture;
+uniform bool uDiscardAlpha;
+uniform bool uIsCircle;
+uniform float uRimPower;
+
+void main()
+{
+    if (uIsCircle) {
+        vec2 p = TexCoord - vec2(0.5);
+        float dist = length(p);
+        if (dist > 0.5) discard;
+
+        // Anti-aliased outer boundary edge
+        float edge = 1.0 - smoothstep(0.482, 0.50, dist);
+
+        // Glowing force-field outer rim
+        float rim = smoothstep(0.32, 0.49, dist);
+        rim = pow(rim, max(0.2, uRimPower * 0.5));
+
+        // Translucent inner energy core
+        float core = smoothstep(0.50, 0.0, dist) * 0.22;
+
+        float alpha = (core + rim * 0.85) * edge * uColor.a;
+        // Brighter electric cyan/white highlight on the energy rim
+        vec3 col = mix(uColor.rgb, vec3(0.85, 0.96, 1.0), rim * 0.75);
+        FragColor = vec4(col, alpha);
+    } else if (uUseTexture) {
+        vec4 texColor = texture(uTexture, TexCoord);
+        if (uDiscardAlpha && texColor.a < 0.12) discard;
+        FragColor = texColor * uColor;
+    } else {
+        FragColor = uColor;
+    }
+}
+)";
+#else
 const char *vertexShaderSource = R"(
 #version 330 core
 layout (location = 0) in vec3 aPos;
@@ -71,6 +134,7 @@ void main()
     }
 }
 )";
+#endif
 } // namespace
 
 Renderer::Renderer()

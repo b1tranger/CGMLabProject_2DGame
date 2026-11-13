@@ -2,6 +2,9 @@
 build/*
 !build/glfw3.dll
 !build/.gitkeep
+build-web/
+TheWenderer_Web/
+webgl_setup_script/
 bin/
 out/
 *.exe

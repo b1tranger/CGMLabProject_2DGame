@@ -1,4 +1,4 @@
-.PHONY: all build run win linux package clean
+.PHONY: all build run win linux package web package-web clean
 
 all: build
 
@@ -17,5 +17,10 @@ linux:
 package: build
 	powershell -NoProfile -ExecutionPolicy Bypass -File build/win_tasks.ps1 -Action package
 
+web:
+	powershell -NoProfile -ExecutionPolicy Bypass -File build_web.ps1
+
+package-web: web
+
 clean:
-	@rm -f build/main.exe build/*.o TheWenderer_Standalone.zip 2>/dev/null || del /q "build\main.exe" "build\*.o" "TheWenderer_Standalone.zip" 2>nul || true
+	@rm -f build/main.exe build/*.o TheWenderer_Standalone.zip TheWenderer_Web_itch.zip 2>/dev/null || del /q "build\main.exe" "build\*.o" "TheWenderer_Standalone.zip" "TheWenderer_Web_itch.zip" 2>nul || true

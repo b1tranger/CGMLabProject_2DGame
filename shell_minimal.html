@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>The Wenderer - Online Web Edition</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #0d0f14;
+            color: #d8dee9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 1024px;
+            height: 720px;
+            max-width: 100vw;
+            max-height: 100vh;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            overflow: hidden;
+            background: #000;
+        }
+        canvas.emscripten {
+            border: 0 none;
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            outline: none;
+        }
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0b0c10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            transition: opacity 0.5s ease;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 229, 255, 0.2);
+            border-top-color: #00e5ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        #loading-text {
+            margin-top: 20px;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #66fcf1;
+        }
+        #progress-bar-container {
+            width: 300px;
+            height: 8px;
+            background: #1f2833;
+            border-radius: 4px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #45a29e, #66fcf1);
+            transition: width 0.2s ease;
+        }
+        .controls-hint {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #8892b0;
+            text-align: center;
+        }
+        .controls-hint kbd {
+            background-color: #1b202c;
+            border: 1px solid #303c54;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 11px;
+            color: #e6f1ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div id="loading-text">Loading The Wenderer (WebAssembly)...</div>
+            <div id="progress-bar-container">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+        <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    </div>
+
+    <div class="controls-hint">
+        Click inside the game window to lock focus | Controls: <kbd>A</kbd>/<kbd>D</kbd> Move &bull; <kbd>Space</kbd> Jump &bull; <kbd>J</kbd> Attack &bull; <kbd>K</kbd> Defend &bull; <kbd>ESC</kbd> Pause
+    </div>
+
+    <script type="text/javascript">
+        // Prevent game keys from scrolling the webpage on itch.io
+        window.addEventListener("keydown", function(e) {
+            if(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.code) > -1) {
+                e.preventDefault();
+            }
+        }, false);
+
+        var loadingOverlay = document.getElementById('loading-overlay');
+        var loadingText = document.getElementById('loading-text');
+        var progressBar = document.getElementById('progress-bar');
+
+        var Module = {
+            preRun: [],
+            postRun: [function() {
+                var canvas = document.getElementById('canvas');
+                if (canvas) canvas.focus();
+            }],
+            print: function(text) { console.log(text); },
+            printErr: function(text) { console.error(text); },
+            canvas: (function() {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost", function(e) {
+                    alert('WebGL context lost. Please reload the page.');
+                    e.preventDefault();
+                }, false);
+                return canvas;
+            })(),
+            setStatus: function(text) {
+                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                if (text === Module.setStatus.last.text) return;
+                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                if (m) {
+                    var current = parseInt(m[2]);
+                    var total = parseInt(m[4]);
+                    var pct = Math.round((current / total) * 100);
+                    progressBar.style.width = pct + '%';
+                    loadingText.innerText = 'Downloading Game Assets (' + pct + '%)...';
+                } else if (!text) {
+                    loadingOverlay.style.opacity = '0';
+                    setTimeout(function() {
+                        loadingOverlay.style.display = 'none';
+                    }, 500);
+                } else {
+                    loadingText.innerText = text;
+                }
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing Engine (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')...' : '');
+            }
+        };
+
+        Module.setStatus('Downloading WebAssembly binary...');
+
+        window.onerror = function() {
+            loadingText.innerText = 'Error loading game. Check browser console (F12).';
+            loadingText.style.color = '#ff6b6b';
+        };
+    </script>
+    {{{ SCRIPT }}}
+</body>
+</html>
+

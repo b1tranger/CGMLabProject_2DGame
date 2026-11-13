@@ -1,20 +1,79 @@
-Implemented center-screen phase announcements, the previous run score display under the HUD score counter, and the highest score display on the Game Over window, then rebuilt, packaged, and updated documentation.
+# Web Build Completed & Packaged for itch.io 🌐🎮
 
-### Changes Implemented
-1. **Center-Screen Phase Announcements**
-   - Added [`CenterAnnouncement`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/Common.h#L248-L254) in [Common.h](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/Common.h#L248-L254) and [`showCenterAnnouncement`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/UIManager.cpp#L240-L248), [`updateCenterAnnouncement`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/UIManager.cpp#L250-L257), and [`renderCenterAnnouncement`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/UIManager.cpp#L259-L333) in [UIManager.h](file:///d:/GitHub/UITS/CGMLabProject_2DGame/include/UIManager.h#L77-L82) and [UIManager.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/UIManager.cpp#L240-L333).
-   - Updated [main.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L852-L872) and [main.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L1066-L1107) so Day/Night phase transitions (`NIGHT HAS FALLEN` / `DAYBREAK HAS DAWNED`), Threat Phase 2/3 escalations, and Phase 3 Horde Spawn announcements render in a fade-animated card dead-center on screen (`(0, 0)`) during gameplay.
+The web build has been compiled to **WebAssembly (`.wasm`)** and **WebGL 2.0**, and all output files along with the upload-ready distribution `.zip` have been placed into the dedicated new directory:
 
-2. **Previous Run Score Under Score Counter HUD**
-   - Expanded [`UIManager::renderScoreHUD`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/UIManager.cpp#L335-L433) to display `PREV SCORE <previousScore>` directly beneath the live `SCORE <totalScore>` line inside the top-right score card, adjusted vertical spacing so hearts and stats fit cleanly, and passed `previousRunScore` from [main.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L3055-L3060).
+📂 **[`/TheWenderer_Web/`](/TheWenderer_Web/)**
 
-3. **Highest Score on Game Over Window & Score Persistence**
-   - Updated [`UIManager::renderGameOver`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/UIManager.cpp#L1390-L1458) to display `HIGHEST SCORE: <highScore> PTS` (plus `[NEW RECORD!]` when beating the record).
-   - Added [`getCurrentScore`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L150-L153), [`loadScoreHistory`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L162-L173), [`saveScoreHistory`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L155-L160), and [`triggerGameOver`](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp#L175-L185) in [main.cpp](file:///d:/GitHub/UITS/CGMLabProject_2DGame/src/main.cpp) to record `previousRunScore` and `highestScore` across retries and persist them in `score_record.txt` (ignored via [.gitignore](file:///d:/GitHub/UITS/CGMLabProject_2DGame/.gitignore)).
+---
 
-4. **Documentation & Archive Updates**
-   - Updated [changelog.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/changelog.md), [LEARNING_GUIDE.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/LEARNING_GUIDE.md), [documentation.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/documentation.md), and [summary.md](file:///d:/GitHub/UITS/CGMLabProject_2DGame/doc/prompts/9.%20Relics,%20Dynamic%20Enemy%20Spawning,%20and%20Music%20Volume%20Slider/summary.md).
+## 1. Generated Web Build Artifacts
 
-### Build & Verification
-- **Game Build & Standalone Package (`win_tasks.ps1`)**: Compiled cleanly (`exit code 0`, zero C++ errors/warnings) into [main.exe](file:///d:/GitHub/UITS/CGMLabProject_2DGame/build/main.exe) (`3,648,380` bytes) and packaged [TheWenderer_Standalone.zip](file:///d:/GitHub/UITS/CGMLabProject_2DGame/TheWenderer_Standalone.zip) (`13,712,992` bytes).
-- **Logic Verification (`./scratch/verify_logic.exe`)**: Executed cleanly (`exit code 0`, `ALL VERIFICATION ASSERTIONS PASSED!`).
+The folder [`/TheWenderer_Web/`](/TheWenderer_Web/) contains all the files required to run the game in modern web browsers or host it online:
+
+| File | Size | Purpose |
+|---|---|---|
+| **[`TheWenderer_Web_itch.zip`](/TheWenderer_Web/TheWenderer_Web_itch.zip)** | **12.8 MB** | **Upload-ready package for itch.io** (contains `index.html` at the zip root). |
+| **[`index.html`](/TheWenderer_Web/index.html)** | 3.9 KB | Custom dark-themed HTML5 container with nearest-neighbor pixel scaling and progress bar. |
+| **[`index.js`](/TheWenderer_Web/index.js)** | 149.9 KB | Emscripten JavaScript runtime glue and event handler bridge. |
+| **[`index.wasm`](/TheWenderer_Web/index.wasm)** | 440.8 KB | Optimized WebAssembly bytecode compiled from the C++17 engine. |
+| **[`index.data`](/TheWenderer_Web/index.data)** | 13.0 MB | Preloaded virtual filesystem packaging all textures, sprites, and sounds from `assets/`. |
+
+---
+
+## 2. Core Code Adaptations Completed
+
+All adaptations use `#ifdef __EMSCRIPTEN__` checks to guarantee **100% backward compatibility** with the native Windows desktop build (`TheWenderer.exe`):
+
+1. **Non-Blocking Asynchronous Main Loop ([`/src/main.cpp`](/src/main.cpp))**:
+   - Factored initialization into `initializeGame(window)` and the per-frame game simulation into `mainLoopIteration()`.
+   - Wired `emscripten_set_main_loop(mainLoopIteration, 0, 1)` to run via browser `requestAnimationFrame` at smooth 60 FPS without freezing the webpage.
+2. **WebGL 2.0 & Shaders ([`/src/Renderer.cpp`](/src/Renderer.cpp) & [`/include/Common.h`](/include/Common.h))**:
+   - Replaced desktop GLAD loader with native Emscripten `<GLES3/gl3.h>` symbols.
+   - Configured `#version 300 es` shaders with `precision highp float;` for crisp pixel-art fragment calculations.
+3. **JavaScript Web Audio API Bridge ([`/src/Audio.cpp`](/src/Audio.cpp))**:
+   - Replaced Windows-only `winmm.lib` (`mciSendStringA`, `PlaySoundA`) with inline `EM_JS` web audio functions (`js_play_sfx_path`, `js_play_wav_buffer`, `js_start_bgm_web`, `js_set_bgm_vol_web`).
+4. **Cinematic Handling ([`/src/VideoPlayer.cpp`](/src/VideoPlayer.cpp))**:
+   - Stubbed out Windows Media Foundation (`mfplat.lib`) under `__EMSCRIPTEN__` to allow smooth fallback to The Wenderer's procedural Modern OpenGL academic splash screen while reducing asset download by 4.8 MB.
+5. **High Score Persistence ([`/src/main.cpp`](/src/main.cpp))**:
+   - Bridged `score_record.txt` file reads and writes to browser `localStorage` (`thewenderer_highest` and `thewenderer_prev`).
+6. **Automation & Shell Template**:
+   - Authored [`/build_web.ps1`](/build_web.ps1) and [`/build_web.bat`](/build_web.bat) to build and package in one command.
+   - Updated [`/Makefile`](/Makefile) with `make web` and `make package-web`.
+
+---
+
+## 3. How to Test Locally
+
+Due to browser Cross-Origin Resource Sharing (CORS) security rules, WebAssembly and data packages cannot be loaded via `file://`. Test locally using a lightweight HTTP server:
+
+```powershell
+python -m http.server 8080 --directory TheWenderer_Web
+```
+Then navigate to: **`http://localhost:8080`** in Chrome, Firefox, Edge, or Safari. Click the canvas or press `Space` to initiate audio and start playing!
+
+---
+
+## 4. Publishing to itch.io in 3 Minutes
+
+1. Go to your [itch.io](https://itch.io) Creator Dashboard $\rightarrow$ **Create new project**.
+2. **Title**: `The Wenderer: 2D Multi-Elevation Platformer`
+3. **Kind of project**: Select **HTML** (*"You have a ZIP or HTML file that will be played in the browser"*).
+4. **Uploads**: Click **Upload files** and select **[`/TheWenderer_Web/TheWenderer_Web_itch.zip`](/TheWenderer_Web/TheWenderer_Web_itch.zip)**. Check the box:  
+   ☑ **This file will be played in the browser**
+5. **Embed options**:
+   - Viewport dimensions: **`1024`** width $\times$ **`720`** height.
+   - Check ☑ **Enable fullscreen button**.
+   - Check ☑ **Automatically start on page load**.
+6. Click **Save & View Page**!
+
+---
+
+## 5. Related Documentation & Verification Links
+
+- **Detailed Porting Guide**: [`/doc/WEB_PORT_AND_ITCH_GUIDE.md`](/doc/WEB_PORT_AND_ITCH_GUIDE.md)
+- **Web Build Folder**: [`/TheWenderer_Web/`](/TheWenderer_Web/)
+- **itch.io Distribution ZIP**: [`/TheWenderer_Web/TheWenderer_Web_itch.zip`](/TheWenderer_Web/TheWenderer_Web_itch.zip)
+- **HTML5 Shell Template**: [`/shell_minimal.html`](/shell_minimal.html)
+- **Build Scripts**: [`/build_web.ps1`](/build_web.ps1) and [`/build_web.bat`](/build_web.bat)
+- **Project Documentation**: [`/README.md`](/README.md) & [`/doc/changelog.md`](/doc/changelog.md)
+- **Session 11 Archive**: [`/doc/prompts/11. Web Port & Itch.io Deployment Guide/summary.md`](/doc/prompts/11.%20Web%20Port%20%26%20Itch.io%20Deployment%20Guide/summary.md)

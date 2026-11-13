@@ -61,6 +61,13 @@ make win
 # Package standalone portable game distribution zip:
 make package
 # (or: mingw32-make package)
+
+# Compile for Web (WebAssembly / WebGL 2 via Emscripten):
+make web
+# (or: build_web.bat)
+
+# Package for itch.io (HTML5 browser game zip):
+make package-web
 ```
 
 ### Direct Compilation with g++ (No Make required)
@@ -128,6 +135,7 @@ build\main.exe
 - **[Technical Progress Documentation](/doc/documentation.md)**: Comprehensive architectural, mathematical, and subsystem specification.
 - **[Academic Code Guide & Explanations](/doc/explain.md)**: Beginner-friendly academic guide explaining components in simple terms for lab presentations & vivas.
 - **[Presentation Guide & Video Narration Script](/doc/PRESENTATION_GUIDE.md)**: Pre-gameplay spoken script, visual B-roll storyboard, live demo playbook, and rapid viva Q&A cheat sheet.
+- **[Web Porting & itch.io Deployment Guide](/doc/WEB_PORT_AND_ITCH_GUIDE.md)**: Detailed step-by-step architectural guide to compiling C++/OpenGL into WebAssembly & WebGL 2.0 with Emscripten and publishing online on itch.io.
 - **[Learning & Implementation Guide](/doc/LEARNING_GUIDE.md)**: Beginner-friendly step-by-step breakdown of OpenGL concepts, mathematics, and guided milestones.
 - **[Project Proposal](/doc/research/CSE55_088_063_093_CGMLab_Project_Proposal.docx.pdf)**: Formal proposal for the CGM Lab course.
 - **[Research Analysis](/doc/research/Platformer%20Game%20Research%20Analysis.pdf)**: Architectural, ludonarrative, and market research.
@@ -137,4 +145,4 @@ build\main.exe
 
 ## 📜 Version History (Changelog)
 
-refer to [changelog.md](doc/changelog.md)
+Refer to [`/doc/changelog.md`](/doc/changelog.md) for complete version history and milestone archives.

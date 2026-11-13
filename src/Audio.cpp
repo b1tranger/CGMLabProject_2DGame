@@ -7,8 +7,51 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+EM_JS(void, js_play_sfx_path, (const char* pathStr, float vol), {
+    var path = UTF8ToString(pathStr);
+    var audio = new Audio(path);
+    audio.volume = Math.max(0.0, Math.min(1.0, vol));
+    audio.play().catch(function(e) {});
+});
+
+EM_JS(void, js_play_wav_buffer, (const uint8_t* data, int len), {
+    var bytes = HEAPU8.subarray(data, data + len);
+    var blob = new Blob([bytes], {type: 'audio/wav'});
+    var url = URL.createObjectURL(blob);
+    var audio = new Audio(url);
+    audio.play().catch(function(e) {});
+});
+
+EM_JS(void, js_start_bgm_web, (const char* pathStr, float vol), {
+    var path = UTF8ToString(pathStr);
+    if (!window.g_bgm) {
+        window.g_bgm = new Audio(path);
+        window.g_bgm.loop = true;
+    }
+    window.g_bgm.volume = Math.max(0.0, Math.min(1.0, vol));
+    window.g_bgm.play().catch(function(e) {});
+});
+
+EM_JS(void, js_set_bgm_vol_web, (float vol), {
+    if (window.g_bgm) {
+        window.g_bgm.volume = Math.max(0.0, Math.min(1.0, vol));
+    }
+});
+
+EM_JS(void, js_stop_bgm_web, (), {
+    if (window.g_bgm) {
+        window.g_bgm.pause();
+        window.g_bgm.currentTime = 0;
+    }
+});
+#else
 #include <mmsystem.h>
 #include <windows.h>
+#endif
 
 AudioManager audioMgr;
 
@@ -18,11 +61,16 @@ AudioManager::AudioManager()
 AudioManager::~AudioManager() {
   stopTransformationAudio();
   stopBGM();
+#ifndef __EMSCRIPTEN__
   mciSendStringA("close sfx_thunder", NULL, 0, NULL);
   mciSendStringA("close sfx_dying_roar", NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::playSlimeDeathSplat() {
+#ifdef __EMSCRIPTEN__
+  js_play_sfx_path("assets/enemies/boss_demon_slime/universfield-wet-splat-impact-567197.mp3", 0.8f);
+#else
   mciSendStringA("close sfx_splat", NULL, 0, NULL);
   mciSendStringA("open "
                  "\"assets/enemies/boss_demon_slime/"
@@ -30,9 +78,13 @@ void AudioManager::playSlimeDeathSplat() {
                  "alias sfx_splat",
                  NULL, 0, NULL);
   mciSendStringA("play sfx_splat from 0", NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::playAcidBubbling() {
+#ifdef __EMSCRIPTEN__
+  js_play_sfx_path("assets/enemies/boss_demon_slime/freesound_community-acid-bubbling-105397.mp3", 0.8f);
+#else
   mciSendStringA("close sfx_bubbling", NULL, 0, NULL);
   mciSendStringA("open "
                  "\"assets/enemies/boss_demon_slime/"
@@ -40,9 +92,13 @@ void AudioManager::playAcidBubbling() {
                  "mpegvideo alias sfx_bubbling",
                  NULL, 0, NULL);
   mciSendStringA("play sfx_bubbling from 0", NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::playMonsterRoar() {
+#ifdef __EMSCRIPTEN__
+  js_play_sfx_path("assets/enemies/boss_demon_slime/audiopapkin-monster-roar-ps-o24-333057.mp3", 0.85f);
+#else
   mciSendStringA("close sfx_roar", NULL, 0, NULL);
   mciSendStringA("open "
                  "\"assets/enemies/boss_demon_slime/"
@@ -50,9 +106,13 @@ void AudioManager::playMonsterRoar() {
                  "alias sfx_roar",
                  NULL, 0, NULL);
   mciSendStringA("play sfx_roar from 0", NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::playSmashLandingBang() {
+#ifdef __EMSCRIPTEN__
+  js_play_sfx_path("assets/enemies/boss_demon_slime/dragon-studio-distant-bang-472364.mp3", 0.85f);
+#else
   mciSendStringA("close sfx_bang", NULL, 0, NULL);
   mciSendStringA(
       "open "
@@ -60,33 +120,52 @@ void AudioManager::playSmashLandingBang() {
       "dragon-studio-distant-bang-472364.mp3\" type mpegvideo alias sfx_bang",
       NULL, 0, NULL);
   mciSendStringA("play sfx_bang from 0", NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::playBossDyingRoar() {
+#ifdef __EMSCRIPTEN__
+  js_play_sfx_path("assets/dyingRoar.mp3", 0.9f);
+#else
   mciSendStringA("close sfx_dying_roar", NULL, 0, NULL);
   mciSendStringA(
       "open \"assets/dyingRoar.mp3\" type mpegvideo alias sfx_dying_roar", NULL,
       0, NULL);
   mciSendStringA("play sfx_dying_roar from 0", NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::playThunderSpell() {
+#ifdef __EMSCRIPTEN__
+  js_play_sfx_path("assets/thunder-after-crackle.mp3", 0.85f);
+#else
   mciSendStringA("close sfx_thunder", NULL, 0, NULL);
   mciSendStringA("open \"assets/thunder-after-crackle.mp3\" type mpegvideo "
                  "alias sfx_thunder",
                  NULL, 0, NULL);
   mciSendStringA("play sfx_thunder from 0", NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::applyBgmVolume() {
+#ifdef __EMSCRIPTEN__
+  float vol = isBgmMuted ? 0.0f : (std::clamp(bgmVolumePercent, 0, 100) / 100.0f);
+  js_set_bgm_vol_web(vol);
+#else
   int effective = isBgmMuted ? 0 : std::clamp(bgmVolumePercent, 0, 100);
   int mciVol = effective * 10; // MCI volume scale is 0..1000
   char cmd[64];
   std::snprintf(cmd, sizeof(cmd), "setaudio bgm volume to %d", mciVol);
   mciSendStringA(cmd, NULL, 0, NULL);
+#endif
 }
 
 void AudioManager::startBGM() {
+#ifdef __EMSCRIPTEN__
+  isBgmMuted = (bgmVolumePercent <= 0);
+  float vol = isBgmMuted ? 0.0f : (std::clamp(bgmVolumePercent, 0, 100) / 100.0f);
+  js_start_bgm_web("assets/Quarter_in_the_Slot.mp3", vol);
+#else
   mciSendStringA("close bgm", NULL, 0, NULL);
   mciSendStringA(
       "open \"assets/Quarter_in_the_Slot.mp3\" type mpegvideo alias bgm", NULL,
@@ -94,9 +173,16 @@ void AudioManager::startBGM() {
   isBgmMuted = (bgmVolumePercent <= 0);
   applyBgmVolume();
   mciSendStringA("play bgm repeat", NULL, 0, NULL);
+#endif
 }
 
-void AudioManager::stopBGM() { mciSendStringA("close bgm", NULL, 0, NULL); }
+void AudioManager::stopBGM() {
+#ifdef __EMSCRIPTEN__
+  js_stop_bgm_web();
+#else
+  mciSendStringA("close bgm", NULL, 0, NULL);
+#endif
+}
 
 void AudioManager::setBgmVolumePercent(int percent) {
   int clamped = std::clamp(percent, 0, 100);
@@ -121,11 +207,13 @@ void AudioManager::toggleBgmMute() {
 }
 
 void AudioManager::stopTransformationAudio() {
+#ifndef __EMSCRIPTEN__
   mciSendStringA("close sfx_splat", NULL, 0, NULL);
   mciSendStringA("close sfx_bubbling", NULL, 0, NULL);
   mciSendStringA("close sfx_roar", NULL, 0, NULL);
   mciSendStringA("close sfx_bang", NULL, 0, NULL);
   mciSendStringA("close sfx_dying_roar", NULL, 0, NULL);
+#endif
 }
 
 std::vector<uint8_t> AudioManager::buildWav(const std::vector<int16_t> &samples,
@@ -497,8 +585,12 @@ void AudioManager::init() {
 
 void AudioManager::play(SFXType type) {
   if (type >= 0 && type < SFX_COUNT && !sfxBuffers[type].empty()) {
+#ifdef __EMSCRIPTEN__
+    js_play_wav_buffer(sfxBuffers[type].data(), static_cast<int>(sfxBuffers[type].size()));
+#else
     PlaySoundA(reinterpret_cast<LPCSTR>(sfxBuffers[type].data()), NULL,
                SND_MEMORY | SND_ASYNC);
+#endif
   }
 }
 
@@ -507,6 +599,7 @@ void AudioManager::updateCooldowns(float deltaTime) {
   climbCooldown -= deltaTime;
   slideCooldown -= deltaTime;
 
+#ifndef __EMSCRIPTEN__
   // Keep BGM looping if cycle finishes
   if (!isBgmMuted) {
     char mode[32] = {0};
@@ -515,4 +608,5 @@ void AudioManager::updateCooldowns(float deltaTime) {
       mciSendStringA("play bgm from 0 repeat", NULL, 0, NULL);
     }
   }
+#endif
 }

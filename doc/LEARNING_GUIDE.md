@@ -773,6 +773,16 @@ In academic capstone and lab submissions, displaying course context, university 
     - **Boss Metamorphosis Countdown**:
       - When an Initial Slime reaches 0 HP, it enters a 5.5-second metamorphosis timer in [`/src/main.cpp`](/src/main.cpp), playing sequenced audio (splat $\rightarrow$ acid $\rightarrow$ dying roar) before ascending into the 5-HP Boss Demon Slime.
 
+22. **Cross-Platform Web Compilation (WebAssembly & WebGL 2.0 via Emscripten) (`v0.8.2`)**:
+    - **From OpenGL 3.3 to WebGL 2.0**:
+      - Web browsers do not execute native x86 machine code or Desktop OpenGL. Emscripten compiles C++ into **WebAssembly (`.wasm`)** and maps OpenGL API calls to **WebGL 2.0** (`<GLES3/gl3.h>`), which is the browser implementation of OpenGL ES 3.0.
+      - Shaders translate cleanly from `#version 330 core` to `#version 300 es` by appending `precision highp float;` for floating-point calculations.
+    - **Non-Blocking Browser Event Loop**:
+      - While desktop games use a blocking while-loop (`while (!glfwWindowShouldClose)`), browsers require a cooperative event loop driven by `emscripten_set_main_loop(mainLoopTick, 0, 1)`. This delegates frame scheduling to `requestAnimationFrame` at 60 FPS without freezing the web page.
+    - **Web Audio & Virtual Asset Pack**:
+      - Audio calls use Emscripten's `EM_JS` JavaScript bridge to invoke the browser's HTML5 Audio API.
+      - Assets are packaged into a virtual filesystem (`--preload-file assets`), allowing identical C++ asset loading paths (`assets/...`) in browser sandboxes. See [`/doc/WEB_PORT_AND_ITCH_GUIDE.md`](/doc/WEB_PORT_AND_ITCH_GUIDE.md) for full instructions.
+
 ---
 
 ## 6. Quick Reference & Math Cheatsheet
